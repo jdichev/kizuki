@@ -9,7 +9,7 @@ import MixedDataModel from "./MixedDataModel";
 import { fetchFeed } from "fetch-feed";
 
 const pino = pinoLib({
-  level: process.env.LOG_LEVEL || "trace",
+  level: process.env.LOG_LEVEL || "info",
   name: "FeedUpdater",
 });
 
@@ -25,6 +25,7 @@ export default class FeedUpdater {
 
   private chunkSize = 4;
   private feedsProcCacheFilePath: string;
+  private updateInProgress: boolean = false;
 
   private feedsProcCache: {
     lastUpdateTimes: { [key: string]: number };
@@ -53,6 +54,14 @@ export default class FeedUpdater {
         pino.warn("Failed to load feeds process cache, starting fresh");
       }
     }
+  }
+
+  /**
+   * Checks whether an update is currently in progress.
+   * @returns {boolean} True if an update is in progress, false otherwise.
+   */
+  public get isUpdateInProgress(): boolean {
+    return this.updateInProgress;
   }
 
   /**
@@ -238,7 +247,7 @@ export default class FeedUpdater {
       await dataModel.insertItem(individualItem, feedData.feed.id);
     }
 
-    pino.debug("FEED: %s - %s", feedData.feed.id, feedData.feed.title);
+    pino.trace("FEED: %s - %s", feedData.feed.id, feedData.feed.title);
   }
 
   /**
@@ -336,7 +345,7 @@ export default class FeedUpdater {
   private async processBulkFeedData(feeds: Feed[]): Promise<void> {
     const chunks = chunk(feeds, this.chunkSize);
 
-    pino.debug(`Chunks num ${chunks.length}, ${this.chunkSize} feeds each`);
+    pino.trace(`Chunks num ${chunks.length}, ${this.chunkSize} feeds each`);
 
     for (const feedsChunk of chunks) {
       const chunkProcTimeStart = Date.now();
@@ -350,7 +359,7 @@ export default class FeedUpdater {
       const chunkProcTimeEnd = Date.now();
 
       pino.trace(
-        "Time to process chunk %s",
+        "Time to fetch chunk %s",
         ms(chunkProcTimeEnd - chunkProcTimeStart)
       );
 
@@ -364,7 +373,7 @@ export default class FeedUpdater {
       const chunkInsertEnd = Date.now();
 
       pino.trace(
-        "Time to insert data from chunk %s",
+        "Time to process data from chunk %s",
         ms(chunkInsertEnd - chunkInsertStart)
       );
     }
@@ -374,15 +383,23 @@ export default class FeedUpdater {
    * Updates items for all feeds.
    */
   public async updateItems() {
-    const feeds = await dataModel.getFeeds();
-    const feedsToUpdate = this.filterByFrequency(feeds);
+    this.updateInProgress = true;
+    try {
+      const feeds = await dataModel.getFeeds();
+      const feedsToUpdate = this.filterByFrequency(feeds);
+      pino.info(
+        `Updating ${feedsToUpdate.length} out of ${feeds.length} feeds`
+      );
 
-    const updateStart = Date.now();
+      const updateStart = Date.now();
 
-    await this.processBulkFeedData(feedsToUpdate);
+      await this.processBulkFeedData(feedsToUpdate);
 
-    const updateEnd = Date.now();
+      const updateEnd = Date.now();
 
-    pino.debug("Crawl time %s", ms(updateEnd - updateStart));
+      pino.info("Crawl time %s", ms(updateEnd - updateStart));
+    } finally {
+      this.updateInProgress = false;
+    }
   }
 }
