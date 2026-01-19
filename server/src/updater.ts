@@ -7,7 +7,7 @@ const INTERVAL_MS = 10 * 60_000; // 10 minutes
 const DRIFT_THRESHOLD_MS = 30_000; // treat significant drift uniformly
 
 const pino = pinoLib({
-  level: process.env.LOG_LEVEL || "trace",
+  level: process.env.LOG_LEVEL || "info",
   name: "updater",
 });
 

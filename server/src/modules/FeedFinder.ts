@@ -5,7 +5,8 @@ import { JSDOM } from "jsdom";
 import pinoLib from "pino";
 
 const pino = pinoLib({
-  level: "trace",
+  level: process.env.LOG_LEVEL || "info",
+  name: "FeedFinder",
 });
 
 /**

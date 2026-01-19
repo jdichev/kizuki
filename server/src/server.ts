@@ -9,7 +9,7 @@ import FeedFinder from "./modules/FeedFinder";
 import projectConfig from "forestconfig";
 
 const pino = pinoLib({
-  level: process.env.LOG_LEVEL || "trace",
+  level: process.env.LOG_LEVEL || "info",
   name: "server",
 });
 
@@ -201,7 +201,7 @@ app.get("/feeds", async (req: Request, res: Response) => {
 
     if (selectedFeedCategory) {
       feeds = await dataModel.getFeeds({ selectedFeedCategory });
-      pino.debug({ feeds }, "Feeds retrieved for category");
+      pino.trace({ feeds }, "Feeds retrieved for category");
       res.json(feeds);
     } else {
       res.status(404).send({ message: "Feed category not found" });
@@ -246,7 +246,7 @@ app.put("/feeds", jsonParser, async (req: Request, res: Response) => {
 app.post("/feeds", jsonParser, async (req: Request, res: Response) => {
   try {
     const result = await updater.addFeed(req.body);
-    pino.debug({ result }, "Feed added successfully");
+    pino.trace({ result }, "Feed added successfully");
     res.json(result);
   } catch (error: any) {
     pino.error({ error: error.message || String(error) }, "Error adding feed");

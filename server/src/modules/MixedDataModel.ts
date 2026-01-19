@@ -9,7 +9,7 @@ import opmlParser from "./OpmlParser";
 import FeedFinder from "./FeedFinder";
 
 const pino = pinoLib({
-  level: "debug",
+  level: process.env.LOG_LEVEL || "info",
   name: "MixedDataModel",
 });
 
