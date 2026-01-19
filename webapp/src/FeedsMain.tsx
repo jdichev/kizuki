@@ -20,6 +20,11 @@ export default function FeedsMain({ topMenu }: HomeProps) {
 
   const [size, setSize] = useState<number>(50);
 
+  const [loadingMore, setLoadingMore] = useState<boolean>(false);
+
+  const loadingStartedAt = useRef<number | null>(null);
+  const loadingHideTimer = useRef<number | null>(null);
+
   const [unreadOnly, setUnreadOnly] = useState<boolean>(false);
 
   const [selectedFeedCategory, setSelectedFeedCategory] =
@@ -63,32 +68,54 @@ export default function FeedsMain({ topMenu }: HomeProps) {
 
   const showItems = useCallback(async () => {
     let res;
-    if (selectedFeed) {
-      res = await ds
-        .getItemsDeferred({ size, unreadOnly, selectedFeed })
-        .catch((e) => {
-          console.log(e);
-        });
-    } else {
-      res = await ds
-        .getItemsDeferred({
-          size,
-          unreadOnly,
-          selectedFeedCategory,
-        })
-        .catch((e) => {
-          console.log(e);
-        });
-    }
 
-    if (unreadOnly) {
-      setActiveNav("categories");
-      setSelectedItem(undefined);
-    }
+    try {
+      if (selectedFeed) {
+        res = await ds
+          .getItemsDeferred({ size, unreadOnly, selectedFeed })
+          .catch((e) => {
+            console.log(e);
+          });
+      } else {
+        res = await ds
+          .getItemsDeferred({
+            size,
+            unreadOnly,
+            selectedFeedCategory,
+          })
+          .catch((e) => {
+            console.log(e);
+          });
+      }
 
-    if (res) {
-      setItems(res);
-      updateFeedCategoryReadStats();
+      if (unreadOnly) {
+        setActiveNav("categories");
+        setSelectedItem(undefined);
+      }
+
+      if (res) {
+        setItems(res);
+        updateFeedCategoryReadStats();
+      }
+    } finally {
+      if (loadingHideTimer.current) {
+        clearTimeout(loadingHideTimer.current);
+        loadingHideTimer.current = null;
+      }
+
+      const minDisplayMs = 500;
+      if (loadingStartedAt.current !== null) {
+        const elapsed = performance.now() - loadingStartedAt.current;
+        const remaining = Math.max(0, minDisplayMs - elapsed);
+
+        loadingHideTimer.current = window.setTimeout(() => {
+          setLoadingMore(false);
+          loadingStartedAt.current = null;
+          loadingHideTimer.current = null;
+        }, remaining);
+      } else {
+        setLoadingMore(false);
+      }
     }
   }, [
     size,
@@ -220,9 +247,25 @@ export default function FeedsMain({ topMenu }: HomeProps) {
   /**
    * Load more items
    */
-  const loadMore = useCallback(async () => {
-    setSize(size + Math.floor(size / 2));
-  }, [size]);
+  const loadMore = useCallback(() => {
+    setLoadingMore(true);
+    loadingStartedAt.current = performance.now();
+
+    if (loadingHideTimer.current) {
+      clearTimeout(loadingHideTimer.current);
+      loadingHideTimer.current = null;
+    }
+
+    setSize((prevSize) => prevSize + Math.floor(prevSize / 2));
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (loadingHideTimer.current) {
+        clearTimeout(loadingHideTimer.current);
+      }
+    };
+  }, []);
 
   /**
    * Select item
@@ -635,6 +678,12 @@ export default function FeedsMain({ topMenu }: HomeProps) {
           />
         </div>
       </main>
+
+      {loadingMore && (
+        <div className="loading-toast" role="status" aria-live="polite">
+          loading...
+        </div>
+      )}
     </>
   );
 }
