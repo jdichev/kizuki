@@ -139,6 +139,7 @@ a:hover {
   -webkit-app-region: drag;
   background: var(--header-bg);
   box-shadow: 0 4px 0 rgba(0, 0, 0, 0.16);
+  z-index: 1;
 }
 
 #top-nav-brand a,
