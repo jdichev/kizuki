@@ -1,5 +1,8 @@
-export const devServerPort: string;
-export const dataServerPort: string;
+export const devServerPort: number;
+export const dataServerPort: number;
+export const hostAddress: string;
+export const getPorts: () => void;
 export const env: {
-  [key: string]: string;
+  DEVELOPMENT: string;
+  PRODUCTION: string;
 };

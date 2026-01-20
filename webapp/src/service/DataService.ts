@@ -1,14 +1,22 @@
+import serverConfig from "../config/serverConfig";
+
 // main data service
 export default class DataService {
   private static instance: DataService;
   private itemsPromiseReject: undefined | ((reason?: any) => void);
   private itemPromiseReject: undefined | ((reason?: any) => void);
   private lastItemId: undefined | number;
+  private readonly baseUrl: string;
 
   constructor() {
     this.itemsPromiseReject = undefined;
     this.itemPromiseReject = undefined;
     this.lastItemId = undefined;
+    this.baseUrl = `${serverConfig.protocol}//${serverConfig.hostname}:${serverConfig.port}`;
+  }
+
+  private makeUrl(path: string): string {
+    return `${this.baseUrl}${path}`;
   }
 
   public static getInstance(): DataService {
@@ -20,21 +28,21 @@ export default class DataService {
   }
 
   public async getFeedCategories(): Promise<FeedCategory[]> {
-    const response = await fetch("http://localhost:3031/categories");
+    const response = await fetch(this.makeUrl("/categories"));
     const categories = await response.json();
 
     return Promise.resolve(categories);
   }
 
   public async getFeedCategoryReadStats(): Promise<FeedCategoryReadStat[]> {
-    const response = await fetch("http://localhost:3031/categories/readstats");
+    const response = await fetch(this.makeUrl("/categories/readstats"));
     const feedCategoryReadStats = response.json();
 
     return Promise.resolve(feedCategoryReadStats);
   }
 
   public async getFeedReadStats(): Promise<FeedReadStat[]> {
-    const response = await fetch("http://localhost:3031/feeds/readstats");
+    const response = await fetch(this.makeUrl("/feeds/readstats"));
     const feedReadStats = response.json();
 
     return Promise.resolve(feedReadStats);
@@ -102,7 +110,7 @@ export default class DataService {
     const queryString = query.toString();
 
     const response = await fetch(
-      `http://localhost:3031/items?${queryString}`,
+      `${this.makeUrl("/items")}?${queryString}`,
       {}
     ).catch((reason) => {
       console.error(reason.code, reason.message, reason.name);
@@ -139,7 +147,7 @@ export default class DataService {
   }
 
   public async getItem(itemId: number | undefined): Promise<Item | undefined> {
-    const response = await fetch(`http://localhost:3031/items/${itemId}`);
+    const response = await fetch(this.makeUrl(`/items/${itemId}`));
     const item = await response.json();
 
     return Promise.resolve(item);
@@ -160,7 +168,7 @@ export default class DataService {
     const queryString = query.toString();
 
     const response = await fetch(
-      `http://localhost:3031/itemsread?${
+      `${this.makeUrl("/itemsread")}?${
         params.feed || params.feedCategory ? queryString : ""
       }`
     );
@@ -176,9 +184,7 @@ export default class DataService {
 
     const queryString = query.toString();
 
-    const response = await fetch(
-      `http://localhost:3031/item/read?${queryString}`
-    );
+    const response = await fetch(this.makeUrl(`/item/read?${queryString}`));
 
     const result = await response.json();
 
@@ -198,7 +204,7 @@ export default class DataService {
 
     const queryString = query.toString();
 
-    const response = await fetch(`http://localhost:3031/feeds?${queryString}`);
+    const response = await fetch(`${this.makeUrl("/feeds")}?${queryString}`);
     const feeds = await response.json();
 
     return Promise.resolve(feeds);
@@ -211,7 +217,7 @@ export default class DataService {
 
     const queryString = query.toString();
 
-    const response = await fetch(`http://localhost:3031/feeds?${queryString}`);
+    const response = await fetch(`${this.makeUrl("/feeds")}?${queryString}`);
 
     const result = await response.json();
 
@@ -225,7 +231,7 @@ export default class DataService {
 
     const queryString = query.toString();
 
-    const response = await fetch(`http://localhost:3031/feeds?${queryString}`, {
+    const response = await fetch(`${this.makeUrl("/feeds")}?${queryString}`, {
       method: "DELETE",
     });
 
@@ -237,7 +243,7 @@ export default class DataService {
   public async updateFeed(feed: Feed): Promise<boolean> {
     const feedJson = JSON.stringify(feed);
 
-    const response = await fetch("http://localhost:3031/feeds", {
+    const response = await fetch(this.makeUrl("/feeds"), {
       method: "PUT",
       headers: {
         "Content-type": "application/json",
@@ -254,7 +260,7 @@ export default class DataService {
     const encodedFeedUrl = encodeURIComponent(feedUrl);
 
     const result = await fetch(
-      `http://localhost:3031/checkfeed?url=${encodedFeedUrl}`
+      this.makeUrl(`/checkfeed?url=${encodedFeedUrl}`)
     );
 
     const resultJson = result.json();
@@ -264,7 +270,7 @@ export default class DataService {
 
   public async checkFeedUrls(feedUrls: string[]) {
     const feedJson = JSON.stringify(feedUrls);
-    const result = await fetch("http://localhost:3031/checkfeedurls", {
+    const result = await fetch(this.makeUrl("/checkfeedurls"), {
       method: "POST",
       headers: {
         "Content-type": "application/json",
@@ -280,7 +286,7 @@ export default class DataService {
   public async addFeed(feed: Feed) {
     const feedJson = JSON.stringify(feed);
 
-    const response = await fetch("http://localhost:3031/feeds", {
+    const response = await fetch(this.makeUrl("/feeds"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -296,7 +302,7 @@ export default class DataService {
   public async addFeedCategory(feedCategory: FeedCategory) {
     const feedCategoryJson = JSON.stringify(feedCategory);
 
-    const response = await fetch("http://localhost:3031/categories", {
+    const response = await fetch(this.makeUrl("/categories"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -317,7 +323,7 @@ export default class DataService {
     const queryString = query.toString();
 
     const response = await fetch(
-      `http://localhost:3031/categories?${queryString}`,
+      `${this.makeUrl("/categories")}?${queryString}`,
       {
         method: "DELETE",
       }
@@ -331,7 +337,7 @@ export default class DataService {
   public async updateFeedCategory(feedCategory: FeedCategory) {
     const feedCategoryJson = JSON.stringify(feedCategory);
 
-    const response = await fetch("http://localhost:3031/categories", {
+    const response = await fetch(this.makeUrl("/categories"), {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -351,7 +357,7 @@ export default class DataService {
   }) {
     const body = JSON.stringify(options);
 
-    const response = await fetch("http://localhost:3031/opml-import", {
+    const response = await fetch(this.makeUrl("/opml-import"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -366,7 +372,7 @@ export default class DataService {
 
   public async exportOpmlFile() {
     try {
-      const response = await fetch("http://localhost:3031/opml-export");
+      const response = await fetch(this.makeUrl("/opml-export"));
 
       if (!response.ok) {
         throw new Error("Failed to export OPML");
