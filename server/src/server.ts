@@ -23,6 +23,27 @@ const jsonParser = bodyParser.json();
 
 app.use(cors());
 
+// Request logging middleware
+app.use((req: Request, res: Response, next) => {
+  const start = Date.now();
+
+  res.on("finish", () => {
+    const duration = Date.now() - start;
+    pino.trace(
+      {
+        method: req.method,
+        path: req.path,
+        query: req.query,
+        status: res.statusCode,
+        duration: `${duration}ms`,
+      },
+      "HTTP Request"
+    );
+  });
+
+  next();
+});
+
 app.get("/", (req: Request, res: Response) => {
   res.json({ message: "OK" });
 });
