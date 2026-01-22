@@ -24,6 +24,7 @@ export default function FeedsMain({ topMenu }: HomeProps) {
 
   const loadingStartedAt = useRef<number | null>(null);
   const loadingHideTimer = useRef<number | null>(null);
+  const scrollDebounceTimer = useRef<number | null>(null);
 
   const [unreadOnly, setUnreadOnly] = useState<boolean>(false);
 
@@ -74,7 +75,7 @@ export default function FeedsMain({ topMenu }: HomeProps) {
         res = await ds
           .getItemsDeferred({ size, unreadOnly, selectedFeed })
           .catch((e) => {
-            console.error('Error fetching items for feed:', e);
+            console.error("Error fetching items for feed:", e);
             return undefined;
           });
       } else {
@@ -85,7 +86,7 @@ export default function FeedsMain({ topMenu }: HomeProps) {
             selectedFeedCategory,
           })
           .catch((e) => {
-            console.error('Error fetching items:', e);
+            console.error("Error fetching items:", e);
             return undefined;
           });
       }
@@ -265,6 +266,9 @@ export default function FeedsMain({ topMenu }: HomeProps) {
     return () => {
       if (loadingHideTimer.current) {
         clearTimeout(loadingHideTimer.current);
+      }
+      if (scrollDebounceTimer.current) {
+        clearTimeout(scrollDebounceTimer.current);
       }
     };
   }, []);
@@ -598,18 +602,25 @@ export default function FeedsMain({ topMenu }: HomeProps) {
 
   const handleScroll = useCallback(
     (e: React.UIEvent<HTMLDivElement>) => {
-      const bottomScrollOffset = 5;
-
-      if (
-        Math.ceil(e.currentTarget.scrollTop + e.currentTarget.offsetHeight) >=
-        e.currentTarget.scrollHeight - bottomScrollOffset
-      ) {
-        loadMore();
+      if (scrollDebounceTimer.current) {
+        clearTimeout(scrollDebounceTimer.current);
       }
 
-      if (e.currentTarget.scrollTop === 0) {
-        showItems();
-      }
+      scrollDebounceTimer.current = window.setTimeout(() => {
+        const bottomScrollOffset = 10;
+
+        const scrollTarget = e.target as HTMLDivElement;
+        if (
+          Math.ceil(scrollTarget.scrollTop + scrollTarget.offsetHeight) >=
+          scrollTarget.scrollHeight - bottomScrollOffset
+        ) {
+          loadMore();
+        }
+
+        if (scrollTarget.scrollTop === 0) {
+          showItems();
+        }
+      }, 500);
     },
     [loadMore, showItems]
   );
