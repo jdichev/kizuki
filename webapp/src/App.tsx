@@ -7,6 +7,7 @@ import ItemsPrompt from "./ItemsPrompt";
 import FeedsList from "./FeedsList";
 import FeedAdd from "./FeedAdd";
 import FeedEdit from "./FeedEdit";
+import Settings from "./Settings";
 
 export default function App() {
   const navMenu = useRef<HTMLDivElement>(null);
@@ -52,6 +53,10 @@ export default function App() {
           <NavLink to="/feeds/add" className="text-decoration-none">
             <i className="bi bi-plus-square-fill"></i>
           </NavLink>
+
+          <NavLink to="/settings" className="text-decoration-none">
+            <i className="bi bi-gear-fill"></i>
+          </NavLink>
         </div>
 
         <Routes>
@@ -69,6 +74,8 @@ export default function App() {
           <Route path="/feeds/add" element={<FeedAdd />} />
 
           <Route path="/feeds/edit/:feedId" element={<FeedEdit />} />
+
+          <Route path="/settings" element={<Settings />} />
         </Routes>
       </Router>
     </div>

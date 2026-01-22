@@ -6,6 +6,7 @@ import pinoLib from "pino";
 import MixedDataModel from "./modules/MixedDataModel";
 import FeedUpdater from "./modules/FeedUpdater";
 import FeedFinder from "./modules/FeedFinder";
+import SettingsManager from "./modules/SettingsManager";
 import projectConfig from "forestconfig";
 
 const pino = pinoLib({
@@ -16,6 +17,8 @@ const pino = pinoLib({
 const dataModel = MixedDataModel.getInstance();
 
 const updater = new FeedUpdater();
+
+const settingsManager = SettingsManager.getInstance();
 
 const app: Application = express();
 
@@ -313,6 +316,48 @@ app.get("/opml-export", async (req: Request, res: Response) => {
     );
     res.status(500).json({ error: "Failed to export OPML" });
   }
+});
+
+// Settings endpoints
+app.get("/settings", (req: Request, res: Response) => {
+  const settings = settingsManager.getAllSettings();
+  res.json(settings);
+});
+
+app.get("/settings/:key", (req: Request, res: Response) => {
+  const { key } = req.params;
+  const value = settingsManager.getSetting(key);
+
+  if (value === undefined) {
+    return res.status(404).json({ error: `Setting "${key}" not found` });
+  }
+
+  res.json({ [key]: value });
+});
+
+app.post("/settings", jsonParser, (req: Request, res: Response) => {
+  const { key, value } = req.body;
+
+  if (!key || typeof key !== "string") {
+    return res
+      .status(400)
+      .json({ error: "Setting key is required and must be a string" });
+  }
+
+  if (value === undefined || typeof value !== "string") {
+    return res
+      .status(400)
+      .json({ error: "Setting value is required and must be a string" });
+  }
+
+  settingsManager.setSetting(key, value);
+  res.json({ [key]: value, message: "Setting updated successfully" });
+});
+
+app.delete("/settings/:key", (req: Request, res: Response) => {
+  const { key } = req.params;
+  settingsManager.deleteSetting(key);
+  res.json({ message: `Setting "${key}" deleted successfully` });
 });
 
 app.use((req: Request, res: Response) => {

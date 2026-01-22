@@ -74,7 +74,8 @@ export default function FeedsMain({ topMenu }: HomeProps) {
         res = await ds
           .getItemsDeferred({ size, unreadOnly, selectedFeed })
           .catch((e) => {
-            console.log(e);
+            console.error('Error fetching items for feed:', e);
+            return undefined;
           });
       } else {
         res = await ds
@@ -84,7 +85,8 @@ export default function FeedsMain({ topMenu }: HomeProps) {
             selectedFeedCategory,
           })
           .catch((e) => {
-            console.log(e);
+            console.error('Error fetching items:', e);
+            return undefined;
           });
       }
 
@@ -93,7 +95,7 @@ export default function FeedsMain({ topMenu }: HomeProps) {
         setSelectedItem(undefined);
       }
 
-      if (res) {
+      if (res && Array.isArray(res)) {
         setItems(res);
         updateFeedCategoryReadStats();
       }
