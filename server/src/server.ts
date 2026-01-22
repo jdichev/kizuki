@@ -8,6 +8,7 @@ import FeedUpdater from "./modules/FeedUpdater";
 import FeedFinder from "./modules/FeedFinder";
 import SettingsManager from "./modules/SettingsManager";
 import projectConfig from "forestconfig";
+import AiService from "./modules/AiService";
 
 const pino = pinoLib({
   level: process.env.LOG_LEVEL || "info",
@@ -83,6 +84,61 @@ app.get("/items", async (req: Request, res: Response) => {
     order: "published",
   });
   res.json(items);
+});
+
+app.get("/groups", async (req: Request, res: Response) => {
+  const unreadOnly = req.query.unread ? req.query.unread === "true" : false;
+
+  const size = req.query.size ? parseInt(req.query.size as string) : undefined;
+
+  const selectedFeedId = req.query.fid
+    ? parseInt(req.query.fid as string)
+    : undefined;
+
+  const selectedFeedCategoryId = req.query.cid
+    ? parseInt(req.query.cid as string)
+    : undefined;
+
+  let selectedFeed;
+  let selectedFeedCategory;
+
+  if (selectedFeedId !== undefined) {
+    selectedFeed = await dataModel.getFeedById(selectedFeedId);
+  } else if (selectedFeedCategoryId !== undefined) {
+    selectedFeedCategory = await dataModel.getFeedCategoryById(
+      selectedFeedCategoryId
+    );
+  }
+
+  const items = await dataModel.getItems({
+    unreadOnly,
+    size,
+    selectedFeed,
+    selectedFeedCategory,
+    order: "published",
+  });
+
+  const aiService = AiService.getInstance();
+
+  const preparedItems = aiService.prepareItemsPrompt(items);
+  pino.trace({ preparedItems }, "Prepared items for AI service");
+
+  const finalPrompt = `
+  You are a categorization agent. What follows is a list of article IDs and article titles.
+  Group the list by generated category and generate a new list that looks like this:
+  <AI generated category name>: <article id>, <article id>
+  <AI generated category name>: <article id>, <article id>, <article id>
+
+  The article list is below:
+  ${preparedItems}
+  `;
+
+  const aiResponse = await aiService.generateContent(finalPrompt);
+  pino.trace({ aiResponse }, "AI response for grouping items");
+
+  const groups = aiService.parseAiGroupsResponse(aiResponse, items);
+
+  res.json(groups);
 });
 
 app.get("/items/:itemId", async (req: Request, res: Response) => {

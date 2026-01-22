@@ -913,6 +913,7 @@ export default class DataService {
           }
 
           if (row) {
+            // @ts-ignore
             row.content = domPurify.sanitize(row.content, {
               FORBID_TAGS: ["style"],
               FORBID_ATTR: [

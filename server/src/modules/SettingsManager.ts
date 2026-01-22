@@ -20,9 +20,7 @@ export default class SettingsManager {
 
   // Default settings
   private static readonly DEFAULT_SETTINGS: { [key: string]: string } = {
-    theme: "light",
-    updateInterval: "3600000", // 1 hour in milliseconds
-    maxConcurrentFeeds: "4",
+    example: "test",
   };
 
   private constructor() {

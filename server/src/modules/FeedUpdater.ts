@@ -295,6 +295,7 @@ export default class FeedUpdater {
    * @param {FeedData} feedData - The feed data to update frequency for.
    */
   public updateFeedFrequencyData(feedData: FeedData) {
+    // @ts-ignore
     const publishedTimes = feedData.items.map((item) => item.published * 1000);
 
     const avg = FeedUpdater.computeFrequency(publishedTimes);

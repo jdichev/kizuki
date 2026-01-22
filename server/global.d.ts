@@ -45,17 +45,17 @@ interface FeedCategoryReadStat {
 interface Item {
   id?: number | string | array;
   title: string;
-  content: string;
-  "content:encoded": string;
-  description: string;
-  link: string;
-  read: 0 | 1;
-  published: number;
+  content?: string;
+  "content:encoded"?: string;
+  description?: string;
+  link?: string;
+  read?: 0 | 1;
+  published?: number;
   feedTitle?: string;
   [pubDate: string]: string;
   [date: string]: string;
   [isoDate: string]: string;
-  comments: string;
+  comments?: string;
 }
 
 // Module
