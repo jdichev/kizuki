@@ -37,6 +37,14 @@ CREATE TABLE IF NOT EXISTS "feeds" (
 	"updateFrequency"	INTEGER DEFAULT 0,
 	PRIMARY KEY("id" AUTOINCREMENT)
 );
+
+CREATE TABLE IF NOT EXISTS "item_categories" (
+  "id"	INTEGER NOT NULL UNIQUE,
+  "title"	TEXT NOT NULL,
+	"text"	TEXT,
+  PRIMARY KEY("id" AUTOINCREMENT)
+);
+
 CREATE TABLE IF NOT EXISTS "items" (
 	"id"	INTEGER NOT NULL UNIQUE,
 	"url"	TEXT NOT NULL UNIQUE,
@@ -48,14 +56,71 @@ CREATE TABLE IF NOT EXISTS "items" (
 	"read"	INTEGER NOT NULL DEFAULT 0,
 	"created"	INTEGER,
 	"json_content"	TEXT,
+	"itemCategoryId"	INTEGER DEFAULT 0,
 	PRIMARY KEY("id" AUTOINCREMENT)
 );
+
 COMMIT;
 `;
 
 const seedData = `
 INSERT OR IGNORE INTO feed_categories (id, title, text)
 VALUES (0, "Uncategorized", "Uncategorized");
+
+INSERT OR IGNORE INTO item_categories (id, title, text) VALUES
+-- General News & Lifestyle (0-99)
+(0, 'Uncategorized', 'General content that does not fit into specific categories.'),
+(1, 'Politics & Government', 'Local, national, and international political news, policy, and elections.'),
+(2, 'Business & Finance', 'Markets, economy, personal finance, startups, and corporate news.'),
+(3, 'Science & Environment', 'Natural sciences, space, climate change, and sustainability.'),
+(4, 'Health & Wellness', 'Medicine, mental health, fitness, nutrition, and medical research.'),
+(5, 'Sports', 'Professional and amateur sports, athlete profiles, and game coverage.'),
+(6, 'Entertainment & Arts', 'Movies, music, television, theater, and fine arts.'),
+(7, 'Lifestyle & Fashion', 'Trends, clothing, home decor, and personal style.'),
+(8, 'Travel & Tourism', 'Destinations, hospitality, aviation, and travel tips.'),
+(9, 'Food & Drink', 'Recipes, restaurants, cooking techniques, and beverage reviews.'),
+(10, 'Education', 'Schools, universities, pedagogy, and lifelong learning.'),
+(11, 'Society & Culture', 'Social issues, human rights, religion, and cultural commentary.'),
+(12, 'Automotive', 'Cars, motorcycles, electric vehicles, and transportation tech.'),
+(13, 'Real Estate', 'Property markets, architecture, and urban development.'),
+(14, 'Law & Justice', 'Legal news, court cases, crime, and civil rights.'),
+(15, 'Parenting & Family', 'Childcare, family dynamics, and youth development.'),
+(16, 'Opinion & Editorial', 'Op-eds, columns, and subjective commentary.'),
+(17, 'Hobbies & Interests', 'Niche pursuits like gardening, crafting, or collecting.'),
+
+-- AI & Data Science (100-199)
+(100, 'Artificial Intelligence', 'General AI news, research, and industry trends.'),
+(101, 'Machine Learning', 'Algorithms, supervised/unsupervised learning, and model training.'),
+(102, 'Generative AI & LLMs', 'Large Language Models, image generation, and creative AI tools.'),
+(103, 'Computer Vision', 'Image recognition, spatial computing, and visual data processing.'),
+(104, 'Data Science & Big Data', 'Data engineering, analytics, and large-scale data processing.'),
+
+-- Software Engineering (200-299)
+(200, 'Software Development', 'General software engineering practices and methodologies.'),
+(201, 'Web Development', 'Frontend and backend web technologies (React, Node, etc.).'),
+(202, 'Mobile Development', 'iOS, Android, and cross-platform mobile frameworks.'),
+(203, 'DevOps & CI/CD', 'Automation, deployment pipelines, and developer operations.'),
+(204, 'Game Development', 'Game engines (Unity, Unreal), physics, and interactive design.'),
+(205, 'Embedded Systems', 'Programming for microcontrollers and specialized hardware.'),
+(206, 'Open Source', 'Community-driven software, licensing, and public repositories.'),
+
+-- Infrastructure & Security (300-499)
+(300, 'Cloud Computing', 'AWS, Azure, Google Cloud, and serverless architectures.'),
+(301, 'Networking & 5G', 'Telecommunications, network protocols, and 5G/6G tech.'),
+(302, 'Blockchain & Web3', 'Distributed ledgers, smart contracts, and decentralized tech.'),
+(400, 'Cybersecurity', 'General security news, threat intelligence, and defense.'),
+(401, 'Hacking & Vulnerabilities', 'Penetration testing, exploits, and security research.'),
+(402, 'Cryptography', 'Encryption standards, privacy tech, and secure communication.'),
+
+-- Hardware & Consumer Tech (500-699)
+(500, 'Hardware & Components', 'General PC hardware, peripherals, and components.'),
+(501, 'Semiconductors & Chips', 'CPUs, GPUs, fabrication (TSMC, Intel), and architecture.'),
+(502, 'Quantum Computing', 'Next-gen computing using quantum mechanics.'),
+(503, 'Robotics & Automation', 'Industrial robots, drones, and autonomous systems.'),
+(600, 'Consumer Electronics', 'Smartphones, laptops, and smart home devices.'),
+(601, 'AR / VR / XR', 'Augmented, Virtual, and Mixed Reality hardware/software.'),
+(602, 'Wearables', 'Smartwatches, health trackers, and hearables.'),
+(603, 'Space Tech', 'Satellite technology, rocket engineering, and space exploration.');
 `;
 
 // main data service
@@ -753,6 +818,70 @@ export default class DataService {
     });
   }
 
+  // Item Categories Methods
+  public async getItemCategories(): Promise<Category[]> {
+    const query = `
+      SELECT id, title, text
+      FROM item_categories
+    `;
+
+    return new Promise((resolve) => {
+      this.database.all(query, (error, rows) => {
+        if (error) {
+          pino.error(error);
+        }
+
+        resolve((rows as Category[]) || []);
+      });
+    });
+  }
+
+  private async itemCategoryExists(itemCategory: Category) {
+    const query = `
+      SELECT id FROM item_categories
+      WHERE title = ?
+    `;
+
+    return new Promise((resolve) => {
+      this.database.get(query, itemCategory.title, (error, row) => {
+        if (error) {
+          pino.error(error);
+        }
+
+        resolve(row);
+      });
+    });
+  }
+
+  public async insertItemCategory(itemCategory: Category): Promise<boolean> {
+    const query = `
+      INSERT INTO item_categories (title, text)
+      VALUES( ?, ? );
+    `;
+
+    pino.debug(itemCategory);
+
+    const itemCategoryExists = await this.itemCategoryExists(itemCategory);
+
+    if (itemCategoryExists) {
+      return Promise.resolve(false);
+    }
+
+    return new Promise((resolve) => {
+      this.database.run(
+        query,
+        [itemCategory.title, itemCategory.text],
+        (error) => {
+          if (error) {
+            pino.error(error);
+          }
+
+          resolve(true);
+        }
+      );
+    });
+  }
+
   public async exportOpml(): Promise<string> {
     const categories = await this.getFeedCategories();
     const feeds = await this.getFeeds();
@@ -895,11 +1024,14 @@ export default class DataService {
         items.published,
         items.read,
         items.url,
-        feeds.title AS feedTitle
+        feeds.title AS feedTitle,
+        item_categories.title AS categoryTitle
       FROM
         items
       LEFT JOIN feeds ON
         feeds.id = items.feed_id
+      LEFT JOIN item_categories ON
+        item_categories.id = items.itemCategoryId
       WHERE items.id = ?
     `;
 
@@ -1260,5 +1392,47 @@ export default class DataService {
         resolve((rows as Item[]) || []);
       });
     });
+  }
+
+  public async updateItemsWithCategories(
+    groups: Array<{ name: string; items: Item[] }>,
+    itemCategories: Category[]
+  ): Promise<void> {
+    // Create a map of category names to their IDs for quick lookup
+    const categoryNameToIdMap = new Map<string, number>();
+    itemCategories.forEach((category) => {
+      categoryNameToIdMap.set(category.title, category.id ?? 0);
+    });
+
+    // Process each group
+    for (const group of groups) {
+      const categoryId = categoryNameToIdMap.get(group.name) ?? 0;
+
+      // Update all items in this group with the category ID
+      for (const item of group.items) {
+        if (item.id === undefined || item.id === null) {
+          pino.debug({ item }, "Skipping item without ID in category update");
+          continue;
+        }
+
+        const query = `
+          UPDATE items
+          SET itemCategoryId = ?
+          WHERE id = ?
+        `;
+
+        await new Promise<void>((resolve) => {
+          this.database.run(query, [categoryId, item.id], (error) => {
+            if (error) {
+              pino.error(error, `Error updating item ${item.id} category`);
+            }
+
+            resolve();
+          });
+        });
+      }
+    }
+
+    pino.debug("Items updated with categories from AI grouping");
   }
 }

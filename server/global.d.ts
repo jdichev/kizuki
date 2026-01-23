@@ -23,12 +23,15 @@ interface FeedData {
   items: Item[];
 }
 
-interface FeedCategory {
+interface Category {
   id?: number;
   title: string;
   text?: string;
   expanded?: boolean;
 }
+
+// Alias for backwards compatibility
+type FeedCategory = Category;
 
 interface FeedReadStat {
   id: number;
@@ -52,6 +55,7 @@ interface Item {
   read?: 0 | 1;
   published?: number;
   feedTitle?: string;
+  categoryTitle?: string;
   [pubDate: string]: string;
   [date: string]: string;
   [isoDate: string]: string;

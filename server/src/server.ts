@@ -118,6 +118,11 @@ app.get("/groups", async (req: Request, res: Response) => {
     order: "published",
   });
 
+  const itemCategories = await dataModel.getItemCategories();
+  const itemCategoriesForPrompt = itemCategories
+    .map((cat) => cat.title)
+    .join(", ");
+
   const aiService = AiService.getInstance();
 
   const preparedItems = aiService.prepareItemsPrompt(items);
@@ -125,9 +130,11 @@ app.get("/groups", async (req: Request, res: Response) => {
 
   const finalPrompt = `
   You are a categorization agent. What follows is a list of article IDs and article titles.
-  Group the list by generated category and generate a new list that looks like this:
+  Group the list by categories and generate a new list that looks like this:
   <AI generated category name>: <article id>, <article id>
   <AI generated category name>: <article id>, <article id>, <article id>
+
+  Our already existing categories are: ${itemCategoriesForPrompt}. Preferrably use these categories when possible.
 
   The article list is below:
   ${preparedItems}
@@ -137,6 +144,7 @@ app.get("/groups", async (req: Request, res: Response) => {
   pino.trace({ aiResponse }, "AI response for grouping items");
 
   const groups = aiService.parseAiGroupsResponse(aiResponse, items);
+  await dataModel.updateItemsWithCategories(groups, itemCategories);
 
   res.json(groups);
 });

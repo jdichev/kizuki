@@ -40,6 +40,7 @@ interface Item {
   published: number;
   created?: number;
   feedTitle?: string;
+  categoryTitle?: string;
   url?: string;
   comments?: string;
   feed_id?: number;

@@ -135,7 +135,9 @@ export default function Article({
         <p>
           {article.feedTitle ? article.feedTitle : "NO_TITLE"},{" "}
           <FormattedDate pubDate={article.published} />
-          &nbsp;|&nbsp;♥&nbsp;
+          &nbsp;|
+          {article.categoryTitle ? ` Category: ${article.categoryTitle}` : ""}
+          &nbsp;♥&nbsp;
           <a
             data-testid="upper-outbound-link"
             href={article.url}

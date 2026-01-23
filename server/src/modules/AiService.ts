@@ -11,12 +11,18 @@ const pino = pinoLib({
  * AiService handles AI operations such as preparing and sending prompts to Gemini AI.
  * Uses SettingsManager for API key configuration.
  * Implements singleton pattern for efficient resource management.
+ * Enforces rate limiting of 15 Requests Per Minute (RPM).
  */
 export default class AiService {
   private static instance: AiService;
   private settingsManager: SettingsManager;
   private aiClient: GoogleGenAI | null = null;
   private static readonly DEFAULT_MODEL = "gemini-3-flash-preview";
+
+  // Rate limiting: 15 requests per minute
+  private static readonly MAX_REQUESTS_PER_MINUTE = 15;
+  private static readonly RATE_LIMIT_WINDOW_MS = 60000; // 1 minute in milliseconds
+  private requestTimestamps: number[] = [];
 
   private constructor() {
     this.settingsManager = SettingsManager.getInstance();
@@ -74,6 +80,47 @@ export default class AiService {
   }
 
   /**
+   * Check and enforce rate limit of 15 RPM
+   * Removes timestamps older than 1 minute and checks if limit is reached
+   * @returns true if request can proceed, false if rate limit exceeded
+   */
+  private checkRateLimit(): boolean {
+    const now = Date.now();
+
+    // Remove timestamps older than 1 minute
+    this.requestTimestamps = this.requestTimestamps.filter(
+      (timestamp) => now - timestamp < AiService.RATE_LIMIT_WINDOW_MS
+    );
+
+    // Check if we've hit the limit
+    if (this.requestTimestamps.length >= AiService.MAX_REQUESTS_PER_MINUTE) {
+      const oldestTimestamp = this.requestTimestamps[0];
+      const timeUntilReset =
+        AiService.RATE_LIMIT_WINDOW_MS - (now - oldestTimestamp);
+      pino.warn(
+        {
+          currentRequests: this.requestTimestamps.length,
+          maxRequests: AiService.MAX_REQUESTS_PER_MINUTE,
+          timeUntilResetMs: timeUntilReset,
+        },
+        "Rate limit exceeded"
+      );
+      return false;
+    }
+
+    // Add current timestamp
+    this.requestTimestamps.push(now);
+    pino.debug(
+      {
+        currentRequests: this.requestTimestamps.length,
+        maxRequests: AiService.MAX_REQUESTS_PER_MINUTE,
+      },
+      "Rate limit check passed"
+    );
+    return true;
+  }
+
+  /**
    * Generate content using Gemini AI
    * @param prompt The prompt to send to the AI
    * @param model Optional model override (defaults to gemini-3-flash-preview)
@@ -94,6 +141,15 @@ export default class AiService {
 
     if (!prompt || prompt.trim() === "") {
       const error = new Error("Prompt cannot be empty");
+      pino.error(error.message);
+      throw error;
+    }
+
+    // Check rate limit before making API call
+    if (!this.checkRateLimit()) {
+      const error = new Error(
+        `Rate limit exceeded. Maximum ${AiService.MAX_REQUESTS_PER_MINUTE} requests per minute allowed.`
+      );
       pino.error(error.message);
       throw error;
     }
@@ -148,6 +204,13 @@ export default class AiService {
     if (!this.isConfigured()) {
       throw new Error(
         "AI Service is not configured. Please set the Gemini API key in settings."
+      );
+    }
+
+    // Check rate limit before making API call
+    if (!this.checkRateLimit()) {
+      throw new Error(
+        `Rate limit exceeded. Maximum ${AiService.MAX_REQUESTS_PER_MINUTE} requests per minute allowed.`
       );
     }
 
