@@ -20,7 +20,7 @@ export default class Updater {
 
   /**
    * Safely triggers a feed update, but only if no update is currently in progress.
-   * After a successful update, categorizes 500 unread items.
+   * After a successful update, categorizes uncategorized items if categorization is not in progress.
    * @param feedUpdater - The FeedUpdater instance to use for the update.
    * @param itemCategorizer - The ItemCategorizer instance to use for categorization.
    */
@@ -37,17 +37,25 @@ export default class Updater {
     void feedUpdater
       .updateItems()
       .then(() => {
-        pino.debug("Feed update completed, starting item categorization");
-        return itemCategorizer.categorizeItems({
-          unreadOnly: true,
-          size: 500,
-        });
+        if (itemCategorizer.isCategorizationInProgress) {
+          pino.debug(
+            "Categorization already in progress, skipping categorization"
+          );
+          return [];
+        }
+
+        pino.debug(
+          "Feed update completed, starting prioritized item categorization"
+        );
+        return itemCategorizer.categorizePrioritized();
       })
       .then((groups) => {
-        pino.info(
-          { groupCount: groups.length },
-          "Item categorization completed after feed update"
-        );
+        if (groups.length > 0) {
+          pino.info(
+            { groupCount: groups.length },
+            "Item categorization completed after feed update"
+          );
+        }
       })
       .catch((err) => pino.error(err, "Update or categorization failed"));
   }

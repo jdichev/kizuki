@@ -21,73 +21,22 @@ export default class ItemCategorizer {
   }
 
   /**
-   * Categorizes items using AI and updates them with the generated categories.
-   * @param options - Options for filtering items to categorize
-   * @param options.unreadOnly - Whether to only categorize unread items
-   * @param options.size - Maximum number of items to categorize
-   * @param options.selectedFeedId - Optional feed ID to filter items
-   * @param options.selectedFeedCategoryId - Optional feed category ID to filter items
-   * @returns The generated groups with their associated items
+   * Shared categorization pipeline once items are selected.
    */
-  public async categorizeItems(
-    options: {
-      unreadOnly?: boolean;
-      size?: number;
-      selectedFeedId?: number;
-      selectedFeedCategoryId?: number;
-    } = {}
+  private async runCategorization(
+    items: any[],
+    itemCategories: any[],
+    aiService: AiService,
+    logContext: string
   ): Promise<any[]> {
-    if (this.categorizationInProgress) {
-      pino.warn("Categorization already in progress, skipping");
-      return [];
-    }
+    const itemCategoriesForPrompt = itemCategories
+      .map((cat) => cat.title)
+      .join(", ");
 
-    try {
-      this.categorizationInProgress = true;
-      pino.debug(options, "Starting item categorization");
+    const preparedItems = aiService.prepareItemsPrompt(items);
+    pino.trace({ preparedItems }, "Prepared items for AI service");
 
-      const {
-        unreadOnly = false,
-        size,
-        selectedFeedId,
-        selectedFeedCategoryId,
-      } = options;
-
-      let selectedFeed;
-      let selectedFeedCategory;
-
-      if (selectedFeedId !== undefined) {
-        selectedFeed = await dataModel.getFeedById(selectedFeedId);
-      } else if (selectedFeedCategoryId !== undefined) {
-        selectedFeedCategory = await dataModel.getFeedCategoryById(
-          selectedFeedCategoryId
-        );
-      }
-
-      const items = await dataModel.getItems({
-        unreadOnly,
-        size,
-        selectedFeed,
-        selectedFeedCategory,
-        order: "published",
-      });
-
-      if (items.length === 0) {
-        pino.debug("No items to categorize");
-        return [];
-      }
-
-      const itemCategories = await dataModel.getItemCategories();
-      const itemCategoriesForPrompt = itemCategories
-        .map((cat) => cat.title)
-        .join(", ");
-
-      const aiService = AiService.getInstance();
-
-      const preparedItems = aiService.prepareItemsPrompt(items);
-      pino.trace({ preparedItems }, "Prepared items for AI service");
-
-      const finalPrompt = `
+    const finalPrompt = `
   You are a categorization agent. What follows is a list of article IDs and article titles.
   Group the list by categories and generate a new list that looks like this:
   <AI generated category name>: <article id>, <article id>
@@ -99,43 +48,97 @@ export default class ItemCategorizer {
   ${preparedItems}
   `;
 
-      const aiResponse = await aiService.generateContent(finalPrompt);
-      pino.trace({ aiResponse }, "AI response for grouping items");
+    const aiResponse = await aiService.generateContent(finalPrompt);
+    pino.trace({ aiResponse }, "AI response for grouping items");
 
-      const groups = aiService.parseAiGroupsResponse(aiResponse, items);
-      await dataModel.updateItemsWithCategories(groups, itemCategories);
+    const groups = aiService.parseAiGroupsResponse(aiResponse, items);
+    await dataModel.updateItemsWithCategories(groups, itemCategories);
 
-      pino.info(
-        { groupCount: groups.length, itemCount: items.length },
-        "Item categorization completed"
+    pino.info(
+      { groupCount: groups.length, itemCount: items.length },
+      `${logContext} item categorization completed`
+    );
+
+    return groups;
+  }
+
+  /**
+   * Categorizes uncategorized items based on priority.
+   * Priority 1: Unread items in Uncategorized category (id=0)
+   * Priority 2: Any items in Uncategorized category (id=0)
+   * @returns The generated groups with their associated items
+   */
+  public async categorizePrioritized(): Promise<any[]> {
+    // Check if AI service is configured
+    const aiService = AiService.getInstance();
+    if (!aiService.isConfigured()) {
+      pino.warn("AI Service not configured, skipping categorization");
+      return [];
+    }
+
+    if (this.categorizationInProgress) {
+      pino.warn("Categorization already in progress, skipping");
+      return [];
+    }
+
+    try {
+      this.categorizationInProgress = true;
+      pino.debug("Starting prioritized item categorization");
+
+      // Get all item categories to find Uncategorized (id=0)
+      const itemCategories = await dataModel.getItemCategories();
+      const uncategorizedCategory = itemCategories.find((cat) => cat.id === 0);
+
+      if (!uncategorizedCategory) {
+        pino.warn("Uncategorized item category (id=0) not found");
+        return [];
+      }
+
+      // Priority 1: Try to find unread items in Uncategorized
+      let items = await dataModel.getItems({
+        unreadOnly: true,
+        size: 500,
+        selectedItemCategory: uncategorizedCategory,
+        order: "published",
+      });
+
+      if (items.length === 0) {
+        // Priority 2: Try to find any items in Uncategorized
+        pino.debug(
+          "No unread uncategorized items found, checking for any uncategorized items"
+        );
+        items = await dataModel.getItems({
+          unreadOnly: false,
+          size: 500,
+          selectedItemCategory: uncategorizedCategory,
+          order: "published",
+        });
+      }
+
+      if (items.length === 0) {
+        pino.debug("No uncategorized items found");
+        return [];
+      }
+
+      pino.debug(
+        { itemCount: items.length },
+        "Found uncategorized items to categorize"
       );
 
-      return groups;
+      return this.runCategorization(
+        items,
+        itemCategories,
+        aiService,
+        "Prioritized"
+      );
     } catch (error: any) {
       pino.error(
         { error: error.message || String(error) },
-        "Error during item categorization"
+        "Error during prioritized item categorization"
       );
       throw error;
     } finally {
       this.categorizationInProgress = false;
     }
-  }
-
-  /**
-   * Categorizes all items in the system.
-   * @param options - Options for categorization
-   * @param options.unreadOnly - Whether to only categorize unread items (default: false)
-   * @param options.size - Maximum number of items to categorize
-   * @returns The generated groups with their associated items
-   */
-  public async categorizeAllItems(
-    options: {
-      unreadOnly?: boolean;
-      size?: number;
-    } = {}
-  ): Promise<any[]> {
-    pino.info("Starting full item categorization");
-    return this.categorizeItems(options);
   }
 }

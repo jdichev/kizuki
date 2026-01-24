@@ -99,39 +99,6 @@ app.get("/items", async (req: Request, res: Response) => {
   res.json(items);
 });
 
-app.get("/groups", async (req: Request, res: Response) => {
-  try {
-    const unreadOnly = req.query.unread ? req.query.unread === "true" : false;
-    const size = req.query.size
-      ? parseInt(req.query.size as string)
-      : undefined;
-    const selectedFeedId = req.query.fid
-      ? parseInt(req.query.fid as string)
-      : undefined;
-    const selectedFeedCategoryId = req.query.cid
-      ? parseInt(req.query.cid as string)
-      : undefined;
-
-    const groups = await itemCategorizer.categorizeItems({
-      unreadOnly,
-      size,
-      selectedFeedId,
-      selectedFeedCategoryId,
-    });
-
-    res.json(groups);
-  } catch (error: any) {
-    pino.error(
-      { error: error.message || String(error) },
-      "Error in /groups endpoint"
-    );
-    res.status(500).json({
-      error: "Failed to categorize items",
-      message: error.message || String(error),
-    });
-  }
-});
-
 app.get("/items/:itemId", async (req: Request, res: Response) => {
   const item = await dataModel.getItemById(parseInt(req.params.itemId));
 
