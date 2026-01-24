@@ -45,7 +45,7 @@ export default function ItemCategoriesNav({
                   itemCategory.id
                 )}`}
               >
-                <i className="bi bi-tag" />
+                {/* <i className="bi bi-tag" /> */}
                 <span> {itemCategory.title}</span>
                 <span className="menu-marker">
                   {getUnreadCountForItemCategory(itemCategory.id)}

@@ -68,6 +68,7 @@
   --total-main-size: 100;
   --side-menu-bg: #2d2d2d;
   --side-menu-fg: #cccccc;
+  --sidebar-divider-pos: 220px;
   --body-font-family:
     system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans",
     "Liberation Sans", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
@@ -163,6 +164,25 @@ a:hover {
   outline-offset: 2px;
 }
 
+#sidebar-divider {
+  position: fixed;
+  left: var(--sidebar-divider-pos);
+  top: var(--header-height);
+  width: 2px;
+  height: calc(100vh - var(--header-height));
+  background: rgba(128, 128, 128, 0.2);
+  border-left: 0.5px solid rgba(128, 128, 128, 0.3);
+  border-right: 0.5px solid rgba(128, 128, 128, 0.3);
+  cursor: col-resize;
+  z-index: 10;
+  user-select: none;
+  transition: background 0.2s ease-out;
+}
+
+#sidebar-divider:hover {
+  background: rgba(128, 128, 128, 0.4);
+}
+
 #top-nav-brand a,
 #top-nav-content .btn,
 #top-nav-content a {
@@ -222,6 +242,7 @@ a:hover {
   text-align: center;
   margin: 0.5rem 0;
   opacity: 0.6;
+  font-size: 1.36rem;
 }
 
 #side-menu a.active {
@@ -244,6 +265,8 @@ a:hover {
   padding-left: 4px;
   min-width: var(--sidebar-min-width);
   overflow-y: auto;
+  width: calc(var(--sidebar-divider-pos) - var(--side-menu-width));
+  box-sizing: border-box;
 }
 
 #sidebar-menu ul {

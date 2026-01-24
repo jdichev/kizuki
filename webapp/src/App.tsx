@@ -9,10 +9,12 @@ import FeedsList from "./FeedsList";
 import FeedAdd from "./FeedAdd";
 import FeedEdit from "./FeedEdit";
 import Settings from "./Settings";
+import { useSidebarDivider } from "./hooks/useSidebarDivider";
 
 export default function App() {
   const navMenu = useRef<HTMLDivElement>(null);
   const [twoColLayout, setTwoColLayout] = useState(false);
+  const dividerRef = useSidebarDivider();
 
   useEffect(() => {
     const hashChangeHandler = () => {
@@ -44,7 +46,7 @@ export default function App() {
           </NavLink>
 
           <NavLink to="/feeds/items" className="text-decoration-none">
-            <i className="bi bi-tag"></i>
+            <i className="bi bi-collection"></i>
           </NavLink>
 
           <NavLink to="/feeds/prompt" className="text-decoration-none">
@@ -63,6 +65,8 @@ export default function App() {
             <i className="bi bi-gear-fill"></i>
           </NavLink>
         </div>
+
+        <div id="sidebar-divider" ref={dividerRef} />
 
         <Routes>
           <Route path="/" element={<Home />} />
