@@ -3,6 +3,7 @@ import { HashRouter as Router, Routes, Route, NavLink } from "react-router-dom";
 
 import Home from "./Home";
 import FeedsMain from "./FeedsMain";
+import ItemCategoriesMain from "./ItemCategoriesMain";
 import ItemsPrompt from "./ItemsPrompt";
 import FeedsList from "./FeedsList";
 import FeedAdd from "./FeedAdd";
@@ -42,6 +43,10 @@ export default function App() {
             <i className="bi bi-layout-text-sidebar-reverse"></i>
           </NavLink>
 
+          <NavLink to="/feeds/items" className="text-decoration-none">
+            <i className="bi bi-tag"></i>
+          </NavLink>
+
           <NavLink to="/feeds/prompt" className="text-decoration-none">
             <i className="bi bi-file-text"></i>
           </NavLink>
@@ -63,6 +68,11 @@ export default function App() {
           <Route path="/" element={<Home />} />
 
           <Route path="/feeds/read" element={<FeedsMain topMenu={navMenu} />} />
+
+          <Route
+            path="/feeds/items"
+            element={<ItemCategoriesMain topMenu={navMenu} />}
+          />
 
           <Route
             path="/feeds/prompt"

@@ -33,6 +33,21 @@ interface FeedCategoryReadStat {
   unreadCount: number;
 }
 
+interface ItemCategory {
+  id?: number;
+  title: string;
+  text?: string;
+  expanded?: boolean;
+}
+
+interface ItemCategoryReadStat {
+  id: number;
+  title: string;
+  unreadCount: number;
+}
+
+type GroupingMode = "feed-categories" | "item-categories";
+
 interface Item {
   id?: number;
   title: string;
@@ -99,4 +114,13 @@ interface CategoriesMainProps {
   getTotalUnreadCount: function;
   getUnreadCountForFeedCategory: function;
   getUnreadCountForFeed: function;
+}
+
+interface ItemCategoriesNavProps {
+  activeNav: string;
+  itemCategories: ItemCategory[];
+  selectedItemCategory: ItemCategory | undefined;
+  selectItemCategory: function;
+  getTotalUnreadCount: function;
+  getUnreadCountForItemCategory: function;
 }

@@ -45,6 +45,12 @@ interface FeedCategoryReadStat {
   unreadCount: number;
 }
 
+interface ItemCategoryReadStat {
+  id: number;
+  title: string;
+  unreadCount: number;
+}
+
 interface Item {
   id?: number | string | array;
   title: string;

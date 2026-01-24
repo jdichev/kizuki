@@ -65,14 +65,24 @@ app.get("/items", async (req: Request, res: Response) => {
     ? parseInt(req.query.cid as string)
     : undefined;
 
+  const selectedItemCategoryId = req.query.icid
+    ? parseInt(req.query.icid as string)
+    : undefined;
+
   let selectedFeed;
   let selectedFeedCategory;
+  let selectedItemCategory;
 
   if (selectedFeedId !== undefined) {
     selectedFeed = await dataModel.getFeedById(selectedFeedId);
   } else if (selectedFeedCategoryId !== undefined) {
     selectedFeedCategory = await dataModel.getFeedCategoryById(
       selectedFeedCategoryId
+    );
+  } else if (selectedItemCategoryId !== undefined) {
+    const itemCategories = await dataModel.getItemCategories();
+    selectedItemCategory = itemCategories.find(
+      (cat) => cat.id === selectedItemCategoryId
     );
   }
 
@@ -81,6 +91,7 @@ app.get("/items", async (req: Request, res: Response) => {
     size,
     selectedFeed,
     selectedFeedCategory,
+    selectedItemCategory,
     order: "published",
   });
   res.json(items);
@@ -224,6 +235,45 @@ app.get("/categories/readstats", async (req: Request, res: Response) => {
   res.json(categoryReadStats);
 });
 
+app.get("/item-categories/readstats", async (req: Request, res: Response) => {
+  try {
+    pino.debug("Fetching item category read stats");
+    const itemCategoryReadStats = await dataModel.getItemCategoryReadStats();
+    pino.debug(
+      { count: itemCategoryReadStats.length },
+      "Item category read stats retrieved"
+    );
+    res.json(itemCategoryReadStats);
+  } catch (error: any) {
+    pino.error(
+      { error: error.message || String(error) },
+      "Error fetching item category read stats"
+    );
+    res.status(500).json({
+      error: "Failed to fetch item category read stats",
+      message: error.message || String(error),
+    });
+  }
+});
+
+app.get("/item-categories", async (req: Request, res: Response) => {
+  try {
+    pino.debug("Fetching item categories");
+    const itemCategories = await dataModel.getItemCategories();
+    pino.debug({ count: itemCategories.length }, "Item categories retrieved");
+    res.json(itemCategories);
+  } catch (error: any) {
+    pino.error(
+      { error: error.message || String(error) },
+      "Error fetching item categories"
+    );
+    res.status(500).json({
+      error: "Failed to fetch item categories",
+      message: error.message || String(error),
+    });
+  }
+});
+
 app.get("/itemsread", async (req: Request, res: Response) => {
   const selectedFeedId = req.query.fid
     ? parseInt(req.query.fid as string)
@@ -233,6 +283,10 @@ app.get("/itemsread", async (req: Request, res: Response) => {
     ? parseInt(req.query.cid as string)
     : undefined;
 
+  const selectedItemCategoryId = req.query.icid
+    ? parseInt(req.query.icid as string)
+    : undefined;
+
   if (selectedFeedId !== undefined) {
     const feed = await dataModel.getFeedById(selectedFeedId);
 
@@ -240,7 +294,7 @@ app.get("/itemsread", async (req: Request, res: Response) => {
       const result = await dataModel.markItemsRead({ feed: feed });
       res.json(result);
     } else {
-      res.json({ message: "Category not found" });
+      res.json({ message: "Feed not found" });
     }
   } else if (selectedFeedCategoryId !== undefined) {
     const category = await dataModel.getFeedCategoryById(
@@ -253,7 +307,21 @@ app.get("/itemsread", async (req: Request, res: Response) => {
       });
       res.json(result);
     } else {
-      res.json({ message: "Category not found" });
+      res.json({ message: "Feed category not found" });
+    }
+  } else if (selectedItemCategoryId !== undefined) {
+    const itemCategories = await dataModel.getItemCategories();
+    const itemCategory = itemCategories.find(
+      (cat) => cat.id === selectedItemCategoryId
+    );
+
+    if (itemCategory) {
+      const result = await dataModel.markItemsRead({
+        itemCategory: itemCategory,
+      });
+      res.json(result);
+    } else {
+      res.json({ message: "Item category not found" });
     }
   } else {
     const result = await dataModel.markItemsRead({});

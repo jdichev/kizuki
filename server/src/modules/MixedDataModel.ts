@@ -602,6 +602,35 @@ export default class DataService {
     });
   }
 
+  public async getItemCategoryReadStats(): Promise<ItemCategoryReadStat[]> {
+    const query = `
+      SELECT
+        item_categories.id,
+        item_categories.title,
+        count(items.itemCategoryId) as unreadCount
+      FROM
+        item_categories
+      LEFT JOIN
+        items
+      ON
+        items.itemCategoryId = item_categories.id
+      WHERE
+        items.read = 0
+      GROUP BY
+        item_categories.id
+    `;
+
+    return new Promise((resolve) => {
+      this.database.all(query, (error, rows) => {
+        if (error) {
+          pino.error(error);
+        }
+
+        resolve((rows as ItemCategoryReadStat[]) || []);
+      });
+    });
+  }
+
   public async getFeedCategoryById(
     feedCategoryId: number
   ): Promise<FeedCategory | undefined> {
@@ -951,6 +980,7 @@ export default class DataService {
   public async markItemsRead(params: {
     feedCategory?: FeedCategory;
     feed?: Feed;
+    itemCategory?: Category;
   }) {
     let query = `
       UPDATE items
@@ -958,7 +988,13 @@ export default class DataService {
       __WHERE_PLACEHOLDER__
     `;
 
-    if (params.feed) {
+    if (params.itemCategory) {
+      const whereQuery = `
+        WHERE itemCategoryId = ${params.itemCategory.id}
+      `;
+
+      query = query.replace("__WHERE_PLACEHOLDER__", whereQuery);
+    } else if (params.feed) {
       const whereQuery = `
         WHERE feed_id = ${params.feed.id}
       `;
@@ -978,7 +1014,9 @@ export default class DataService {
       );
       query = query.replace("__WHERE_PLACEHOLDER__", whereQuery);
     } else {
-      query = query.replace("__WHERE_PLACEHOLDER__", "");
+      if (!params.itemCategory && !params.feed) {
+        query = query.replace("__WHERE_PLACEHOLDER__", "");
+      }
     }
 
     return new Promise((resolve) => {
@@ -1099,12 +1137,14 @@ export default class DataService {
       unreadOnly?: boolean;
       selectedFeedCategory?: FeedCategory | undefined;
       selectedFeed?: Feed | undefined;
+      selectedItemCategory?: Category | undefined;
       order?: string;
     } = {
       size: 50,
       unreadOnly: false,
       selectedFeedCategory: undefined,
       selectedFeed: undefined,
+      selectedItemCategory: undefined,
       order: "published",
     }
   ): Promise<Item[]> {
@@ -1137,7 +1177,15 @@ export default class DataService {
     `;
 
     let filteredById = false;
-    if (params.selectedFeed) {
+    if (params.selectedItemCategory) {
+      whereQuery1 = `
+      WHERE
+      items.itemCategoryId = ${params.selectedItemCategory.id}
+    `;
+      query = query.replace("__WHERE_PLACEHOLDER1__", whereQuery1);
+
+      filteredById = true;
+    } else if (params.selectedFeed) {
       whereQuery1 = whereQuery1.replace(
         "__CATEGORY_IDS_PLACEHOLDER__",
         `${params.selectedFeed.id}`

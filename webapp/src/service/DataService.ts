@@ -41,6 +41,41 @@ export default class DataService {
     return Promise.resolve(feedCategoryReadStats);
   }
 
+  public async getItemCategories(): Promise<ItemCategory[]> {
+    try {
+      const response = await fetch(this.makeUrl("/item-categories"));
+      if (!response.ok) {
+        console.error("Failed to fetch item categories:", response.status);
+        return [];
+      }
+      const categories = await response.json();
+      return Promise.resolve(Array.isArray(categories) ? categories : []);
+    } catch (error) {
+      console.error("Error fetching item categories:", error);
+      return [];
+    }
+  }
+
+  public async getItemCategoryReadStats(): Promise<ItemCategoryReadStat[]> {
+    try {
+      const response = await fetch(this.makeUrl("/item-categories/readstats"));
+      if (!response.ok) {
+        console.error(
+          "Failed to fetch item category read stats:",
+          response.status
+        );
+        return [];
+      }
+      const itemCategoryReadStats = await response.json();
+      return Promise.resolve(
+        Array.isArray(itemCategoryReadStats) ? itemCategoryReadStats : []
+      );
+    } catch (error) {
+      console.error("Error fetching item category read stats:", error);
+      return [];
+    }
+  }
+
   public async getFeedReadStats(): Promise<FeedReadStat[]> {
     const response = await fetch(this.makeUrl("/feeds/readstats"));
     const feedReadStats = response.json();
@@ -57,11 +92,13 @@ export default class DataService {
       unreadOnly: boolean;
       selectedFeedCategory?: FeedCategory | undefined;
       selectedFeed?: Feed | undefined;
+      selectedItemCategory?: ItemCategory | undefined;
     } = {
       size: 50,
       unreadOnly: false,
       selectedFeedCategory: undefined,
       selectedFeed: undefined,
+      selectedItemCategory: undefined,
     }
   ): Promise<Item[]> {
     this.itemsTimeout && clearTimeout(this.itemsTimeout);
@@ -84,11 +121,13 @@ export default class DataService {
       unreadOnly: boolean;
       selectedFeedCategory?: FeedCategory | undefined;
       selectedFeed?: Feed | undefined;
+      selectedItemCategory?: ItemCategory | undefined;
     } = {
       size: 50,
       unreadOnly: false,
       selectedFeedCategory: undefined,
       selectedFeed: undefined,
+      selectedItemCategory: undefined,
     }
   ): Promise<Item[]> {
     const query = new URLSearchParams();
@@ -105,6 +144,10 @@ export default class DataService {
 
     if (params.selectedFeed) {
       query.set("fid", JSON.stringify(params.selectedFeed.id));
+    }
+
+    if (params.selectedItemCategory) {
+      query.set("icid", JSON.stringify(params.selectedItemCategory.id));
     }
 
     const queryString = query.toString();
@@ -156,20 +199,25 @@ export default class DataService {
   public async markItemsRead(params: {
     feed?: Feed;
     feedCategory?: FeedCategory;
+    itemCategory?: ItemCategory;
   }) {
     const query = new URLSearchParams();
 
     if (params.feed) {
       query.set("fid", JSON.stringify(params.feed.id));
-    } else if (!params.feed && params.feedCategory) {
+    } else if (params.feedCategory) {
       query.set("cid", JSON.stringify(params.feedCategory.id));
+    } else if (params.itemCategory) {
+      query.set("icid", JSON.stringify(params.itemCategory.id));
     }
 
     const queryString = query.toString();
 
     const response = await fetch(
       `${this.makeUrl("/itemsread")}?${
-        params.feed || params.feedCategory ? queryString : ""
+        params.feed || params.feedCategory || params.itemCategory
+          ? queryString
+          : ""
       }`
     );
     const result = response.json();
