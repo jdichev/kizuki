@@ -474,6 +474,8 @@ table.feeds-table {
   display: block;
   padding: 10px;
   text-decoration: none;
+  /* to cover for rounding errors */
+  margin-right: 1px;
 }
 
 #list-panel .table a:focus {

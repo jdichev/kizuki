@@ -50,7 +50,7 @@ export default function App() {
           </NavLink>
 
           <NavLink to="/feeds/prompt" className="text-decoration-none">
-            <i className="bi bi-file-text"></i>
+            <i className="bi bi-body-text"></i>
           </NavLink>
 
           <NavLink to="/feeds/list" className="text-decoration-none">
