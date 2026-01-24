@@ -2,6 +2,7 @@
 import pinoLib from "pino";
 // Import the FeedUpdater class from a local module
 import FeedUpdater from "./modules/FeedUpdater";
+import ItemCategorizer from "./modules/ItemCategorizer";
 
 const INTERVAL_MS = 10 * 60_000; // 10 minutes
 const DRIFT_THRESHOLD_MS = 30_000; // treat significant drift uniformly
@@ -19,9 +20,14 @@ export default class Updater {
 
   /**
    * Safely triggers a feed update, but only if no update is currently in progress.
+   * After a successful update, categorizes 500 unread items.
    * @param feedUpdater - The FeedUpdater instance to use for the update.
+   * @param itemCategorizer - The ItemCategorizer instance to use for categorization.
    */
-  private static safeUpdate(feedUpdater: FeedUpdater) {
+  private static safeUpdate(
+    feedUpdater: FeedUpdater,
+    itemCategorizer: ItemCategorizer
+  ) {
     if (feedUpdater.isUpdateInProgress) {
       pino.warn("Update already in progress, skipping this update cycle");
 
@@ -30,7 +36,20 @@ export default class Updater {
 
     void feedUpdater
       .updateItems()
-      .catch((err) => pino.error(err, "Update failed"));
+      .then(() => {
+        pino.debug("Feed update completed, starting item categorization");
+        return itemCategorizer.categorizeItems({
+          unreadOnly: true,
+          size: 500,
+        });
+      })
+      .then((groups) => {
+        pino.info(
+          { groupCount: groups.length },
+          "Item categorization completed after feed update"
+        );
+      })
+      .catch((err) => pino.error(err, "Update or categorization failed"));
   }
 
   /**
@@ -39,9 +58,10 @@ export default class Updater {
    */
   public static start() {
     const feedUpdater = new FeedUpdater();
+    const itemCategorizer = new ItemCategorizer();
     pino.debug(`Updating regularly`);
 
-    this.safeUpdate(feedUpdater);
+    this.safeUpdate(feedUpdater, itemCategorizer);
 
     // Self-scheduling timer with drift detection and resynchronization
     let nextAt = Date.now() + INTERVAL_MS;
@@ -54,7 +74,7 @@ export default class Updater {
       const hasSignificantDrift = drift > DRIFT_THRESHOLD_MS;
 
       // Always run the update
-      this.safeUpdate(feedUpdater);
+      this.safeUpdate(feedUpdater, itemCategorizer);
 
       // Adjust schedule, with logging on drift
       if (hasSignificantDrift) {

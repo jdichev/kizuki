@@ -7,8 +7,8 @@ import MixedDataModel from "./modules/MixedDataModel";
 import FeedUpdater from "./modules/FeedUpdater";
 import FeedFinder from "./modules/FeedFinder";
 import SettingsManager from "./modules/SettingsManager";
+import ItemCategorizer from "./modules/ItemCategorizer";
 import projectConfig from "forestconfig";
-import AiService from "./modules/AiService";
 
 const pino = pinoLib({
   level: process.env.LOG_LEVEL || "info",
@@ -18,6 +18,8 @@ const pino = pinoLib({
 const dataModel = MixedDataModel.getInstance();
 
 const updater = new FeedUpdater();
+
+const itemCategorizer = new ItemCategorizer();
 
 const settingsManager = SettingsManager.getInstance();
 
@@ -98,66 +100,36 @@ app.get("/items", async (req: Request, res: Response) => {
 });
 
 app.get("/groups", async (req: Request, res: Response) => {
-  const unreadOnly = req.query.unread ? req.query.unread === "true" : false;
+  try {
+    const unreadOnly = req.query.unread ? req.query.unread === "true" : false;
+    const size = req.query.size
+      ? parseInt(req.query.size as string)
+      : undefined;
+    const selectedFeedId = req.query.fid
+      ? parseInt(req.query.fid as string)
+      : undefined;
+    const selectedFeedCategoryId = req.query.cid
+      ? parseInt(req.query.cid as string)
+      : undefined;
 
-  const size = req.query.size ? parseInt(req.query.size as string) : undefined;
+    const groups = await itemCategorizer.categorizeItems({
+      unreadOnly,
+      size,
+      selectedFeedId,
+      selectedFeedCategoryId,
+    });
 
-  const selectedFeedId = req.query.fid
-    ? parseInt(req.query.fid as string)
-    : undefined;
-
-  const selectedFeedCategoryId = req.query.cid
-    ? parseInt(req.query.cid as string)
-    : undefined;
-
-  let selectedFeed;
-  let selectedFeedCategory;
-
-  if (selectedFeedId !== undefined) {
-    selectedFeed = await dataModel.getFeedById(selectedFeedId);
-  } else if (selectedFeedCategoryId !== undefined) {
-    selectedFeedCategory = await dataModel.getFeedCategoryById(
-      selectedFeedCategoryId
+    res.json(groups);
+  } catch (error: any) {
+    pino.error(
+      { error: error.message || String(error) },
+      "Error in /groups endpoint"
     );
+    res.status(500).json({
+      error: "Failed to categorize items",
+      message: error.message || String(error),
+    });
   }
-
-  const items = await dataModel.getItems({
-    unreadOnly,
-    size,
-    selectedFeed,
-    selectedFeedCategory,
-    order: "published",
-  });
-
-  const itemCategories = await dataModel.getItemCategories();
-  const itemCategoriesForPrompt = itemCategories
-    .map((cat) => cat.title)
-    .join(", ");
-
-  const aiService = AiService.getInstance();
-
-  const preparedItems = aiService.prepareItemsPrompt(items);
-  pino.trace({ preparedItems }, "Prepared items for AI service");
-
-  const finalPrompt = `
-  You are a categorization agent. What follows is a list of article IDs and article titles.
-  Group the list by categories and generate a new list that looks like this:
-  <AI generated category name>: <article id>, <article id>
-  <AI generated category name>: <article id>, <article id>, <article id>
-
-  Our already existing categories are: ${itemCategoriesForPrompt}. Preferrably use these categories when possible.
-
-  The article list is below:
-  ${preparedItems}
-  `;
-
-  const aiResponse = await aiService.generateContent(finalPrompt);
-  pino.trace({ aiResponse }, "AI response for grouping items");
-
-  const groups = aiService.parseAiGroupsResponse(aiResponse, items);
-  await dataModel.updateItemsWithCategories(groups, itemCategories);
-
-  res.json(groups);
 });
 
 app.get("/items/:itemId", async (req: Request, res: Response) => {
