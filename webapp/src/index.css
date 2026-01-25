@@ -168,18 +168,18 @@ a:hover {
   position: fixed;
   left: var(--sidebar-divider-pos);
   top: var(--header-height);
-  width: 1px;
+  width: 2px;
   height: calc(100vh - var(--header-height));
-  background: rgba(128, 128, 128, 0.2);
-  border-left: 0.5px solid rgba(128, 128, 128, 0.3);
-  border-right: 0.5px solid rgba(128, 128, 128, 0.3);
   cursor: col-resize;
   z-index: 10;
   user-select: none;
   transition: background 0.2s ease-out;
+  background: rgba(128, 128, 128, 0.02);
 }
 
 #sidebar-divider:hover {
+  border-left: 0.5px solid rgba(128, 128, 128, 0.3);
+  border-right: 0.5px solid rgba(128, 128, 128, 0.3);
   background: rgba(128, 128, 128, 0.4);
   width: 2px;
 }
@@ -256,7 +256,7 @@ a:hover {
 }
 
 #welcome-content {
-  grid-column-start: 2;
+  grid-column-start: 3;
   grid-column-end: 4;
   padding: 10% 15%;
 }
@@ -529,7 +529,7 @@ table.feeds-table {
 
 #content-panel {
   padding: 8px 24px 16px 16px;
-  box-shadow: inset 1px 0 rgba(128, 128, 128, 0.3);
+  box-shadow: inset 1px 0 rgba(128, 128, 128, 0.02);
 }
 
 #content-panel img,
