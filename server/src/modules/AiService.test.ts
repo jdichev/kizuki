@@ -1,4 +1,5 @@
 import AiService from "./AiService";
+import ItemCategorizer from "./ItemCategorizer";
 import SettingsManager from "./SettingsManager";
 
 // Mock the @google/genai module
@@ -182,7 +183,7 @@ describe("AiService", () => {
     });
   });
 
-  describe("prepareItemsPrompt", () => {
+  describe("buildItemsPrompt (ItemCategorizer)", () => {
     it("should format items as plain text with id and title per line", () => {
       const items = [
         { id: 1, title: "First Article" },
@@ -190,7 +191,7 @@ describe("AiService", () => {
         { id: 3, title: "Third Article" },
       ] as Item[];
 
-      const result = aiService.prepareItemsPrompt(items);
+      const result = ItemCategorizer.buildItemsPromptList(items);
 
       expect(result).toBe(
         "1: First Article\n2: Second Article\n3: Third Article"
@@ -198,13 +199,13 @@ describe("AiService", () => {
     });
 
     it("should return empty string for empty array", () => {
-      const result = aiService.prepareItemsPrompt([]);
+      const result = ItemCategorizer.buildItemsPromptList([] as any);
       expect(result).toBe("");
     });
 
     it("should return empty string for null or undefined", () => {
-      const result1 = aiService.prepareItemsPrompt(null as any);
-      const result2 = aiService.prepareItemsPrompt(undefined as any);
+      const result1 = ItemCategorizer.buildItemsPromptList(null as any);
+      const result2 = ItemCategorizer.buildItemsPromptList(undefined as any);
 
       expect(result1).toBe("");
       expect(result2).toBe("");
@@ -218,22 +219,20 @@ describe("AiService", () => {
         { id: 3, title: "Another Valid Item" },
       ] as Item[];
 
-      const result = aiService.prepareItemsPrompt(items);
+      const result = ItemCategorizer.buildItemsPromptList(items);
 
       expect(result).toBe("1: Valid Item\n3: Another Valid Item");
     });
 
-    it("should handle items with special characters in titles", () => {
+    it("should include feed title when present", () => {
       const items = [
-        { id: 1, title: 'Title with "quotes"' },
-        { id: 2, title: "Title with: colons & symbols!" },
+        { id: 1, title: "Story", feedTitle: "Tech" },
+        { id: 2, title: "News" },
       ] as Item[];
 
-      const result = aiService.prepareItemsPrompt(items);
+      const result = ItemCategorizer.buildItemsPromptList(items);
 
-      expect(result).toBe(
-        '1: Title with "quotes"\n2: Title with: colons & symbols!'
-      );
+      expect(result).toBe("1: Tech Story\n2: News");
     });
   });
 });

@@ -1,5 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 import pinoLib from "pino";
+import fs from "fs";
+import path from "path";
+import os from "os";
 import SettingsManager from "./SettingsManager";
 
 const pino = pinoLib({
@@ -11,21 +14,35 @@ const pino = pinoLib({
  * AiService handles AI operations such as preparing and sending prompts to Gemini AI.
  * Uses SettingsManager for API key configuration.
  * Implements singleton pattern for efficient resource management.
- * Enforces rate limiting of 15 Requests Per Minute (RPM).
+ * Enforces rate limiting: 2 requests/hour and 20 requests/day (persisted on disk).
  */
 export default class AiService {
   private static instance: AiService;
   private settingsManager: SettingsManager;
   private aiClient: GoogleGenAI | null = null;
   private static readonly DEFAULT_MODEL = "gemini-3-flash-preview";
+  private static readonly BACKUP_MODEL = "models/gemma-3-27b-it";
 
-  // Rate limiting: 15 requests per minute
-  private static readonly MAX_REQUESTS_PER_MINUTE = 15;
-  private static readonly RATE_LIMIT_WINDOW_MS = 60000; // 1 minute in milliseconds
-  private requestTimestamps: number[] = [];
+  // Rate limiting: 2 requests per hour, 20 requests per day
+  private static readonly MAX_REQUESTS_PER_HOUR = 2;
+  private static readonly MAX_REQUESTS_PER_DAY = 20;
+  private static readonly HOUR_MS = 60 * 60 * 1000;
+  private static readonly DAY_MS = 24 * 60 * 60 * 1000;
+
+  private rateLimitCacheFilePath: string;
+  private rateLimitCache: {
+    currentDate: string;
+    requestTimestamps: number[];
+  } = {
+    currentDate: new Date().toISOString().split("T")[0],
+    requestTimestamps: [],
+  };
 
   private constructor() {
     this.settingsManager = SettingsManager.getInstance();
+    const storageDir = path.join(os.homedir(), ".forest");
+    this.rateLimitCacheFilePath = path.join(storageDir, "ai-rate-limit.json");
+    this.loadRateLimitCache();
     this.initializeClient();
   }
 
@@ -80,40 +97,133 @@ export default class AiService {
   }
 
   /**
-   * Check and enforce rate limit of 15 RPM
-   * Removes timestamps older than 1 minute and checks if limit is reached
+   * Load rate limit cache from disk
+   */
+  private loadRateLimitCache(): void {
+    try {
+      if (fs.existsSync(this.rateLimitCacheFilePath)) {
+        const fileContent = fs.readFileSync(
+          this.rateLimitCacheFilePath,
+          "utf-8"
+        );
+        this.rateLimitCache = JSON.parse(fileContent);
+        pino.debug(
+          { date: this.rateLimitCache.currentDate },
+          "AI rate limit cache loaded"
+        );
+      } else {
+        pino.debug("No existing AI rate limit cache found, starting fresh");
+      }
+    } catch (error) {
+      pino.warn(
+        { error },
+        "Failed to load AI rate limit cache, starting fresh"
+      );
+      this.rateLimitCache = {
+        currentDate: new Date().toISOString().split("T")[0],
+        requestTimestamps: [],
+      };
+    }
+  }
+
+  /**
+   * Save rate limit cache to disk
+   */
+  private saveRateLimitCache(): void {
+    try {
+      const storageDir = path.dirname(this.rateLimitCacheFilePath);
+      if (!fs.existsSync(storageDir)) {
+        fs.mkdirSync(storageDir, { recursive: true });
+      }
+      fs.writeFileSync(
+        this.rateLimitCacheFilePath,
+        JSON.stringify(this.rateLimitCache, null, 2)
+      );
+    } catch (error) {
+      pino.error({ error }, "Failed to save AI rate limit cache");
+    }
+  }
+
+  /**
+   * Check and enforce rate limits: 2 per hour and 20 per day
    * @returns true if request can proceed, false if rate limit exceeded
    */
   private checkRateLimit(): boolean {
     const now = Date.now();
+    const today = new Date().toISOString().split("T")[0];
 
-    // Remove timestamps older than 1 minute
-    this.requestTimestamps = this.requestTimestamps.filter(
-      (timestamp) => now - timestamp < AiService.RATE_LIMIT_WINDOW_MS
-    );
+    // Reset cache if date changed
+    if (this.rateLimitCache.currentDate !== today) {
+      pino.info("New day detected, resetting rate limit cache");
+      this.rateLimitCache = {
+        currentDate: today,
+        requestTimestamps: [],
+      };
+    }
 
-    // Check if we've hit the limit
-    if (this.requestTimestamps.length >= AiService.MAX_REQUESTS_PER_MINUTE) {
-      const oldestTimestamp = this.requestTimestamps[0];
-      const timeUntilReset =
-        AiService.RATE_LIMIT_WINDOW_MS - (now - oldestTimestamp);
+    // Remove timestamps older than 24 hours
+    this.rateLimitCache.requestTimestamps =
+      this.rateLimitCache.requestTimestamps.filter(
+        (timestamp) => now - timestamp < AiService.DAY_MS
+      );
+
+    // Daily limit check
+    if (
+      this.rateLimitCache.requestTimestamps.length >=
+      AiService.MAX_REQUESTS_PER_DAY
+    ) {
+      const oldestTimestamp = this.rateLimitCache.requestTimestamps[0];
+      const timeUntilResetMs = AiService.DAY_MS - (now - oldestTimestamp);
+      const timeUntilResetHours = Math.ceil(
+        timeUntilResetMs / (60 * 60 * 1000)
+      );
+
       pino.warn(
         {
-          currentRequests: this.requestTimestamps.length,
-          maxRequests: AiService.MAX_REQUESTS_PER_MINUTE,
-          timeUntilResetMs: timeUntilReset,
+          currentRequests: this.rateLimitCache.requestTimestamps.length,
+          dailyLimit: AiService.MAX_REQUESTS_PER_DAY,
+          timeUntilResetHours,
         },
-        "Rate limit exceeded"
+        "Daily rate limit (20 requests/day) exceeded"
       );
       return false;
     }
 
-    // Add current timestamp
-    this.requestTimestamps.push(now);
+    // Hourly limit check
+    const oneHourAgo = now - AiService.HOUR_MS;
+    const requestsInLastHour = this.rateLimitCache.requestTimestamps.filter(
+      (timestamp) => timestamp > oneHourAgo
+    ).length;
+
+    if (requestsInLastHour >= AiService.MAX_REQUESTS_PER_HOUR) {
+      const oldestHourlyTimestamp = this.rateLimitCache.requestTimestamps.find(
+        (timestamp) => timestamp > oneHourAgo
+      );
+      const timeUntilHourlyResetMs = oldestHourlyTimestamp
+        ? AiService.HOUR_MS - (now - oldestHourlyTimestamp)
+        : AiService.HOUR_MS;
+
+      pino.warn(
+        {
+          currentRequests: requestsInLastHour,
+          hourlyLimit: AiService.MAX_REQUESTS_PER_HOUR,
+          timeUntilResetMs: Math.ceil(timeUntilHourlyResetMs),
+        },
+        "Hourly rate limit (2 requests/hour) exceeded"
+      );
+      return false;
+    }
+
+    // Add current timestamp and persist
+    this.rateLimitCache.requestTimestamps.push(now);
+    this.saveRateLimitCache();
+
     pino.debug(
       {
-        currentRequests: this.requestTimestamps.length,
-        maxRequests: AiService.MAX_REQUESTS_PER_MINUTE,
+        currentDailyRequests: this.rateLimitCache.requestTimestamps.length,
+        dailyLimit: AiService.MAX_REQUESTS_PER_DAY,
+        currentHourlyRequests: requestsInLastHour + 1,
+        hourlyLimit: AiService.MAX_REQUESTS_PER_HOUR,
       },
       "Rate limit check passed"
     );
@@ -129,7 +239,7 @@ export default class AiService {
    */
   public async generateContent(
     prompt: string,
-    model: string = AiService.DEFAULT_MODEL
+    modelParam: string = AiService.DEFAULT_MODEL
   ): Promise<string> {
     if (!this.isConfigured()) {
       const error = new Error(
@@ -145,13 +255,15 @@ export default class AiService {
       throw error;
     }
 
+    let model = modelParam;
     // Check rate limit before making API call
     if (!this.checkRateLimit()) {
-      const error = new Error(
-        `Rate limit exceeded. Maximum ${AiService.MAX_REQUESTS_PER_MINUTE} requests per minute allowed.`
+      pino.warn(
+        { mainModel: modelParam, backupModel: AiService.BACKUP_MODEL },
+        `Rate limit exceeded for main model. Falling back to backup model: ${AiService.BACKUP_MODEL}`
       );
-      pino.error(error.message);
-      throw error;
+      // Use backup model instead of throwing
+      model = AiService.BACKUP_MODEL;
     }
 
     try {
@@ -197,7 +309,7 @@ export default class AiService {
   }): Promise<string> {
     const {
       prompt,
-      model = AiService.DEFAULT_MODEL,
+      model: modelParam = AiService.DEFAULT_MODEL,
       systemInstruction,
     } = options;
 
@@ -207,11 +319,15 @@ export default class AiService {
       );
     }
 
+    let model = modelParam;
     // Check rate limit before making API call
     if (!this.checkRateLimit()) {
-      throw new Error(
-        `Rate limit exceeded. Maximum ${AiService.MAX_REQUESTS_PER_MINUTE} requests per minute allowed.`
+      pino.warn(
+        { mainModel: modelParam, backupModel: AiService.BACKUP_MODEL },
+        `Rate limit exceeded for main model. Falling back to backup model: ${AiService.BACKUP_MODEL}`
       );
+      // Use backup model instead of throwing
+      model = AiService.BACKUP_MODEL;
     }
 
     try {
@@ -255,23 +371,6 @@ export default class AiService {
    */
   public getDefaultModel(): string {
     return AiService.DEFAULT_MODEL;
-  }
-
-  /**
-   * Prepare items for AI prompt as plain text
-   * Converts an array of items into a formatted string where each line contains item ID and title
-   * @param items Array of items from the data model
-   * @returns Plain text string with format: "id: title" per line
-   */
-  public prepareItemsPrompt(items: Item[]): string {
-    if (!items || items.length === 0) {
-      return "";
-    }
-
-    return items
-      .filter((item) => item.id !== undefined && item.title)
-      .map((item) => `${item.id}: ${item.title}`)
-      .join("\n");
   }
 
   /**
