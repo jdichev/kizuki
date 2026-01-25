@@ -176,9 +176,9 @@ app.get("/categories/readstats", async (req: Request, res: Response) => {
 
 app.get("/item-categories/readstats", async (req: Request, res: Response) => {
   try {
-    pino.debug("Fetching item category read stats");
+    pino.trace("Fetching item category read stats");
     const itemCategoryReadStats = await dataModel.getItemCategoryReadStats();
-    pino.debug(
+    pino.trace(
       { count: itemCategoryReadStats.length },
       "Item category read stats retrieved"
     );
@@ -197,9 +197,9 @@ app.get("/item-categories/readstats", async (req: Request, res: Response) => {
 
 app.get("/item-categories", async (req: Request, res: Response) => {
   try {
-    pino.debug("Fetching item categories");
+    pino.trace("Fetching item categories");
     const itemCategories = await dataModel.getItemCategories();
-    pino.debug({ count: itemCategories.length }, "Item categories retrieved");
+    pino.trace({ count: itemCategories.length }, "Item categories retrieved");
     res.json(itemCategories);
   } catch (error: any) {
     pino.error(

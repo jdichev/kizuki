@@ -13,6 +13,23 @@ export default class ItemCategorizer {
   private categorizationInProgress: boolean = false;
 
   /**
+   * Formats items into a prompt-friendly string.
+   */
+  public static buildItemsPromptList(items: any[]): string {
+    if (!items || items.length === 0) {
+      return "";
+    }
+
+    return items
+      .filter((item) => item.id !== undefined && item.title)
+      .map((item) => {
+        const feedPrefix = item.feedTitle ? `${item.feedTitle} ` : "";
+        return `${item.id}: ${feedPrefix}${item.title}`;
+      })
+      .join("\n");
+  }
+
+  /**
    * Checks whether categorization is currently in progress.
    * @returns {boolean} True if categorization is in progress, false otherwise.
    */
@@ -33,12 +50,12 @@ export default class ItemCategorizer {
       .map((cat) => cat.title)
       .join(", ");
 
-    const preparedItems = aiService.prepareItemsPrompt(items);
+    const preparedItems = ItemCategorizer.buildItemsPromptList(items);
     pino.trace({ preparedItems }, "Prepared items for AI service");
 
     const finalPrompt = `
-  You are a categorization agent. What follows is a list of article IDs and article titles.
-  Group the list by categories and generate a new list that looks like this:
+  You are a categorization agent. What follows is a list where each line is article ID, article source, and article title.
+  Group the list by categories and generate a new list that is formatted like next 2 lines and don't add other text:
   <AI generated category name>: <article id>, <article id>
   <AI generated category name>: <article id>, <article id>, <article id>
 
@@ -97,7 +114,7 @@ export default class ItemCategorizer {
       // Priority 1: Try to find unread items in Uncategorized
       let items = await dataModel.getItems({
         unreadOnly: true,
-        size: 500,
+        size: 1000,
         selectedItemCategory: uncategorizedCategory,
         order: "published",
       });
@@ -109,7 +126,7 @@ export default class ItemCategorizer {
         );
         items = await dataModel.getItems({
           unreadOnly: false,
-          size: 500,
+          size: 1000,
           selectedItemCategory: uncategorizedCategory,
           order: "published",
         });
