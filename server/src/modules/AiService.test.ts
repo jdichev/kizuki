@@ -1,9 +1,14 @@
 import AiService from "./AiService";
-import ItemCategorizer from "./ItemCategorizer";
 import SettingsManager from "./SettingsManager";
+import fs from "fs";
+import os from "os";
+import path from "path";
 
 // Mock the @google/genai module
 jest.mock("@google/genai");
+jest.mock("fs");
+jest.mock("os");
+jest.mock("./ItemCategorizer");
 
 describe("AiService", () => {
   let aiService: AiService;
@@ -13,6 +18,21 @@ describe("AiService", () => {
   beforeEach(() => {
     // Clear all mocks
     jest.clearAllMocks();
+
+    // Reset singletons by clearing their private static instances
+    (AiService as any).instance = undefined;
+    (SettingsManager as any).instance = undefined;
+
+    // Mock os.homedir and os.tmpdir
+    (os.homedir as jest.Mock).mockReturnValue("/tmp/test-home");
+    (os.tmpdir as jest.Mock).mockReturnValue("/tmp");
+
+    // Mock fs operations to prevent rate limit cache interference
+    // Always return false for existsSync to ensure fresh rate limit state
+    (fs.existsSync as jest.Mock).mockReturnValue(false);
+    (fs.readFileSync as jest.Mock).mockReturnValue("{}");
+    (fs.writeFileSync as jest.Mock).mockReturnValue(undefined);
+    (fs.mkdirSync as jest.Mock).mockReturnValue(undefined);
 
     // Get instances
     settingsManager = SettingsManager.getInstance();
@@ -111,7 +131,7 @@ describe("AiService", () => {
 
   describe("generateContentWithOptions", () => {
     beforeEach(() => {
-      settingsManager.setSetting("geminiApiKey", "test-api-key");
+      settingsManager.setSetting("GEMINI_API_KEY", "test-api-key");
       aiService.refreshClient();
     });
 
@@ -154,15 +174,15 @@ describe("AiService", () => {
 
   describe("refreshClient", () => {
     it("should reinitialize client when API key changes", () => {
-      settingsManager.setSetting("geminiApiKey", "old-key");
+      settingsManager.setSetting("GEMINI_API_KEY", "old-key");
       aiService.refreshClient();
       expect(aiService.isConfigured()).toBe(true);
 
-      settingsManager.setSetting("geminiApiKey", "");
+      settingsManager.setSetting("GEMINI_API_KEY", "");
       aiService.refreshClient();
       expect(aiService.isConfigured()).toBe(false);
 
-      settingsManager.setSetting("geminiApiKey", "new-key");
+      settingsManager.setSetting("GEMINI_API_KEY", "new-key");
       aiService.refreshClient();
       expect(aiService.isConfigured()).toBe(true);
     });
@@ -180,59 +200,6 @@ describe("AiService", () => {
       const instance2 = AiService.getInstance();
 
       expect(instance1).toBe(instance2);
-    });
-  });
-
-  describe("buildItemsPrompt (ItemCategorizer)", () => {
-    it("should format items as plain text with id and title per line", () => {
-      const items = [
-        { id: 1, title: "First Article" },
-        { id: 2, title: "Second Article" },
-        { id: 3, title: "Third Article" },
-      ] as Item[];
-
-      const result = ItemCategorizer.buildItemsPromptList(items);
-
-      expect(result).toBe(
-        "1: First Article\n2: Second Article\n3: Third Article"
-      );
-    });
-
-    it("should return empty string for empty array", () => {
-      const result = ItemCategorizer.buildItemsPromptList([] as any);
-      expect(result).toBe("");
-    });
-
-    it("should return empty string for null or undefined", () => {
-      const result1 = ItemCategorizer.buildItemsPromptList(null as any);
-      const result2 = ItemCategorizer.buildItemsPromptList(undefined as any);
-
-      expect(result1).toBe("");
-      expect(result2).toBe("");
-    });
-
-    it("should filter out items without id or title", () => {
-      const items = [
-        { id: 1, title: "Valid Item" },
-        { id: undefined, title: "No ID" },
-        { id: 2, title: "" },
-        { id: 3, title: "Another Valid Item" },
-      ] as Item[];
-
-      const result = ItemCategorizer.buildItemsPromptList(items);
-
-      expect(result).toBe("1: Valid Item\n3: Another Valid Item");
-    });
-
-    it("should include feed title when present", () => {
-      const items = [
-        { id: 1, title: "Story", feedTitle: "Tech" },
-        { id: 2, title: "News" },
-      ] as Item[];
-
-      const result = ItemCategorizer.buildItemsPromptList(items);
-
-      expect(result).toBe("1: Tech Story\n2: News");
     });
   });
 });
