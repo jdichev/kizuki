@@ -51,7 +51,7 @@
     --table-row-odd: #383a3b;
     --content-body-color: #e4e4e4;
     --button-color-highlight: #f55;
-    --weak-color: #898989;
+    --weak-color: #585858;
     --highlight-color: #97c279;
   }
 }
@@ -263,7 +263,8 @@ a:hover {
 
 #sidebar-menu {
   padding-top: 20px;
-  padding-left: 2px;
+  padding-left: 4px;
+  padding-right: 4px;
   min-width: var(--sidebar-min-width);
   overflow-y: auto;
   width: calc(var(--sidebar-divider-pos) - var(--side-menu-width));
@@ -401,6 +402,12 @@ a:hover {
   overflow-y: auto;
 }
 
+#list-panel,
+#sidebar-menu {
+  -webkit-user-select: none; /* Safari */
+  user-select: none;
+}
+
 #content-panel iframe {
   border-width: 1px;
   border-style: solid;
@@ -439,8 +446,8 @@ table.feeds-table {
 #list-panel {
   user-select: none;
   padding-top: 8px;
-  padding-left: 2px;
-  padding-right: 2px;
+  padding-left: 8px;
+  padding-right: 4px;
 }
 
 #list-panel .table td {
@@ -563,7 +570,7 @@ table.feeds-table {
 #player {
   width: calc(
     (((87vw) / var(--total-main-size)) * var(--right-column-unitless-size)) -
-      82px - var(--side-menu-width)
+      82px - var(--side-menu-width) - 30px
   );
   height: calc(
     (
