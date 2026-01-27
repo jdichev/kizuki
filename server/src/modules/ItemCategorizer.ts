@@ -80,12 +80,10 @@ export default class ItemCategorizer {
   }
 
   /**
-   * Categorizes uncategorized items based on priority.
-   * Priority 1: Unread items in Uncategorized category (id=0)
-   * Priority 2: Any items in Uncategorized category (id=0)
+   * Categorizes uncategorized items
    * @returns The generated groups with their associated items
    */
-  public async categorizePrioritized(): Promise<any[]> {
+  public async categorize(): Promise<any[]> {
     // Check if AI service is configured
     const aiService = AiService.getInstance();
     if (!aiService.isConfigured()) {
@@ -111,26 +109,13 @@ export default class ItemCategorizer {
         return [];
       }
 
-      // Priority 1: Try to find unread items in Uncategorized
+      // Just find items in Uncategorized category
       let items = await dataModel.getItems({
-        unreadOnly: true,
-        size: 1000,
+        unreadOnly: false,
+        size: 500,
         selectedItemCategory: uncategorizedCategory,
         order: "published",
       });
-
-      if (items.length === 0) {
-        // Priority 2: Try to find any items in Uncategorized
-        pino.debug(
-          "No unread uncategorized items found, checking for any uncategorized items"
-        );
-        items = await dataModel.getItems({
-          unreadOnly: false,
-          size: 1000,
-          selectedItemCategory: uncategorizedCategory,
-          order: "published",
-        });
-      }
 
       if (items.length === 0) {
         pino.debug("No uncategorized items found");
@@ -146,12 +131,12 @@ export default class ItemCategorizer {
         items,
         itemCategories,
         aiService,
-        "Prioritized"
+        "standard"
       );
     } catch (error: any) {
       pino.error(
         { error: error.message || String(error) },
-        "Error during prioritized item categorization"
+        "Error during standard item categorization"
       );
       throw error;
     } finally {

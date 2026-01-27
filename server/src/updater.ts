@@ -47,7 +47,7 @@ export default class Updater {
         pino.debug(
           "Feed update completed, starting prioritized item categorization"
         );
-        return itemCategorizer.categorizePrioritized();
+        return itemCategorizer.categorize();
       })
       .then((groups) => {
         if (groups.length > 0) {
