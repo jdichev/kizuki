@@ -445,7 +445,10 @@ export default function ItemCategoriesMain({ topMenu }: HomeProps) {
         </div>
 
         <div id="content-panel" ref={articleRef}>
-          <Article article={article} />
+          <Article
+            article={article}
+            selectedItemCategory={selectedItemCategory}
+          />
         </div>
       </main>
 

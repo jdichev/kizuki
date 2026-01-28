@@ -75,6 +75,7 @@ interface ArticleProps {
   article?: Item;
   selectedFeedCategory?: FeedCategory;
   selectedFeed?: Feed;
+  selectedItemCategory?: ItemCategory;
 }
 
 interface ItemsTableProps {

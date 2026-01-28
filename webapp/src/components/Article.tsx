@@ -7,6 +7,7 @@ export default function Article({
   article,
   selectedFeedCategory,
   selectedFeed,
+  selectedItemCategory,
 }: ArticleProps) {
   const [videoId, setVideoId] = useState<String>();
   const [videoKind, setVideoKind] = useState<"standard" | "short" | null>(null);
@@ -246,6 +247,14 @@ export default function Article({
     return (
       <article data-testid="article-placeholder">
         <h2>{selectedFeedCategory.title}</h2>
+      </article>
+    );
+  }
+
+  if (selectedItemCategory) {
+    return (
+      <article data-testid="article-placeholder">
+        <h2>{selectedItemCategory.title}</h2>
       </article>
     );
   }
