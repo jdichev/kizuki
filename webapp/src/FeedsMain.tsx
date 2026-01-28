@@ -4,6 +4,7 @@ import DataService from "./service/DataService";
 import Article from "./components/Article";
 import ItemsTable from "./components/ItemsTable";
 import CategoriesMain from "./components/CategoriesMain";
+import TopNavMenu from "./components/TopNavMenu";
 
 const ds = DataService.getInstance();
 
@@ -649,30 +650,11 @@ export default function FeedsMain({ topMenu }: HomeProps) {
         >
           {topMenu.current &&
             ReactDOM.createPortal(
-              <>
-                <button
-                  type="button"
-                  className="btn btn-sm"
-                  id="items-check-all-read-x"
-                  title="Mark all read"
-                  onClick={() => markItemsRead()}
-                >
-                  <i className="bi bi-check2-circle" />
-                </button>
-
-                <button
-                  type="button"
-                  className="btn btn-sm"
-                  id="unread-only"
-                  onClick={() => showUnreadOnly()}
-                >
-                  {unreadOnly ? (
-                    <i className="bi bi-circle-fill" />
-                  ) : (
-                    <i className="bi bi-circle" />
-                  )}
-                </button>
-              </>,
+              <TopNavMenu
+                unreadOnly={unreadOnly}
+                onMarkAllRead={markItemsRead}
+                onToggleUnreadOnly={showUnreadOnly}
+              />,
               topMenu.current
             )}
 
