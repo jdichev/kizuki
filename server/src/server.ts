@@ -8,6 +8,7 @@ import FeedUpdater from "./modules/FeedUpdater";
 import FeedFinder from "./modules/FeedFinder";
 import SettingsManager from "./modules/SettingsManager";
 import ItemCategorizer from "./modules/ItemCategorizer";
+import AiService from "./modules/AiService";
 import projectConfig from "forestconfig";
 
 const pino = pinoLib({
@@ -22,6 +23,8 @@ const updater = new FeedUpdater();
 const itemCategorizer = new ItemCategorizer();
 
 const settingsManager = SettingsManager.getInstance();
+
+const aiService = AiService.getInstance();
 
 const app: Application = express();
 
@@ -429,6 +432,41 @@ app.delete("/settings/:key", (req: Request, res: Response) => {
   const { key } = req.params;
   settingsManager.deleteSetting(key);
   res.json({ message: `Setting "${key}" deleted successfully` });
+});
+
+app.post("/api/summarize", jsonParser, async (req: Request, res: Response) => {
+  try {
+    const { content } = req.body;
+
+    if (!content) {
+      return res.status(400).json({
+        error: "Content is required",
+        message: "Please provide content to summarize",
+      });
+    }
+
+    if (!aiService.isConfigured()) {
+      return res.status(503).json({
+        error: "AI service not configured",
+        message:
+          "Please set the Gemini API key in settings to use this feature",
+      });
+    }
+
+    pino.info({ contentLength: content.length }, "Summarizing article content");
+    const summary = await aiService.summarizeArticle(content);
+
+    res.json({ summary });
+  } catch (error: any) {
+    pino.error(
+      { error: error.message || String(error) },
+      "Error summarizing content"
+    );
+    res.status(500).json({
+      error: "Failed to summarize content",
+      message: error.message || String(error),
+    });
+  }
 });
 
 app.use((req: Request, res: Response) => {

@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 /* eslint-disable react/no-danger */
 import FormattedDate from "./FormattedDate";
+import serverConfig from "../config/serverConfig";
 
 // @ts-ignore
 export default function Article({
@@ -12,10 +13,15 @@ export default function Article({
   const [videoId, setVideoId] = useState<String>();
   const [videoKind, setVideoKind] = useState<"standard" | "short" | null>(null);
   const playerRef = useRef<any>(null);
+  const [summary, setSummary] = useState<string | null>(null);
+  const [isLoadingSummary, setIsLoadingSummary] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
 
   useEffect(() => {
     setVideoId(undefined);
     setVideoKind(null);
+    setSummary(null);
+    setSummaryError(null);
 
     if (!article || !article.url) return;
 
@@ -97,6 +103,37 @@ export default function Article({
     }
   };
 
+  const handleSummarize = async () => {
+    if (!article || !article.content) return;
+
+    setIsLoadingSummary(true);
+    setSummaryError(null);
+
+    try {
+      const url = `${serverConfig.protocol}//${serverConfig.hostname}:${serverConfig.port}/api/summarize`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ content: article.content }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to summarize");
+      }
+
+      const data = await response.json();
+      setSummary(data.summary);
+    } catch (error: any) {
+      console.error("Error summarizing article:", error);
+      setSummaryError(error.message || "Failed to summarize article");
+    } finally {
+      setIsLoadingSummary(false);
+    }
+  };
+
   // Keyboard shortcut handler
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
@@ -149,6 +186,15 @@ export default function Article({
           >
             Visit Site
           </a>
+          &nbsp;|&nbsp;
+          <button
+            onClick={handleSummarize}
+            disabled={isLoadingSummary}
+            className="btn btn-sm btn-link text-decoration-none p-0"
+            style={{ border: "none" }}
+          >
+            {isLoadingSummary ? "Summarizing..." : "Summarize Text"}
+          </button>
           {article.comments ? (
             <>
               &nbsp;|&nbsp;
@@ -191,6 +237,19 @@ export default function Article({
             </>
           ) : (
             <></>
+          )}
+
+          {summary && (
+            <div className="article-summary">
+              <h4>Summary</h4>
+              <p style={{ whiteSpace: "pre-wrap" }}>{summary}</p>
+            </div>
+          )}
+
+          {summaryError && (
+            <div className="article-summary-error">
+              <strong>Error:</strong> {summaryError}
+            </div>
           )}
 
           <div

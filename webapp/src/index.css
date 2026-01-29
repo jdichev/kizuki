@@ -550,6 +550,24 @@ table.feeds-table {
   padding-right: 5%;
 }
 
+.article-summary {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  border: 1px solid var(--frame-border-color);
+  background-color: var(--items-list-bg);
+  font-size: 0.8rem;
+  font-family: monospace;
+}
+
+.article-summary-error {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  border: 1px solid var(--frame-border-color);
+  background-color: var(--btn-bg-color);
+  font-size: 0.8rem;
+  font-family: monospace;
+}
+
 #content img,
 #content li {
   margin-bottom: 1rem;

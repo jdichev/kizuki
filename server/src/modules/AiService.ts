@@ -374,6 +374,54 @@ export default class AiService {
   }
 
   /**
+   * Summarize article content in up to 350 words
+   * @param htmlContent The HTML content to summarize
+   * @returns A plain text summary (abstract) of the content
+   */
+  public async summarizeArticle(htmlContent: string): Promise<string> {
+    if (!htmlContent || htmlContent.trim() === "") {
+      throw new Error("Content cannot be empty");
+    }
+
+    // Strip HTML tags to get plain text
+    const plainText = htmlContent
+      .replace(/<script[^>]*>.*?<\/script>/gi, "") // Remove script tags
+      .replace(/<style[^>]*>.*?<\/style>/gi, "") // Remove style tags
+      .replace(/<[^>]+>/g, " ") // Remove all HTML tags
+      .replace(/&nbsp;/g, " ") // Replace non-breaking spaces
+      .replace(/&amp;/g, "&") // Replace HTML entities
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/\s+/g, " ") // Normalize whitespace
+      .trim();
+
+    if (!plainText) {
+      throw new Error("Content is empty after HTML stripping");
+    }
+
+    pino.debug(
+      { originalLength: htmlContent.length, plainTextLength: plainText.length },
+      "Stripped HTML from article content"
+    );
+
+    const prompt = `Please provide a concise summary (abstract) of the following article in up to 350 words. Focus on the key points, main ideas, and important details:\n\n${plainText}`;
+
+    try {
+      const summary = await this.generateContent(prompt);
+      pino.info(
+        { summaryLength: summary.length },
+        "Article summarized successfully"
+      );
+      return summary;
+    } catch (error) {
+      pino.error({ error }, "Failed to summarize article");
+      throw error;
+    }
+  }
+
+  /**
    * Parse AI response containing categorized article IDs and group items accordingly
    * Expected format: "Category Name: id1, id2, id3"
    * @param aiResponse The AI-generated response with categories and article IDs
