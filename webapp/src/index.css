@@ -46,7 +46,7 @@
     --link-color: #dbd4c5;
     --link-hover-color: #ffffff;
     --link-highlight-color: #f0c87f;
-    --btn-bg-color: #252526;
+    --btn-bg-color: #424244;
     --btn-fg-color: #f8f9fa;
     --table-row-odd: #383a3b;
     --content-body-color: #e4e4e4;
@@ -550,22 +550,26 @@ table.feeds-table {
   padding-right: 5%;
 }
 
-.article-summary {
+.text-summary {
   margin-bottom: 1.5rem;
   padding: 1rem;
   border: 1px solid var(--frame-border-color);
   background-color: var(--items-list-bg);
   font-size: 0.8rem;
   font-family: monospace;
+  overflow-wrap: anywhere;
+  word-break: normal;
 }
 
-.article-summary-error {
+.text-summary-error {
   margin-bottom: 1.5rem;
   padding: 1rem;
   border: 1px solid var(--frame-border-color);
   background-color: var(--btn-bg-color);
   font-size: 0.8rem;
   font-family: monospace;
+  overflow-wrap: anywhere;
+  word-break: normal;
 }
 
 #content img,

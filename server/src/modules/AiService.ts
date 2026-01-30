@@ -406,7 +406,13 @@ export default class AiService {
       "Stripped HTML from article content"
     );
 
-    const prompt = `Please provide a concise summary (abstract) of the following article in up to 350 words. Focus on the key points, main ideas, and important details:\n\n${plainText}`;
+    const prompt = `
+      Please provide a concise summary (abstract) of the following article in up to 240 words.
+      The first sentence should be separated on its own line and answer the main questions of who, what(, and when, where if possible).
+      Feel free to use lists or short tables if appropriate.
+      Focus on the key points, main ideas, and important details:
+      
+      ${plainText}`;
 
     try {
       const summary = await this.generateContent(prompt);

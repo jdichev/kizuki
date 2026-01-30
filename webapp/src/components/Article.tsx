@@ -16,12 +16,17 @@ export default function Article({
   const [summary, setSummary] = useState<string | null>(null);
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [retrievedContent, setRetrievedContent] = useState<string | null>(null);
+  const [isLoadingContent, setIsLoadingContent] = useState(false);
+  const [retrieveError, setRetrieveError] = useState<string | null>(null);
 
   useEffect(() => {
     setVideoId(undefined);
     setVideoKind(null);
     setSummary(null);
     setSummaryError(null);
+    setRetrievedContent(null);
+    setRetrieveError(null);
 
     if (!article || !article.url) return;
 
@@ -104,19 +109,77 @@ export default function Article({
   };
 
   const handleSummarize = async () => {
-    if (!article || !article.content) return;
+    if (!article) return;
 
     setIsLoadingSummary(true);
     setSummaryError(null);
 
     try {
+      let contentToSummarize = article.content;
+      let shouldFetchLatest = false;
+
+      // If no content or content is too short, fetch the full article
+      if (!article.content) {
+        shouldFetchLatest = true;
+      } else {
+        // Count words in the article content (strip HTML tags first)
+        const textContent = article.content
+          .replace(/<[^>]*>/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+        const wordCount = textContent.split(/\s+/).length;
+
+        if (wordCount < 90) {
+          shouldFetchLatest = true;
+        }
+      }
+
+      // Fetch the full article if needed
+      if (shouldFetchLatest && article.url) {
+        try {
+          const retrieveUrl = `${serverConfig.protocol}//${serverConfig.hostname}:${serverConfig.port}/api/retrieve-latest`;
+          const retrieveResponse = await fetch(retrieveUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ url: article.url, format: "html" }),
+          });
+
+          if (retrieveResponse.ok) {
+            const retrieveData = await retrieveResponse.json();
+            contentToSummarize = retrieveData.markdown;
+            // Also update the displayed retrieved content as HTML
+            if (retrieveData.html) {
+              setRetrievedContent(retrieveData.html);
+            } else {
+              setRetrievedContent(retrieveData.markdown);
+            }
+          } else {
+            const errorData = await retrieveResponse.json();
+            throw new Error(
+              `Failed to retrieve article: ${errorData.message || "Unknown error"}`
+            );
+          }
+        } catch (retrieveError: any) {
+          console.warn("Failed to retrieve full article:", retrieveError);
+          throw new Error(
+            `Cannot summarize: ${retrieveError.message || "Failed to retrieve article content"}`
+          );
+        }
+      }
+
+      if (!contentToSummarize) {
+        throw new Error("No content available to summarize");
+      }
+
       const url = `${serverConfig.protocol}//${serverConfig.hostname}:${serverConfig.port}/api/summarize`;
       const response = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ content: article.content }),
+        body: JSON.stringify({ content: contentToSummarize, format: "html" }),
       });
 
       if (!response.ok) {
@@ -125,12 +188,45 @@ export default function Article({
       }
 
       const data = await response.json();
-      setSummary(data.summary);
+      // Use HTML version if available, otherwise use plain summary
+      setSummary(data.html || data.summary);
     } catch (error: any) {
       console.error("Error summarizing article:", error);
       setSummaryError(error.message || "Failed to summarize article");
     } finally {
       setIsLoadingSummary(false);
+    }
+  };
+
+  const handleRetrieveLatest = async () => {
+    if (!article || !article.url) return;
+
+    setIsLoadingContent(true);
+    setRetrieveError(null);
+
+    try {
+      const url = `${serverConfig.protocol}//${serverConfig.hostname}:${serverConfig.port}/api/retrieve-latest`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ url: article.url, format: "html" }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to retrieve article");
+      }
+
+      const data = await response.json();
+      // Use HTML version if available, otherwise use markdown
+      setRetrievedContent(data.html || data.markdown);
+    } catch (error: any) {
+      console.error("Error retrieving article:", error);
+      setRetrieveError(error.message || "Failed to retrieve article");
+    } finally {
+      setIsLoadingContent(false);
     }
   };
 
@@ -240,15 +336,36 @@ export default function Article({
           )}
 
           {summary && (
-            <div className="article-summary">
+            <div className="text-summary">
               <h4>Summary</h4>
-              <p style={{ whiteSpace: "pre-wrap" }}>{summary}</p>
+              <div
+                dangerouslySetInnerHTML={{
+                  __html: summary,
+                }}
+              />
             </div>
           )}
 
           {summaryError && (
-            <div className="article-summary-error">
+            <div className="text-summary-error">
               <strong>Error:</strong> {summaryError}
+            </div>
+          )}
+
+          {retrievedContent && (
+            <div className="text-summary">
+              <h4>Retrieved Latest Content</h4>
+              <div
+                dangerouslySetInnerHTML={{
+                  __html: retrievedContent,
+                }}
+              />
+            </div>
+          )}
+
+          {retrieveError && (
+            <div className="text-summary-error">
+              <strong>Error:</strong> {retrieveError}
             </div>
           )}
 

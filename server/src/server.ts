@@ -3,6 +3,7 @@ import express, { Application, Request, Response } from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
 import pinoLib from "pino";
+import { marked } from "marked";
 import MixedDataModel from "./modules/MixedDataModel";
 import FeedUpdater from "./modules/FeedUpdater";
 import FeedFinder from "./modules/FeedFinder";
@@ -10,6 +11,7 @@ import SettingsManager from "./modules/SettingsManager";
 import ItemCategorizer from "./modules/ItemCategorizer";
 import AiService from "./modules/AiService";
 import projectConfig from "forestconfig";
+import { convertArticleToMarkdown } from "./modules/ArticleToMarkdown";
 
 const pino = pinoLib({
   level: process.env.LOG_LEVEL || "info",
@@ -436,7 +438,7 @@ app.delete("/settings/:key", (req: Request, res: Response) => {
 
 app.post("/api/summarize", jsonParser, async (req: Request, res: Response) => {
   try {
-    const { content } = req.body;
+    const { content, format } = req.body;
 
     if (!content) {
       return res.status(400).json({
@@ -456,7 +458,15 @@ app.post("/api/summarize", jsonParser, async (req: Request, res: Response) => {
     pino.info({ contentLength: content.length }, "Summarizing article content");
     const summary = await aiService.summarizeArticle(content);
 
-    res.json({ summary });
+    let responseContent = summary;
+    if (format === "html") {
+      responseContent = await marked(summary);
+    }
+
+    res.json({
+      summary,
+      html: format === "html" ? responseContent : undefined,
+    });
   } catch (error: any) {
     pino.error(
       { error: error.message || String(error) },
@@ -468,6 +478,42 @@ app.post("/api/summarize", jsonParser, async (req: Request, res: Response) => {
     });
   }
 });
+
+app.post(
+  "/api/retrieve-latest",
+  jsonParser,
+  async (req: Request, res: Response) => {
+    try {
+      const { url, format } = req.body;
+
+      if (!url) {
+        return res.status(400).json({
+          error: "URL is required",
+          message: "Please provide a URL to retrieve",
+        });
+      }
+
+      pino.info({ url }, "Retrieving latest article content");
+      const markdown = await convertArticleToMarkdown(url);
+
+      let content = markdown;
+      if (format === "html") {
+        content = await marked(markdown);
+      }
+
+      res.json({ markdown, html: format === "html" ? content : undefined });
+    } catch (error: any) {
+      pino.error(
+        { error: error.message || String(error) },
+        "Error retrieving article content"
+      );
+      res.status(500).json({
+        error: "Failed to retrieve article content",
+        message: error.message || String(error),
+      });
+    }
+  }
+);
 
 app.use((req: Request, res: Response) => {
   return res.status(404).send({ message: "Not found" });
