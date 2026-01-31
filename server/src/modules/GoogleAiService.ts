@@ -259,11 +259,11 @@ export default class GoogleAiService {
     // Check rate limit before making API call
     if (!this.checkRateLimit()) {
       pino.warn(
-        { mainModel: modelParam, backupModel: AiService.BACKUP_MODEL },
-        `Rate limit exceeded for main model. Falling back to backup model: ${AiService.BACKUP_MODEL}`
+        { mainModel: modelParam, backupModel: GoogleAiService.BACKUP_MODEL },
+        `Rate limit exceeded for main model. Falling back to backup model: ${GoogleAiService.BACKUP_MODEL}`
       );
       // Use backup model instead of throwing
-      model = AiService.BACKUP_MODEL;
+      model = GoogleAiService.BACKUP_MODEL;
     }
 
     try {

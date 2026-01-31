@@ -9,7 +9,7 @@ import FeedUpdater from "./modules/FeedUpdater";
 import FeedFinder from "./modules/FeedFinder";
 import SettingsManager from "./modules/SettingsManager";
 import ItemCategorizer from "./modules/ItemCategorizer";
-import AiService from "./modules/AiService";
+import GoogleAiService from "./modules/GoogleAiService";
 import projectConfig from "forestconfig";
 import { convertArticleToMarkdown } from "./modules/ArticleToMarkdown";
 
@@ -26,7 +26,7 @@ const itemCategorizer = new ItemCategorizer();
 
 const settingsManager = SettingsManager.getInstance();
 
-const aiService = AiService.getInstance();
+const aiService = GoogleAiService.getInstance();
 
 const app: Application = express();
 

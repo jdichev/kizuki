@@ -1,4 +1,4 @@
-import GoogleAiService from "./AiService";
+import GoogleAiService from "./GoogleAiService";
 import SettingsManager from "./SettingsManager";
 import fs from "fs";
 import os from "os";

@@ -1,6 +1,6 @@
 import pinoLib from "pino";
 import MixedDataModel from "./MixedDataModel";
-import AiService from "./AiService";
+import GoogleAiService from "./GoogleAiService";
 
 const pino = pinoLib({
   level: process.env.LOG_LEVEL || "info",
@@ -43,7 +43,7 @@ export default class ItemCategorizer {
   private async runCategorization(
     items: any[],
     itemCategories: any[],
-    aiService: AiService,
+    aiService: GoogleAiService,
     logContext: string
   ): Promise<any[]> {
     const itemCategoriesForPrompt = itemCategories
@@ -85,7 +85,7 @@ export default class ItemCategorizer {
    */
   public async categorize(): Promise<any[]> {
     // Check if AI service is configured
-    const aiService = AiService.getInstance();
+    const aiService = GoogleAiService.getInstance();
     if (!aiService.isConfigured()) {
       pino.warn("AI Service not configured, skipping categorization");
       return [];
