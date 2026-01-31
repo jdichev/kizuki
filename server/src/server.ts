@@ -460,7 +460,7 @@ app.post("/api/summarize", jsonParser, async (req: Request, res: Response) => {
 
     let responseContent = summary;
     if (format === "html") {
-      responseContent = await marked(summary);
+      responseContent = marked(summary) as string;
     }
 
     res.json({
@@ -498,7 +498,7 @@ app.post(
 
       let content = markdown;
       if (format === "html") {
-        content = await marked(markdown);
+        content = marked(markdown) as string;
       }
 
       res.json({ markdown, html: format === "html" ? content : undefined });

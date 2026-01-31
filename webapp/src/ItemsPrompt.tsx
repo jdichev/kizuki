@@ -128,12 +128,14 @@ export default function ItemsPrompt({ topMenu }: HomeProps) {
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
       if (["KeyW", "KeyK", "ArrowUp"].includes(e.code)) {
+        e.preventDefault();
         if (activeNav === "categories") {
           selectPrevFeedOrCategory();
         }
       }
 
       if (["KeyS", "KeyJ", "ArrowDown"].includes(e.code)) {
+        e.preventDefault();
         if (activeNav === "categories") {
           selectNextFeedOrCategory();
         }

@@ -112,6 +112,7 @@ export default function ItemCategoriesMain({ topMenu }: HomeProps) {
       }
 
       if (["KeyW", "KeyK", "ArrowUp"].includes(e.code)) {
+        e.preventDefault();
         if (activeNav === "categories") {
           selectPrevItemCategory();
         } else if (activeNav === "items") {
@@ -120,6 +121,7 @@ export default function ItemCategoriesMain({ topMenu }: HomeProps) {
       }
 
       if (["KeyS", "KeyJ", "ArrowDown"].includes(e.code)) {
+        e.preventDefault();
         if (activeNav === "categories") {
           selectNextItemCategory();
         } else if (activeNav === "items") {

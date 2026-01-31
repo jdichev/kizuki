@@ -155,6 +155,7 @@ export default function FeedsMain({ topMenu }: HomeProps) {
       }
 
       if (["KeyW", "KeyK", "ArrowUp"].includes(e.code)) {
+        e.preventDefault();
         if (activeNav === "categories") {
           selectPrevFeedOrCategory();
         } else if (activeNav === "items") {
@@ -163,6 +164,7 @@ export default function FeedsMain({ topMenu }: HomeProps) {
       }
 
       if (["KeyS", "KeyJ", "ArrowDown"].includes(e.code)) {
+        e.preventDefault();
         if (activeNav === "categories") {
           selectNextFeedOrCategory();
         } else if (activeNav === "items") {
