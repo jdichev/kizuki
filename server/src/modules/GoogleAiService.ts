@@ -42,6 +42,7 @@ export default class GoogleAiService {
 
   // Usage metrics tracking
   private usageMetricsCacheFilePath: string;
+  private lastModelUsed: string = GoogleAiService.DEFAULT_MODEL;
   private usageMetrics: {
     lastUpdated: string;
     totalRequests: number;
@@ -588,6 +589,7 @@ export default class GoogleAiService {
         "Generating AI content"
       );
 
+      this.lastModelUsed = model;
       const response = await this.aiClient!.models.generateContent({
         model: model,
         contents: prompt,
@@ -656,6 +658,7 @@ export default class GoogleAiService {
         "Generating AI content with options"
       );
 
+      this.lastModelUsed = model;
       const contentConfig: any = {
         model: model,
         contents: prompt,
@@ -741,12 +744,16 @@ export default class GoogleAiService {
       ${plainText}`;
 
     try {
-      const summary = await this.generateContent(prompt);
+      const summary = await this.generateContent(
+        prompt,
+        GoogleAiService.BACKUP_MODEL
+      );
+      const result = `${summary}\n\n---\n*Summary generated using: ${this.lastModelUsed}*`;
       pino.info(
-        { summaryLength: summary.length },
+        { summaryLength: result.length, model: this.lastModelUsed },
         "Article summarized successfully"
       );
-      return summary;
+      return result;
     } catch (error) {
       pino.error({ error }, "Failed to summarize article");
       throw error;
