@@ -1,3 +1,4 @@
+import { ServiceUsageClient } from "@google-cloud/service-usage";
 import { GoogleGenAI } from "@google/genai";
 import pinoLib from "pino";
 import fs from "fs";
@@ -20,6 +21,7 @@ export default class GoogleAiService {
   private static instance: GoogleAiService;
   private settingsManager: SettingsManager;
   private aiClient: GoogleGenAI | null = null;
+  private serviceUsageClient: ServiceUsageClient | null = null;
   private static readonly DEFAULT_MODEL = "gemini-3-flash-preview";
   private static readonly BACKUP_MODEL = "models/gemma-3-27b-it";
 
@@ -38,12 +40,34 @@ export default class GoogleAiService {
     requestTimestamps: [],
   };
 
+  // Usage metrics tracking
+  private usageMetricsCacheFilePath: string;
+  private usageMetrics: {
+    lastUpdated: string;
+    totalRequests: number;
+    totalTokensUsed: number;
+    quotaLimits: Map<string, number>;
+    quotaUsage: Map<string, number>;
+  } = {
+    lastUpdated: new Date().toISOString(),
+    totalRequests: 0,
+    totalTokensUsed: 0,
+    quotaLimits: new Map(),
+    quotaUsage: new Map(),
+  };
+
   private constructor() {
     this.settingsManager = SettingsManager.getInstance();
     const storageDir = path.join(os.homedir(), ".forest");
     this.rateLimitCacheFilePath = path.join(storageDir, "ai-rate-limit.json");
+    this.usageMetricsCacheFilePath = path.join(
+      storageDir,
+      "google-ai-usage-metrics.json"
+    );
     this.loadRateLimitCache();
+    this.loadUsageMetrics();
     this.initializeClient();
+    this.initializeServiceUsageClient();
   }
 
   /**
@@ -87,6 +111,7 @@ export default class GoogleAiService {
   public refreshClient(): void {
     pino.info("Refreshing Google GenAI client");
     this.initializeClient();
+    this.initializeServiceUsageClient();
   }
 
   /**
@@ -94,6 +119,297 @@ export default class GoogleAiService {
    */
   public isConfigured(): boolean {
     return this.aiClient !== null;
+  }
+
+  /**
+   * Initialize the Service Usage client for monitoring quotas and usage
+   */
+  private initializeServiceUsageClient(): void {
+    try {
+      const credentials = this.settingsManager.getSetting(
+        "GOOGLE_APPLICATION_CREDENTIALS"
+      );
+      if (credentials) {
+        this.serviceUsageClient = new ServiceUsageClient({
+          keyFilename: credentials,
+        });
+        pino.info("Service Usage client initialized for quota monitoring");
+      } else {
+        pino.debug(
+          "GOOGLE_APPLICATION_CREDENTIALS not configured, Service Usage client skipped"
+        );
+      }
+    } catch (error) {
+      pino.warn(
+        { error },
+        "Failed to initialize Service Usage client for quota monitoring"
+      );
+      this.serviceUsageClient = null;
+    }
+  }
+
+  /**
+   * Load usage metrics from disk
+   */
+  private loadUsageMetrics(): void {
+    try {
+      if (fs.existsSync(this.usageMetricsCacheFilePath)) {
+        const fileContent = fs.readFileSync(
+          this.usageMetricsCacheFilePath,
+          "utf-8"
+        );
+        const parsed = JSON.parse(fileContent);
+        this.usageMetrics = {
+          lastUpdated: parsed.lastUpdated,
+          totalRequests: parsed.totalRequests || 0,
+          totalTokensUsed: parsed.totalTokensUsed || 0,
+          quotaLimits: new Map(parsed.quotaLimits || []),
+          quotaUsage: new Map(parsed.quotaUsage || []),
+        };
+        pino.debug(
+          { requests: this.usageMetrics.totalRequests },
+          "Usage metrics loaded"
+        );
+      }
+    } catch (error) {
+      pino.warn({ error }, "Failed to load usage metrics, starting fresh");
+      this.usageMetrics = {
+        lastUpdated: new Date().toISOString(),
+        totalRequests: 0,
+        totalTokensUsed: 0,
+        quotaLimits: new Map(),
+        quotaUsage: new Map(),
+      };
+    }
+  }
+
+  /**
+   * Save usage metrics to disk
+   */
+  private saveUsageMetrics(): void {
+    try {
+      const storageDir = path.dirname(this.usageMetricsCacheFilePath);
+      if (!fs.existsSync(storageDir)) {
+        fs.mkdirSync(storageDir, { recursive: true });
+      }
+      const metricsToSave = {
+        lastUpdated: this.usageMetrics.lastUpdated,
+        totalRequests: this.usageMetrics.totalRequests,
+        totalTokensUsed: this.usageMetrics.totalTokensUsed,
+        quotaLimits: Array.from(this.usageMetrics.quotaLimits.entries()),
+        quotaUsage: Array.from(this.usageMetrics.quotaUsage.entries()),
+      };
+      fs.writeFileSync(
+        this.usageMetricsCacheFilePath,
+        JSON.stringify(metricsToSave, null, 2)
+      );
+    } catch (error) {
+      pino.error({ error }, "Failed to save usage metrics");
+    }
+  }
+
+  /**
+   * Fetch and update service metrics for configured Google Cloud services
+   * Tracks enabled APIs and their status
+   * @param projectId The Google Cloud project ID
+   * @returns Object containing service metrics and status
+   */
+  public async fetchServiceMetrics(projectId: string): Promise<{
+    servicesEnabled: string[];
+    servicesCount: number;
+    lastUpdated: string;
+  } | null> {
+    if (!this.serviceUsageClient) {
+      pino.warn("Service Usage client not initialized");
+      return null;
+    }
+
+    try {
+      const request = {
+        parent: `projects/${projectId}`,
+        filter: "state:ENABLED",
+      };
+
+      const [services] = await this.serviceUsageClient.listServices(request);
+
+      const enabledServices: string[] = [];
+
+      if (services) {
+        for (const service of services) {
+          if (service.name) {
+            enabledServices.push(service.name);
+
+            // Track if this is the Gemini/GenerativeAI service
+            if (
+              service.name.includes("aiplatform") ||
+              service.name.includes("generativelanguage")
+            ) {
+              pino.debug(
+                { service: service.name },
+                "AI service detected and enabled"
+              );
+            }
+          }
+        }
+      }
+
+      const lastUpdated = new Date().toISOString();
+      this.usageMetrics.lastUpdated = lastUpdated;
+      this.saveUsageMetrics();
+
+      pino.info(
+        {
+          servicesCount: enabledServices.length,
+          lastUpdated,
+        },
+        "Service metrics fetched successfully"
+      );
+
+      return {
+        servicesEnabled: enabledServices,
+        servicesCount: enabledServices.length,
+        lastUpdated,
+      };
+    } catch (error) {
+      pino.error({ error }, "Failed to fetch service metrics");
+      return null;
+    }
+  }
+
+  /**
+   * Get quota status and warnings based on local tracking
+   * @returns Object containing quota status and alerts
+   */
+  public getQuotaStatus(): {
+    status: "healthy" | "warning" | "critical";
+    hourlyRemaining: number;
+    dailyRemaining: number;
+    alerts: string[];
+    recommendations: string[];
+  } {
+    const now = Date.now();
+    const oneHourAgo = now - GoogleAiService.HOUR_MS;
+
+    const requestsInLastHour = this.rateLimitCache.requestTimestamps.filter(
+      (timestamp) => timestamp > oneHourAgo
+    ).length;
+
+    const requestsInLastDay = this.rateLimitCache.requestTimestamps.filter(
+      (timestamp) => now - timestamp < GoogleAiService.DAY_MS
+    ).length;
+
+    const hourlyRemaining =
+      GoogleAiService.MAX_REQUESTS_PER_HOUR - requestsInLastHour;
+    const dailyRemaining =
+      GoogleAiService.MAX_REQUESTS_PER_DAY - requestsInLastDay;
+
+    const alerts: string[] = [];
+    const recommendations: string[] = [];
+    let status: "healthy" | "warning" | "critical" = "healthy";
+
+    // Check hourly quota
+    if (hourlyRemaining <= 0) {
+      alerts.push("Hourly quota exhausted");
+      status = "critical";
+      recommendations.push(
+        "Wait at least 1 hour before making new AI requests"
+      );
+    } else if (hourlyRemaining <= 1) {
+      alerts.push("Hourly quota nearly exhausted");
+      status = "warning";
+      recommendations.push("Limit AI requests - only 1 remaining this hour");
+    }
+
+    // Check daily quota
+    if (dailyRemaining <= 0) {
+      alerts.push("Daily quota exhausted");
+      status = "critical";
+      recommendations.push("Wait until tomorrow to make new AI requests");
+    } else if (dailyRemaining <= 5) {
+      if (status !== "critical") {
+        status = "warning";
+      }
+      alerts.push("Daily quota running low");
+      recommendations.push(`Only ${dailyRemaining} requests remaining today`);
+    }
+
+    // Token usage warning
+    if (this.usageMetrics.totalTokensUsed > 1000000) {
+      if (status === "healthy") {
+        status = "warning";
+      }
+      recommendations.push(
+        `High token usage detected: ${this.usageMetrics.totalTokensUsed.toLocaleString()} tokens used`
+      );
+    }
+
+    return {
+      status,
+      hourlyRemaining,
+      dailyRemaining,
+      alerts,
+      recommendations,
+    };
+  }
+
+  /**
+   * Get current usage metrics
+   * @returns Current usage and rate limit information
+   */
+  public getUsageMetrics(): {
+    totalRequests: number;
+    totalTokensUsed: number;
+    requestsRemaining: {
+      hourly: number;
+      daily: number;
+    };
+    quotaMetrics: {
+      limits: Record<string, number>;
+      usage: Record<string, number>;
+    };
+  } {
+    const now = Date.now();
+    const oneHourAgo = now - GoogleAiService.HOUR_MS;
+
+    const requestsInLastHour = this.rateLimitCache.requestTimestamps.filter(
+      (timestamp) => timestamp > oneHourAgo
+    ).length;
+
+    const requestsInLastDay = this.rateLimitCache.requestTimestamps.filter(
+      (timestamp) => now - timestamp < GoogleAiService.DAY_MS
+    ).length;
+
+    return {
+      totalRequests: this.usageMetrics.totalRequests,
+      totalTokensUsed: this.usageMetrics.totalTokensUsed,
+      requestsRemaining: {
+        hourly: GoogleAiService.MAX_REQUESTS_PER_HOUR - requestsInLastHour,
+        daily: GoogleAiService.MAX_REQUESTS_PER_DAY - requestsInLastDay,
+      },
+      quotaMetrics: {
+        limits: Object.fromEntries(this.usageMetrics.quotaLimits),
+        usage: Object.fromEntries(this.usageMetrics.quotaUsage),
+      },
+    };
+  }
+
+  /**
+   * Update token usage metrics
+   * @param tokensUsed Number of tokens used in the request
+   */
+  private updateTokenMetrics(tokensUsed: number): void {
+    this.usageMetrics.totalRequests++;
+    this.usageMetrics.totalTokensUsed += tokensUsed;
+    this.usageMetrics.lastUpdated = new Date().toISOString();
+    this.saveUsageMetrics();
+
+    pino.debug(
+      {
+        totalRequests: this.usageMetrics.totalRequests,
+        totalTokensUsed: this.usageMetrics.totalTokensUsed,
+      },
+      "Token metrics updated"
+    );
   }
 
   /**
@@ -283,8 +599,12 @@ export default class GoogleAiService {
         throw new Error("AI response did not contain text");
       }
 
+      // Estimate tokens (rough approximation: 1 token ≈ 4 characters)
+      const estimatedTokens = Math.ceil((prompt.length + text.length) / 4);
+      this.updateTokenMetrics(estimatedTokens);
+
       pino.info(
-        { responseLength: text.length },
+        { responseLength: text.length, estimatedTokens },
         "AI content generated successfully"
       );
 
@@ -353,8 +673,14 @@ export default class GoogleAiService {
         throw new Error("AI response did not contain text");
       }
 
+      // Estimate tokens (rough approximation: 1 token ≈ 4 characters)
+      const estimatedTokens = Math.ceil(
+        (prompt.length + (systemInstruction?.length || 0) + text.length) / 4
+      );
+      this.updateTokenMetrics(estimatedTokens);
+
       pino.info(
-        { responseLength: text.length },
+        { responseLength: text.length, estimatedTokens },
         "AI content generated successfully with options"
       );
       return text;

@@ -48,6 +48,7 @@
     "ts-node": "^10.9.1"
   },
   "dependencies": {
+    "@google-cloud/service-usage": "^4.2.1",
     "@google/genai": "^1.38.0",
     "axios": "^1.13.2",
     "body-parser": "^1.20.4",

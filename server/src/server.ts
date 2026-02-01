@@ -515,6 +515,73 @@ app.post(
   }
 );
 
+// Google AI Service metrics endpoints
+app.get("/api/google-ai/metrics", (req: Request, res: Response) => {
+  try {
+    const metrics = aiService.getUsageMetrics();
+    pino.debug({ metrics }, "Google AI usage metrics retrieved");
+    res.json(metrics);
+  } catch (error: any) {
+    pino.error({ error }, "Failed to get Google AI usage metrics");
+    res.status(500).json({
+      error: "Failed to retrieve Google AI usage metrics",
+      message: error.message || String(error),
+    });
+  }
+});
+
+app.get("/api/google-ai/quota-status", (req: Request, res: Response) => {
+  try {
+    const quotaStatus = aiService.getQuotaStatus();
+    pino.debug(
+      { status: quotaStatus.status },
+      "Google AI quota status retrieved"
+    );
+    res.json(quotaStatus);
+  } catch (error: any) {
+    pino.error({ error }, "Failed to get Google AI quota status");
+    res.status(500).json({
+      error: "Failed to retrieve Google AI quota status",
+      message: error.message || String(error),
+    });
+  }
+});
+
+app.post(
+  "/api/google-ai/service-metrics",
+  jsonParser,
+  async (req: Request, res: Response) => {
+    try {
+      const { projectId } = req.body;
+
+      if (!projectId || typeof projectId !== "string") {
+        return res.status(400).json({
+          error: "projectId is required",
+          message: "Please provide a Google Cloud project ID",
+        });
+      }
+
+      pino.info({ projectId }, "Fetching Google AI service metrics");
+      const serviceMetrics = await aiService.fetchServiceMetrics(projectId);
+
+      if (!serviceMetrics) {
+        return res.status(503).json({
+          error: "Service Usage API not available",
+          message: "Google Cloud credentials may not be configured",
+        });
+      }
+
+      res.json(serviceMetrics);
+    } catch (error: any) {
+      pino.error({ error }, "Failed to fetch Google AI service metrics");
+      res.status(500).json({
+        error: "Failed to fetch Google AI service metrics",
+        message: error.message || String(error),
+      });
+    }
+  }
+);
+
 app.use((req: Request, res: Response) => {
   return res.status(404).send({ message: "Not found" });
 });
