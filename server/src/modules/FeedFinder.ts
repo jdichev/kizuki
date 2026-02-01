@@ -3,6 +3,8 @@ import isValidDomain from "is-valid-domain";
 import axios from "axios";
 import { JSDOM } from "jsdom";
 import pinoLib from "pino";
+import { MediumFeedResolver } from "../helpers/MediumFeedResolver";
+import { SubstackFeedResolver } from "../helpers/SubstackFeedResolver";
 
 const pino = pinoLib({
   level: process.env.LOG_LEVEL || "info",
@@ -17,12 +19,18 @@ export default class FeedFinder {
 
   private maxDepth = 2;
 
+  private mediumFeedResolver: MediumFeedResolver;
+
+  private substackFeedResolver: SubstackFeedResolver;
+
   constructor() {
     this.rssParser = new RssParser({
       xml2js: {
         emptyTag: "EMPTY_TAG",
       },
     });
+    this.mediumFeedResolver = new MediumFeedResolver(this.rssParser);
+    this.substackFeedResolver = new SubstackFeedResolver(this.rssParser);
   }
 
   private async loadFeedData(feedUrl: string): Promise<Feed | null> {
@@ -103,6 +111,16 @@ export default class FeedFinder {
       return feedData ? [feedData] : [];
     }
 
+    const specialFeeds = await this.mediumFeedResolver.resolveFeeds(resUrl);
+    if (specialFeeds.length) {
+      return specialFeeds;
+    }
+
+    const substackFeeds = await this.substackFeedResolver.resolveFeeds(resUrl);
+    if (substackFeeds.length) {
+      return substackFeeds;
+    }
+
     if (depth < this.maxDepth) {
       const foundFeedUrls = await this.searchForFeeds(resUrl.href, depth + 1);
 
@@ -143,7 +161,29 @@ export default class FeedFinder {
       }
     });
 
-    if (foundUrls.length) {
+    let specialFeeds: Feed[] = [];
+    try {
+      specialFeeds = await this.mediumFeedResolver.resolveFeeds(
+        new URL(url),
+        body
+      );
+    } catch (error) {
+      pino.warn(
+        { error },
+        "Failed to resolve special platform feeds from HTML"
+      );
+    }
+
+    let substackFeeds: Feed[] = [];
+    try {
+      substackFeeds = await this.substackFeedResolver.resolveFeeds(
+        new URL(url)
+      );
+    } catch (error) {
+      pino.warn({ error }, "Failed to resolve Substack feeds from HTML");
+    }
+
+    if (foundUrls.length || specialFeeds.length || substackFeeds.length) {
       let combinedResult = await Promise.all(
         foundUrls.map(async (foundUrl) => {
           const checkedFeedData = await this.checkFeed(foundUrl, depth);
@@ -157,7 +197,11 @@ export default class FeedFinder {
 
       let finalArr: Feed[] = [];
 
-      finalArr = finalArr.concat(...combinedResult);
+      finalArr = finalArr.concat(
+        specialFeeds,
+        substackFeeds,
+        ...combinedResult
+      );
 
       const occurrenceArr: string[] = [];
 
