@@ -211,6 +211,7 @@ a:hover {
 #top-nav-brand a {
   margin: 0 10px;
   padding: 0;
+  font-weight: 200;
 }
 
 #top-nav-brand a::before {
