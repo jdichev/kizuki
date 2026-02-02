@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import ReactDOM from "react-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import DataService from "./service/DataService";
 import Article from "./components/Article";
 import ItemsTable from "./components/ItemsTable";
@@ -9,6 +10,9 @@ import TopNavMenu from "./components/TopNavMenu";
 const ds = DataService.getInstance();
 
 export default function FeedsMain({ topMenu }: HomeProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [items, setItems] = useState<Item[]>([]);
 
   const [feedCategories, setFeedCategories] = useState<FeedCategory[]>([]);
@@ -26,6 +30,7 @@ export default function FeedsMain({ topMenu }: HomeProps) {
   const loadingStartedAt = useRef<number | null>(null);
   const loadingHideTimer = useRef<number | null>(null);
   const scrollDebounceTimer = useRef<number | null>(null);
+  const initializedFromUrl = useRef(false);
 
   const [unreadOnly, setUnreadOnly] = useState<boolean>(false);
 
@@ -47,6 +52,37 @@ export default function FeedsMain({ topMenu }: HomeProps) {
   const listRef = useRef<HTMLDivElement>(null);
 
   const articleRef = useRef<HTMLDivElement>(null);
+
+  const updateUrlForSelection = useCallback(
+    (categoryId?: number, feedId?: number) => {
+      const params = new URLSearchParams(location.search);
+
+      console.log("updateUrlForSelection called with:", { categoryId, feedId });
+
+      if (categoryId) {
+        params.set("category", `${categoryId}`);
+      } else {
+        params.delete("category");
+      }
+
+      if (feedId) {
+        params.set("feed", `${feedId}`);
+      } else {
+        params.delete("feed");
+      }
+
+      const search = params.toString();
+      const nextUrl = `${location.pathname}${search ? `?${search}` : ""}`;
+      const currentUrl = `${location.pathname}${location.search}`;
+
+      console.log("updateUrlForSelection result:", { nextUrl, currentUrl });
+
+      if (nextUrl !== currentUrl) {
+        navigate(nextUrl, { replace: true });
+      }
+    },
+    [location.pathname, location.search, navigate]
+  );
 
   const showFeedCategories = useCallback(async () => {
     const res = await ds.getFeedCategories();
@@ -137,6 +173,94 @@ export default function FeedsMain({ topMenu }: HomeProps) {
     showFeedCategories();
     updateFeedCategoryReadStats();
   }, [showFeedCategories, updateFeedCategoryReadStats]);
+
+  useEffect(() => {
+    if (initializedFromUrl.current || feedCategories.length === 0) {
+      return;
+    }
+
+    const params = new URLSearchParams(location.search);
+    const categoryId = params.get("category")
+      ? Number(params.get("category"))
+      : undefined;
+    const feedId = params.get("feed") ? Number(params.get("feed")) : undefined;
+
+    if (!categoryId && !feedId) {
+      initializedFromUrl.current = true;
+      return;
+    }
+
+    if (categoryId) {
+      const targetCategory = feedCategories.find((c) => c.id === categoryId);
+
+      if (targetCategory) {
+        setSelectedFeedCategory(targetCategory);
+        setSize(50);
+        setArticle(undefined);
+        setSelectedItem(undefined);
+        setUnreadOnly(false);
+        setActiveNav("categories");
+
+        if (feedId) {
+          setFeedCategories((prev) =>
+            prev.map((c) => ({
+              ...c,
+              expanded: c.id === categoryId,
+            }))
+          );
+        }
+      }
+    }
+
+    initializedFromUrl.current = true;
+  }, [feedCategories, location.search]);
+
+  useEffect(() => {
+    if (!selectedFeedCategory || !initializedFromUrl.current) {
+      return;
+    }
+
+    const params = new URLSearchParams(location.search);
+    const feedId = params.get("feed") ? Number(params.get("feed")) : undefined;
+
+    if (!feedId) {
+      return;
+    }
+
+    const loadFeedsAndSelect = async () => {
+      const feedIdStr = `${selectedFeedCategory.id}`;
+
+      if (!categoryFeeds[feedIdStr]) {
+        const feeds = await ds.getFeeds({
+          selectedFeedCategory: selectedFeedCategory,
+        });
+
+        const sortedFeeds = feeds.sort((a, b) =>
+          a.title.localeCompare(b.title)
+        );
+
+        setCategoryFeeds((prev) => {
+          const next = { ...prev };
+          next[feedIdStr] = sortedFeeds;
+          return next;
+        });
+
+        const targetFeed = sortedFeeds.find((f) => f.id === feedId);
+        if (targetFeed) {
+          setSelectedFeed(targetFeed);
+        }
+      } else {
+        const targetFeed = categoryFeeds[feedIdStr].find(
+          (f) => f.id === feedId
+        );
+        if (targetFeed) {
+          setSelectedFeed(targetFeed);
+        }
+      }
+    };
+
+    loadFeedsAndSelect();
+  }, [selectedFeedCategory, location.search, categoryFeeds]);
 
   useEffect(() => {
     const updatesInterval = setInterval(() => {
@@ -358,30 +482,34 @@ export default function FeedsMain({ topMenu }: HomeProps) {
 
   const loadCategoryFeeds = useCallback(
     async (feedCategory: FeedCategory | undefined) => {
-      const feedIdStr = `${feedCategory?.id}`;
-
-      if (!categoryFeeds[feedIdStr]) {
-        const feeds = await ds.getFeeds({
-          selectedFeedCategory: feedCategory,
-        });
-
-        setCategoryFeeds((prev) => {
-          const next = { ...prev };
-
-          next[feedIdStr] = feeds.sort((a, b) =>
-            a.title.localeCompare(b.title)
-          );
-
-          return next;
-        });
+      if (!feedCategory?.id) {
+        return [] as Feed[];
       }
+
+      const feedIdStr = `${feedCategory.id}`;
+
+      if (categoryFeeds[feedIdStr]) {
+        return categoryFeeds[feedIdStr];
+      }
+
+      const feeds = await ds.getFeeds({
+        selectedFeedCategory: feedCategory,
+      });
+
+      const sortedFeeds = feeds.sort((a, b) => a.title.localeCompare(b.title));
+
+      setCategoryFeeds((prev) => {
+        const next = { ...prev };
+
+        next[feedIdStr] = sortedFeeds;
+
+        return next;
+      });
+
+      return sortedFeeds;
     },
     [categoryFeeds]
   );
-
-  /**
-   * Select feed category, filtering items
-   */
   const selectFeedCategory = useCallback(
     async (
       feedCategory: FeedCategory | undefined,
@@ -396,6 +524,7 @@ export default function FeedsMain({ topMenu }: HomeProps) {
       setActiveNav("categories");
 
       setUnreadOnly(false);
+      updateUrlForSelection(feedCategory?.id, undefined);
       document
         .getElementById(`category-${feedCategory ? feedCategory.id : "all"}`)
         ?.focus();
@@ -420,21 +549,32 @@ export default function FeedsMain({ topMenu }: HomeProps) {
         await updateFeedReadStats();
       }
     },
-    [loadCategoryFeeds, setFeedCategories, updateFeedReadStats]
+    [
+      loadCategoryFeeds,
+      setFeedCategories,
+      updateFeedReadStats,
+      updateUrlForSelection,
+    ]
   );
 
   /**
    * Select a feed
    */
   const selectFeed = useCallback(
-    (feed: FeedCategory | undefined) => {
+    (feed: Feed | undefined) => {
+      const nextFeed = feed;
+      const nextCategoryId =
+        nextFeed?.feedCategoryId ?? selectedFeedCategory?.id;
+
       setSize(50);
-      setSelectedFeed(feed as Feed);
+      setSelectedFeed(nextFeed);
       setUnreadOnly(false);
+      setActiveNav("categories");
       listRef.current?.scrollTo(0, 0);
-      document.getElementById(`feed-${feed?.id}`)?.focus();
+      updateUrlForSelection(nextCategoryId, nextFeed?.id);
+      document.getElementById(`feed-${nextFeed?.id}`)?.focus();
     },
-    [setSize]
+    [selectedFeedCategory?.id, setSize, updateUrlForSelection]
   );
 
   const selectNextFeedOrCategory = useCallback(() => {

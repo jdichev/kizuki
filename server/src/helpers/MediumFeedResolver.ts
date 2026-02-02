@@ -80,6 +80,7 @@ export class MediumFeedResolver {
   ): string[] {
     const candidates: string[] = [];
     const hostname = url.hostname.toLowerCase();
+    const originalUrl = url.href;
 
     // Subdomain format: subdomain.medium.com/feed
     if (hostname.endsWith(".medium.com") && hostname !== "medium.com") {
@@ -109,8 +110,10 @@ export class MediumFeedResolver {
       candidates.push(`${url.origin}/feed`);
     }
 
-    // Remove duplicates
-    return [...new Set(candidates)];
+    // Remove duplicates and exclude the original URL
+    return [...new Set(candidates)].filter(
+      (candidate) => candidate !== originalUrl
+    );
   }
 
   /**

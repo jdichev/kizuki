@@ -77,6 +77,7 @@ export class SubstackFeedResolver {
     const candidates: string[] = [];
     const hostname = url.hostname.toLowerCase();
     const pathname = url.pathname;
+    const originalUrl = url.href;
 
     // Standard Substack subdomain: name.substack.com/feed
     if (hostname.endsWith(".substack.com") && hostname !== "substack.com") {
@@ -100,8 +101,10 @@ export class SubstackFeedResolver {
       candidates.push(`${url.origin}/feed`);
     }
 
-    // Remove duplicates
-    return [...new Set(candidates)];
+    // Remove duplicates and exclude the original URL
+    return [...new Set(candidates)].filter(
+      (candidate) => candidate !== originalUrl
+    );
   }
 
   /**

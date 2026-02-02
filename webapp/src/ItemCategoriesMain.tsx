@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import ReactDOM from "react-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import DataService from "./service/DataService";
 import Article from "./components/Article";
 import ItemsTable from "./components/ItemsTable";
@@ -9,6 +10,9 @@ import TopNavMenu from "./components/TopNavMenu";
 const ds = DataService.getInstance();
 
 export default function ItemCategoriesMain({ topMenu }: HomeProps) {
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const [items, setItems] = useState<Item[]>([]);
   const [itemCategories, setItemCategories] = useState<ItemCategory[]>([]);
   const [itemCategoryReadStats, setItemCategoryReadStats] = useState<
@@ -28,6 +32,28 @@ export default function ItemCategoriesMain({ topMenu }: HomeProps) {
   const scrollDebounceTimer = useRef<number | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const articleRef = useRef<HTMLDivElement>(null);
+  const initializedFromUrl = useRef<boolean>(false);
+
+  const updateUrlForSelection = useCallback(
+    (categoryId?: number) => {
+      const params = new URLSearchParams(location.search);
+
+      if (categoryId) {
+        params.set("category", `${categoryId}`);
+      } else {
+        params.delete("category");
+      }
+
+      const search = params.toString();
+      const nextUrl = `${location.pathname}${search ? `?${search}` : ""}`;
+      const currentUrl = `${location.pathname}${location.search}`;
+
+      if (nextUrl !== currentUrl) {
+        navigate(nextUrl, { replace: true });
+      }
+    },
+    [location.pathname, location.search, navigate]
+  );
 
   const showItemCategories = useCallback(async () => {
     const res = await ds.getItemCategories();
@@ -94,6 +120,27 @@ export default function ItemCategoriesMain({ topMenu }: HomeProps) {
     showItemCategories();
     updateItemCategoryReadStats();
   }, [showItemCategories, updateItemCategoryReadStats]);
+
+  useEffect(() => {
+    if (initializedFromUrl.current || itemCategories.length === 0) {
+      return;
+    }
+
+    const params = new URLSearchParams(location.search);
+    const categoryIdStr = params.get("category");
+
+    if (categoryIdStr) {
+      const categoryId = parseInt(categoryIdStr, 10);
+      if (!isNaN(categoryId)) {
+        const category = itemCategories.find((c) => c.id === categoryId);
+        if (category) {
+          setSelectedItemCategory(category);
+        }
+      }
+    }
+
+    initializedFromUrl.current = true;
+  }, [location.search, itemCategories]);
 
   useEffect(() => {
     const updatesInterval = setInterval(() => {
@@ -273,13 +320,14 @@ export default function ItemCategoriesMain({ topMenu }: HomeProps) {
       listRef.current?.scrollTo(0, 0);
       setActiveNav("categories");
       setUnreadOnly(false);
+      updateUrlForSelection(itemCategory?.id);
       document
         .getElementById(
           `item-category-${itemCategory ? itemCategory.id : "all"}`
         )
         ?.focus();
     },
-    []
+    [updateUrlForSelection]
   );
 
   const selectNextItemCategory = useCallback(() => {
