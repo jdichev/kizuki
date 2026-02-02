@@ -30,6 +30,10 @@ export default function App() {
   return (
     <div id="wrapper" className={twoColLayout ? "two-columns" : ""}>
       <Router>
+        <div id="top-nav-home">
+          <NavLink to="/" className="text-decoration-none" />
+        </div>
+
         <div id="top-nav-brand">
           <NavLink to="/" className="text-decoration-none" />
         </div>

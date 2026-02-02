@@ -135,6 +135,7 @@ a:hover {
   text-align: right;
 }
 
+#top-nav-home,
 #top-nav-brand,
 #top-nav-content {
   -webkit-app-region: drag;
@@ -202,21 +203,24 @@ a:hover {
   color: var(--items-list-bg);
 }
 
+#top-nav-home a {
+  display: inline-block;
+  width: 100%;
+  text-align: center;
+  text-decoration: none;
+}
+
+#top-nav-home a:not(:hover) {
+  color: var(--side-menu-fg);
+}
+
+#top-nav-home a::before {
+  content: " ▲ ";
+  letter-spacing: 0.2rem;
+}
+
 #top-nav-brand {
   text-align: right;
-  grid-column-start: 1;
-  grid-column-end: 3;
-}
-
-#top-nav-brand a {
-  margin: 0 10px;
-  padding: 0;
-  font-weight: 200;
-}
-
-#top-nav-brand a::before {
-  content: "気づき";
-  letter-spacing: 0.2rem;
 }
 
 #top-nav-options a {
