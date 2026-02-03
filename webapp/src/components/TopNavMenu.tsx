@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from "react";
-import "../styles/TopNavMenu.css";
 
 interface TopNavMenuProps {
   unreadOnly: boolean;

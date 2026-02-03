@@ -19,6 +19,8 @@ export default function Article({
   const [retrievedContent, setRetrievedContent] = useState<string | null>(null);
   const [isLoadingContent, setIsLoadingContent] = useState(false);
   const [retrieveError, setRetrieveError] = useState<string | null>(null);
+  const [isRetrievedContentExpanded, setIsRetrievedContentExpanded] =
+    useState(false);
 
   useEffect(() => {
     setVideoId(undefined);
@@ -27,6 +29,7 @@ export default function Article({
     setSummaryError(null);
     setRetrievedContent(null);
     setRetrieveError(null);
+    setIsRetrievedContentExpanded(false);
 
     if (!article || !article.url) return;
 
@@ -354,12 +357,24 @@ export default function Article({
 
           {retrievedContent && (
             <div className="text-summary">
-              <h4>Retrieved Latest Content</h4>
-              <div
-                dangerouslySetInnerHTML={{
-                  __html: retrievedContent,
-                }}
-              />
+              <h4>
+                Retrieved Latest Content{" "}
+                <button
+                  onClick={() =>
+                    setIsRetrievedContentExpanded(!isRetrievedContentExpanded)
+                  }
+                  className="btn-collapse-expand"
+                >
+                  {isRetrievedContentExpanded ? "[collapse]" : "[expand]"}
+                </button>
+              </h4>
+              {isRetrievedContentExpanded && (
+                <div
+                  dangerouslySetInnerHTML={{
+                    __html: retrievedContent,
+                  }}
+                />
+              )}
             </div>
           )}
 
