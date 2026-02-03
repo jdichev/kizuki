@@ -38,7 +38,7 @@ export default function ItemCategoriesMain({ topMenu }: HomeProps) {
     (categoryId?: number) => {
       const params = new URLSearchParams(location.search);
 
-      if (categoryId) {
+      if (categoryId !== undefined) {
         params.set("category", `${categoryId}`);
       } else {
         params.delete("category");

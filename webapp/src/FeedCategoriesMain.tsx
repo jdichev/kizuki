@@ -59,13 +59,13 @@ export default function FeedsMain({ topMenu }: HomeProps) {
 
       console.log("updateUrlForSelection called with:", { categoryId, feedId });
 
-      if (categoryId) {
+      if (categoryId !== undefined) {
         params.set("category", `${categoryId}`);
       } else {
         params.delete("category");
       }
 
-      if (feedId) {
+      if (feedId !== undefined) {
         params.set("feed", `${feedId}`);
       } else {
         params.delete("feed");
