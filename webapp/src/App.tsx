@@ -2,9 +2,9 @@ import { useEffect, useState, useRef } from "react";
 import { HashRouter as Router, Routes, Route, NavLink } from "react-router-dom";
 
 import Home from "./Home";
-import FeedsMain from "./FeedsMain";
+import FeedCategoriesMain from "./FeedCategoriesMain";
 import ItemCategoriesMain from "./ItemCategoriesMain";
-import ItemsPrompt from "./ItemsPrompt";
+import FeedCategoriesRaw from "./FeedCategoriesRaw";
 import FeedsList from "./FeedsList";
 import FeedAdd from "./FeedAdd";
 import FeedEdit from "./FeedEdit";
@@ -75,7 +75,10 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
 
-          <Route path="/feeds/read" element={<FeedsMain topMenu={navMenu} />} />
+          <Route
+            path="/feeds/read"
+            element={<FeedCategoriesMain topMenu={navMenu} />}
+          />
 
           <Route
             path="/feeds/items"
@@ -84,7 +87,7 @@ export default function App() {
 
           <Route
             path="/feeds/prompt"
-            element={<ItemsPrompt topMenu={navMenu} />}
+            element={<FeedCategoriesRaw topMenu={navMenu} />}
           />
 
           <Route path="/feeds/list" element={<FeedsList topMenu={navMenu} />} />
