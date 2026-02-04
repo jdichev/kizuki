@@ -22,10 +22,12 @@ export default class FeedUpdater {
   private static readonly WEEK_LENGTH = 1000 * 60 * 60 * 24 * 7;
   private static readonly HALF_DAY_LENGTH = 1000 * 60 * 60 * 12;
   private static readonly QUARTER_DAY_LENGTH = 1000 * 60 * 60 * 6;
+  private static readonly DOMAIN_REQUEST_DELAY = 1000; // 1 second between requests to same domain
 
   private chunkSize = 4;
   private feedsProcCacheFilePath: string;
   private updateInProgress: boolean = false;
+  private domainLastRequestTime: Map<string, number> = new Map();
 
   private feedsProcCache: {
     lastUpdateTimes: { [key: string]: number };
@@ -62,6 +64,52 @@ export default class FeedUpdater {
    */
   public get isUpdateInProgress(): boolean {
     return this.updateInProgress;
+  }
+
+  /**
+   * Extracts the domain (hostname) from a URL.
+   * @param {string} url - The URL to extract the domain from.
+   * @returns {string} The domain or the original URL if parsing fails.
+   */
+  private extractDomain(url: string): string {
+    try {
+      const urlObj = new URL(url);
+      return urlObj.hostname;
+    } catch (error) {
+      pino.warn({ url }, "Failed to parse URL for domain extraction");
+      return url; // Fallback to full URL if parsing fails
+    }
+  }
+
+  /**
+   * Fetches a feed with domain-based rate limiting.
+   * Ensures requests to the same domain are spaced at least 1 second apart.
+   * @param {string} feedUrl - The feed URL to fetch.
+   * @returns {Promise<string>} The feed content as a string.
+   */
+  private async fetchFeedWithRateLimit(feedUrl: string): Promise<string> {
+    const domain = this.extractDomain(feedUrl);
+    const now = Date.now();
+    const lastRequestTime = this.domainLastRequestTime.get(domain);
+
+    if (lastRequestTime !== undefined) {
+      const timeSinceLastRequest = now - lastRequestTime;
+      const delay = Math.max(
+        0,
+        FeedUpdater.DOMAIN_REQUEST_DELAY - timeSinceLastRequest
+      );
+
+      if (delay > 0) {
+        pino.trace(
+          { domain, delay, feedUrl },
+          "Rate limiting: waiting before fetching feed"
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+
+    this.domainLastRequestTime.set(domain, Date.now());
+    return fetchFeed(feedUrl);
   }
 
   /**
@@ -183,7 +231,7 @@ export default class FeedUpdater {
     let feedRes;
 
     try {
-      feedResStr = await fetchFeed(feedData.feedUrl);
+      feedResStr = await this.fetchFeedWithRateLimit(feedData.feedUrl);
       feedRes = JSON.parse(feedResStr);
     } catch (error) {
       pino.error(error);
@@ -260,7 +308,7 @@ export default class FeedUpdater {
     let feedRes;
 
     try {
-      feedResStr = await fetchFeed(feed.feedUrl);
+      feedResStr = await this.fetchFeedWithRateLimit(feed.feedUrl);
       feedRes = JSON.parse(feedResStr);
     } catch (error) {
       pino.error(`Error fetching feed ${feed.feedUrl}: ${error}`);
