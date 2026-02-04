@@ -129,9 +129,16 @@ export class MediumFeedResolver {
   private static async getContentType(
     url: string
   ): Promise<string | undefined> {
-    const res = await axios.get(url).catch((reason) => {
-      pino.debug(reason, "Failed to fetch content type");
-    });
+    const res = await axios
+      .get(url, {
+        headers: {
+          "Accept-Encoding": "gzip, deflate",
+          "User-Agent": "Forest/1.0 (Feed Reader)",
+        },
+      })
+      .catch((reason) => {
+        pino.debug(reason, "Failed to fetch content type");
+      });
 
     const contentType = res
       ? res.headers["content-type"]?.split(";")[0].trim()

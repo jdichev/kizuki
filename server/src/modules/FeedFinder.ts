@@ -54,9 +54,16 @@ export default class FeedFinder {
   }
 
   static async getContentType(url: string): Promise<string | undefined> {
-    const res = await axios.get(url).catch((reson) => {
-      pino.error(reson);
-    });
+    const res = await axios
+      .get(url, {
+        headers: {
+          "Accept-Encoding": "gzip, deflate",
+          "User-Agent": "Forest/1.0 (Feed Reader)",
+        },
+      })
+      .catch((reson) => {
+        pino.error(reson);
+      });
 
     // pino.debug(res?.headers);
     const contentType = res
@@ -131,11 +138,34 @@ export default class FeedFinder {
   }
 
   private async searchForFeeds(url: string, depth: number): Promise<Feed[]> {
-    const res = await axios.get(url).catch((reason) => {
-      pino.error(reason);
-    });
+    const res = await axios
+      .get(url, {
+        headers: {
+          "Accept-Encoding": "gzip, deflate",
+          "User-Agent": "Forest/1.0 (Feed Reader)",
+          Accept:
+            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        },
+      })
+      .catch((reason) => {
+        pino.error(reason);
+      });
 
     if (!res) {
+      return [];
+    }
+
+    // Validate Content-Type to prevent parsing non-HTML content
+    const contentType = res.headers["content-type"]?.toLowerCase() || "";
+    const validContentTypes = [
+      "text/html",
+      "application/xhtml+xml",
+      "application/xml",
+      "text/xml",
+    ];
+
+    if (!validContentTypes.some((type) => contentType.includes(type))) {
+      pino.warn({ url, contentType }, "Skipping non-HTML content");
       return [];
     }
 
