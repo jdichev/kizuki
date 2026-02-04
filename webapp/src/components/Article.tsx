@@ -365,7 +365,7 @@ export default function Article({
                   }
                   className="btn-collapse-expand"
                 >
-                  {isRetrievedContentExpanded ? "[collapse]" : "[expand]"}
+                  {isRetrievedContentExpanded ? "[hide]" : "[preview]"}
                 </button>
               </h4>
               {isRetrievedContentExpanded && (
