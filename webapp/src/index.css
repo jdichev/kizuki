@@ -203,24 +203,20 @@ a:hover {
   color: var(--items-list-bg);
 }
 
-#top-nav-home a {
+#top-nav-brand a {
   display: inline-block;
   width: 100%;
   text-align: center;
   text-decoration: none;
 }
 
-#top-nav-home a:not(:hover) {
+#top-nav-brand a:not(:hover) {
   color: var(--sidebar-fg);
 }
 
-#top-nav-home a::before {
+#top-nav-brand a::before {
   content: " ▲ ";
   letter-spacing: 0.2rem;
-}
-
-#top-nav-brand {
-  text-align: right;
 }
 
 #top-nav-options a {
