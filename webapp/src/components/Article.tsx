@@ -1,7 +1,9 @@
 import { useEffect, useState, useRef } from "react";
+import ReactDOM from "react-dom";
 /* eslint-disable react/no-danger */
 import FormattedDate from "./FormattedDate";
 import serverConfig from "../config/serverConfig";
+import TopNavOptionsMenu from "./TopNavOptionsMenu";
 
 // @ts-ignore
 export default function Article({
@@ -9,6 +11,7 @@ export default function Article({
   selectedFeedCategory,
   selectedFeed,
   selectedItemCategory,
+  topOptions,
 }: ArticleProps) {
   const [videoId, setVideoId] = useState<String>();
   const [videoKind, setVideoKind] = useState<"standard" | "short" | null>(null);
@@ -266,163 +269,168 @@ export default function Article({
 
   if (article) {
     return (
-      <article>
-        <h1 id="title" dangerouslySetInnerHTML={{ __html: article.title }} />
-
-        <p>
-          {article.feedTitle ? article.feedTitle : "NO_TITLE"},{" "}
-          <FormattedDate pubDate={article.published} />
-          &nbsp;|
-          {article.categoryTitle ? ` Category: ${article.categoryTitle}` : ""}
-          &nbsp;♥&nbsp;
-          <a
-            data-testid="upper-outbound-link"
-            href={article.url}
-            target="_blank"
-            rel="noreferrer noopener"
-            title={`Click to Visit ${article.title}`}
-            className="text-decoration-none"
-          >
-            Visit Site
-          </a>
-          &nbsp;|&nbsp;
-          <button
-            onClick={handleSummarize}
-            disabled={isLoadingSummary}
-            className="btn btn-sm btn-link text-decoration-none p-0"
-            style={{ border: "none" }}
-          >
-            {isLoadingSummary ? "Summarizing..." : "Summarize Text"}
-          </button>
-          {article.comments ? (
-            <>
-              &nbsp;|&nbsp;
-              <a
-                href={article.comments}
-                target="_blank"
-                rel="noreferrer noopener"
-                title="Comments"
-                className="text-decoration-none"
-              >
-                Comments
-              </a>
-            </>
-          ) : (
-            ""
+      <>
+        {topOptions?.current &&
+          ReactDOM.createPortal(
+            <TopNavOptionsMenu
+              onSummarize={handleSummarize}
+              onRetrieveLatest={handleRetrieveLatest}
+              isLoadingSummary={isLoadingSummary}
+              isLoadingContent={isLoadingContent}
+            />,
+            topOptions.current
           )}
-        </p>
+        <article>
+          <h1 id="title" dangerouslySetInnerHTML={{ __html: article.title }} />
 
-        <div id="content">
-          {videoId ? (
-            <>
-              <div className="mb-2">
-                {videoKind === "short" ? (
-                  <span className="badge bg-info text-dark">YouTube Short</span>
-                ) : (
-                  <span className="badge bg-light text-dark">
-                    YouTube Video
-                  </span>
-                )}
-              </div>
-              <iframe
-                title={article.title}
-                data-testid="yt-embed-frame"
-                id="player"
-                width="640"
-                height="390"
-                src={`https://www.youtube.com/embed/${videoId}?enablejsapi=1`}
-              />
-              <br />
-            </>
-          ) : (
-            <></>
-          )}
-
-          {summary && (
-            <div className="text-summary">
-              <h4>Summary</h4>
-              <div
-                dangerouslySetInnerHTML={{
-                  __html: summary,
-                }}
-              />
-            </div>
-          )}
-
-          {summaryError && (
-            <div className="text-summary-error">
-              <strong>Error:</strong> {summaryError}
-            </div>
-          )}
-
-          {retrievedContent && (
-            <div className="text-summary">
-              <h4>
-                Retrieved Latest Content{" "}
-                <button
-                  onClick={() =>
-                    setIsRetrievedContentExpanded(!isRetrievedContentExpanded)
-                  }
-                  className="btn-collapse-expand"
-                >
-                  {isRetrievedContentExpanded ? "[hide]" : "[preview]"}
-                </button>
-              </h4>
-              {isRetrievedContentExpanded && (
-                <div
-                  dangerouslySetInnerHTML={{
-                    __html: retrievedContent,
-                  }}
-                />
-              )}
-            </div>
-          )}
-
-          {retrieveError && (
-            <div className="text-summary-error">
-              <strong>Error:</strong> {retrieveError}
-            </div>
-          )}
-
-          <div
-            dangerouslySetInnerHTML={{
-              //@ts-ignore
-              __html: article.content,
-            }}
-          />
-        </div>
-
-        <ul className="mt-4 fs-6" id="content-options">
-          <li>
+          <p>
+            {article.feedTitle ? article.feedTitle : "NO_TITLE"},{" "}
+            <FormattedDate pubDate={article.published} />
+            &nbsp;|
+            {article.categoryTitle ? ` Category: ${article.categoryTitle}` : ""}
+            &nbsp;♥&nbsp;
             <a
-              data-testid="lower-outbound-link"
+              data-testid="upper-outbound-link"
               href={article.url}
               target="_blank"
               rel="noreferrer noopener"
               title={`Click to Visit ${article.title}`}
               className="text-decoration-none"
             >
-              Visit {article.feedTitle}
+              Visit Site
             </a>
-          </li>
-          {article.comments ? (
+            {article.comments ? (
+              <>
+                &nbsp;|&nbsp;
+                <a
+                  href={article.comments}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  title="Comments"
+                  className="text-decoration-none"
+                >
+                  Comments
+                </a>
+              </>
+            ) : (
+              ""
+            )}
+          </p>
+
+          <div id="content">
+            {videoId ? (
+              <>
+                <div className="mb-2">
+                  {videoKind === "short" ? (
+                    <span className="badge bg-info text-dark">
+                      YouTube Short
+                    </span>
+                  ) : (
+                    <span className="badge bg-light text-dark">
+                      YouTube Video
+                    </span>
+                  )}
+                </div>
+                <iframe
+                  title={article.title}
+                  data-testid="yt-embed-frame"
+                  id="player"
+                  width="640"
+                  height="390"
+                  src={`https://www.youtube.com/embed/${videoId}?enablejsapi=1`}
+                />
+                <br />
+              </>
+            ) : (
+              <></>
+            )}
+
+            {summary && (
+              <div className="text-summary">
+                <h4>Summary</h4>
+                <div
+                  dangerouslySetInnerHTML={{
+                    __html: summary,
+                  }}
+                />
+              </div>
+            )}
+
+            {summaryError && (
+              <div className="text-summary-error">
+                <strong>Error:</strong> {summaryError}
+              </div>
+            )}
+
+            {retrievedContent && (
+              <div className="text-summary">
+                <h4>
+                  Retrieved Latest Content{" "}
+                  <button
+                    onClick={() =>
+                      setIsRetrievedContentExpanded(!isRetrievedContentExpanded)
+                    }
+                    className="btn-collapse-expand"
+                  >
+                    {isRetrievedContentExpanded ? "[hide]" : "[preview]"}
+                  </button>
+                </h4>
+                {isRetrievedContentExpanded && (
+                  <div
+                    dangerouslySetInnerHTML={{
+                      __html: retrievedContent,
+                    }}
+                  />
+                )}
+              </div>
+            )}
+
+            {retrieveError && (
+              <div className="text-summary-error">
+                <strong>Error:</strong> {retrieveError}
+              </div>
+            )}
+
+            <div
+              dangerouslySetInnerHTML={{
+                //@ts-ignore
+                __html: article.content,
+              }}
+            />
+          </div>
+
+          <ul className="mt-4 fs-6" id="content-options">
             <li>
               <a
-                data-testid="comments-link"
-                href={article.comments}
+                data-testid="lower-outbound-link"
+                href={article.url}
                 target="_blank"
                 rel="noreferrer noopener"
-                title="Comments"
+                title={`Click to Visit ${article.title}`}
                 className="text-decoration-none"
               >
-                Comments
+                Visit {article.feedTitle}
               </a>
             </li>
-          ) : (
-            ""
-          )}
-        </ul>
-      </article>
+            {article.comments ? (
+              <li>
+                <a
+                  data-testid="comments-link"
+                  href={article.comments}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  title="Comments"
+                  className="text-decoration-none"
+                >
+                  Comments
+                </a>
+              </li>
+            ) : (
+              ""
+            )}
+          </ul>
+        </article>
+      </>
     );
   }
 

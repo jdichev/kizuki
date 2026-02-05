@@ -68,7 +68,8 @@ interface Item {
 // Components
 
 interface HomeProps {
-  topMenu: React.RefObject<HTMLDivElement>;
+  topMenu: React.RefObject<HTMLDivElement | null>;
+  topOptions?: React.RefObject<HTMLDivElement | null>;
 }
 
 interface ArticleProps {
@@ -76,6 +77,7 @@ interface ArticleProps {
   selectedFeedCategory?: FeedCategory;
   selectedFeed?: Feed;
   selectedItemCategory?: ItemCategory;
+  topOptions?: React.RefObject<HTMLDivElement | null>;
 }
 
 interface ItemsTableProps {
@@ -94,7 +96,7 @@ interface FormattedDateProps {
 }
 
 interface FeedsProps {
-  topMenu: React.RefObject<HTMLDivElement>;
+  topMenu: React.RefObject<HTMLDivElement | null>;
 }
 
 interface FeedsTableProps {

@@ -1,22 +1,23 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
-interface TopNavMenuProps {
-  unreadOnly: boolean;
-  onMarkAllRead: () => void;
-  onToggleUnreadOnly: () => void;
+interface TopNavOptionsMenuProps {
+  onSummarize: () => void;
+  onRetrieveLatest: () => void;
+  isLoadingSummary: boolean;
+  isLoadingContent: boolean;
 }
 
-export default function TopNavMenu({
-  unreadOnly,
-  onMarkAllRead,
-  onToggleUnreadOnly,
-}: TopNavMenuProps) {
+export default function TopNavOptionsMenu({
+  onSummarize,
+  onRetrieveLatest,
+  isLoadingSummary,
+  isLoadingContent,
+}: TopNavOptionsMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
 
-  // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -32,16 +33,6 @@ export default function TopNavMenu({
     }
   }, [isOpen]);
 
-  const handleMarkAllRead = () => {
-    onMarkAllRead();
-    setIsOpen(false);
-  };
-
-  const handleToggleUnreadOnly = () => {
-    onToggleUnreadOnly();
-    setIsOpen(false);
-  };
-
   const handleToggleMenu = () => {
     if (!isOpen && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
@@ -53,15 +44,25 @@ export default function TopNavMenu({
     setIsOpen(!isOpen);
   };
 
+  const handleSummarizeClick = () => {
+    onSummarize();
+    setIsOpen(false);
+  };
+
+  const handleRetrieveClick = () => {
+    onRetrieveLatest();
+    setIsOpen(false);
+  };
+
   return (
     <div className="top-nav-menu-wrapper" ref={menuRef}>
       <button
         ref={buttonRef}
         type="button"
         className="btn btn-sm top-nav-menu-toggle"
-        title="Menu"
+        title="Article options"
         onClick={handleToggleMenu}
-        aria-label="Toggle menu"
+        aria-label="Toggle article options"
         aria-expanded={isOpen}
       >
         <i className="bi bi-three-dots-vertical" />
@@ -78,25 +79,31 @@ export default function TopNavMenu({
           <button
             type="button"
             className="top-nav-menu-item"
-            id="unread-only"
-            title="Show unread only"
-            onClick={handleToggleUnreadOnly}
+            title="Summarize article"
+            onClick={handleSummarizeClick}
+            disabled={isLoadingSummary}
           >
             <span className="menu-item-icon">
-              {unreadOnly && <i className="bi bi-check-lg" />}
+              <i className="bi bi-card-text" />
             </span>
-            <span className="menu-item-label">Show unread only</span>
+            <span className="menu-item-label">
+              {isLoadingSummary ? "Summarizing..." : "Summarize article"}
+            </span>
           </button>
 
           <button
             type="button"
             className="top-nav-menu-item"
-            id="items-check-all-read-x"
-            title="Mark all as read"
-            onClick={handleMarkAllRead}
+            title="Retrieve latest content"
+            onClick={handleRetrieveClick}
+            disabled={isLoadingContent}
           >
-            <span className="menu-item-icon" />
-            <span className="menu-item-label">Mark all as read</span>
+            <span className="menu-item-icon">
+              <i className="bi bi-cloud-download" />
+            </span>
+            <span className="menu-item-label">
+              {isLoadingContent ? "Retrieving..." : "Retrieve latest"}
+            </span>
           </button>
         </div>
       )}

@@ -9,7 +9,7 @@ import TopNavMenu from "./components/TopNavMenu";
 
 const ds = DataService.getInstance();
 
-export default function FeedsMain({ topMenu }: HomeProps) {
+export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -812,6 +812,7 @@ export default function FeedsMain({ topMenu }: HomeProps) {
             article={article}
             selectedFeedCategory={selectedFeedCategory}
             selectedFeed={selectedFeed}
+            topOptions={topOptions}
           />
         </div>
       </main>

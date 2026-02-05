@@ -13,6 +13,7 @@ import { useSidebarDivider } from "./hooks/useSidebarDivider";
 
 export default function App() {
   const navMenu = useRef<HTMLDivElement>(null);
+  const navOptions = useRef<HTMLDivElement>(null);
   const [twoColLayout, setTwoColLayout] = useState(false);
   const dividerRef = useSidebarDivider();
 
@@ -39,7 +40,7 @@ export default function App() {
         <div className="main-content" id="top-nav-content">
           <div id="top-nav-menu" ref={navMenu} />
 
-          <div id="top-nav-options"></div>
+          <div id="top-nav-options" ref={navOptions}></div>
         </div>
 
         <div id="side-menu">
@@ -75,17 +76,23 @@ export default function App() {
 
           <Route
             path="/feeds/read"
-            element={<FeedCategoriesMain topMenu={navMenu} />}
+            element={
+              <FeedCategoriesMain topMenu={navMenu} topOptions={navOptions} />
+            }
           />
 
           <Route
             path="/feeds/items"
-            element={<ItemCategoriesMain topMenu={navMenu} />}
+            element={
+              <ItemCategoriesMain topMenu={navMenu} topOptions={navOptions} />
+            }
           />
 
           <Route
             path="/feeds/prompt"
-            element={<FeedCategoriesRaw topMenu={navMenu} />}
+            element={
+              <FeedCategoriesRaw topMenu={navMenu} topOptions={navOptions} />
+            }
           />
 
           <Route path="/feeds/list" element={<FeedsList topMenu={navMenu} />} />

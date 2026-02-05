@@ -9,7 +9,7 @@ import TopNavMenu from "./components/TopNavMenu";
 
 const ds = DataService.getInstance();
 
-export default function ItemCategoriesMain({ topMenu }: HomeProps) {
+export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -480,6 +480,7 @@ export default function ItemCategoriesMain({ topMenu }: HomeProps) {
           <Article
             article={article}
             selectedItemCategory={selectedItemCategory}
+            topOptions={topOptions}
           />
         </div>
       </main>
