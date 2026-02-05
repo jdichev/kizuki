@@ -10,6 +10,7 @@ import FeedFinder from "./modules/FeedFinder";
 import SettingsManager from "./modules/SettingsManager";
 import ItemCategorizer from "./modules/ItemCategorizer";
 import GoogleAiService from "./modules/GoogleAiService";
+import GoogleServiceUsageManager from "./modules/GoogleServiceUsageManager";
 import projectConfig from "forestconfig";
 import { convertArticleToMarkdown } from "./modules/ArticleToMarkdown";
 
@@ -27,6 +28,8 @@ const itemCategorizer = new ItemCategorizer();
 const settingsManager = SettingsManager.getInstance();
 
 const aiService = GoogleAiService.getInstance();
+
+const serviceUsageManager = GoogleServiceUsageManager.getInstance();
 
 const app: Application = express();
 
@@ -562,7 +565,8 @@ app.post(
       }
 
       pino.info({ projectId }, "Fetching Google AI service metrics");
-      const serviceMetrics = await aiService.fetchServiceMetrics(projectId);
+      const serviceMetrics =
+        await serviceUsageManager.fetchServiceMetrics(projectId);
 
       if (!serviceMetrics) {
         return res.status(503).json({
