@@ -284,8 +284,13 @@ export default function Article({
           <h1 id="title" dangerouslySetInnerHTML={{ __html: article.title }} />
 
           <p>
-            {article.feedTitle ? article.feedTitle : "NO_TITLE"},{" "}
-            <FormattedDate pubDate={article.published} />
+            <a
+              href={`#/feeds/read?category=${article.feedCategoryId}&feed=${article.feedId}`}
+              className="text-decoration-none"
+            >
+              {article.feedTitle ? article.feedTitle : "NO_TITLE"}
+            </a>
+            , <FormattedDate pubDate={article.published} />
             &nbsp;|
             {article.categoryTitle ? ` Category: ${article.categoryTitle}` : ""}
             &nbsp;♥&nbsp;

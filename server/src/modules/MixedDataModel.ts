@@ -1062,7 +1062,9 @@ export default class DataService {
         items.published,
         items.read,
         items.url,
+        items.feed_id AS feedId,
         feeds.title AS feedTitle,
+        feeds.feedCategoryId,
         item_categories.title AS categoryTitle
       FROM
         items
@@ -1158,7 +1160,9 @@ export default class DataService {
         items.title,
         items.published,
         items.read,
-        feeds.title AS feedTitle
+        items.feed_id AS feedId,
+        feeds.title AS feedTitle,
+        feeds.feedCategoryId
       FROM
         items
       LEFT JOIN feeds ON

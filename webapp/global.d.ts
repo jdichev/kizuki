@@ -58,7 +58,8 @@ interface Item {
   categoryTitle?: string;
   url?: string;
   comments?: string;
-  feed_id?: number;
+  feedId?: number;
+  feedCategoryId?: number;
   jsonContent?: {
     "yt-id"?: string;
   };
