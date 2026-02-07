@@ -59,6 +59,7 @@ interface Item {
   description?: string;
   link?: string;
   read?: 0 | 1;
+  bookmarked?: 0 | 1;
   published?: number;
   feedTitle?: string;
   categoryTitle?: string;

@@ -64,6 +64,9 @@ app.get("/", (req: Request, res: Response) => {
 
 app.get("/items", async (req: Request, res: Response) => {
   const unreadOnly = req.query.unread ? req.query.unread === "true" : false;
+  const bookmarkedOnly = req.query.bookmarked
+    ? req.query.bookmarked === "true"
+    : false;
 
   const size = req.query.size ? parseInt(req.query.size as string) : undefined;
 
@@ -98,6 +101,7 @@ app.get("/items", async (req: Request, res: Response) => {
 
   const items = await dataModel.getItems({
     unreadOnly,
+    bookmarkedOnly,
     size,
     selectedFeed,
     selectedFeedCategory,
@@ -129,6 +133,23 @@ app.get("/item/read", async (req: Request, res: Response) => {
 
     if (item) {
       const result = await dataModel.markItemRead(item);
+      res.json(result);
+    } else {
+      res.json({ message: "Item not found" });
+    }
+  }
+});
+
+app.get("/item/bookmark", async (req: Request, res: Response) => {
+  const itemId = req.query.id ? parseInt(req.query.id as string) : undefined;
+
+  if (itemId === undefined) {
+    res.json({ message: "id is needed" });
+  } else {
+    const item = await dataModel.getItemById(itemId);
+
+    if (item) {
+      const result = await dataModel.toggleItemBookmark(item);
       res.json(result);
     } else {
       res.json({ message: "Item not found" });

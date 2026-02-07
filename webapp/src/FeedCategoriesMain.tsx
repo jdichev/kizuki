@@ -6,6 +6,7 @@ import Article from "./components/Article";
 import ItemsTable from "./components/ItemsTable";
 import CategoriesMain from "./components/CategoriesMain";
 import TopNavMenu from "./components/TopNavMenu";
+import { useFilterState } from "./hooks/useFilterState";
 
 const ds = DataService.getInstance();
 
@@ -27,12 +28,13 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
 
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
 
+  const { unreadOnly, bookmarkedOnly, showUnreadOnly, showBookmarkedOnly } =
+    useFilterState();
+
   const loadingStartedAt = useRef<number | null>(null);
   const loadingHideTimer = useRef<number | null>(null);
   const scrollDebounceTimer = useRef<number | null>(null);
   const initializedFromUrl = useRef(false);
-
-  const [unreadOnly, setUnreadOnly] = useState<boolean>(false);
 
   const [selectedFeedCategory, setSelectedFeedCategory] =
     useState<FeedCategory>();
@@ -110,7 +112,7 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
     try {
       if (selectedFeed) {
         res = await ds
-          .getItemsDeferred({ size, unreadOnly, selectedFeed })
+          .getItemsDeferred({ size, unreadOnly, bookmarkedOnly, selectedFeed })
           .catch((e) => {
             console.error("Error fetching items for feed:", e);
             return undefined;
@@ -120,6 +122,7 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
           .getItemsDeferred({
             size,
             unreadOnly,
+            bookmarkedOnly,
             selectedFeedCategory,
           })
           .catch((e) => {
@@ -363,7 +366,7 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
 
       if (e.code === "KeyE") {
         setActiveNav("categories");
-        showUnreadOnly();
+        handleToggleUnreadOnly();
       }
     };
 
@@ -689,14 +692,18 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
     article && window.open(article.url, "", "noopener,noreferrer");
   }, [article]);
 
-  /**
-   * Show unread only
-   */
-  const showUnreadOnly = useCallback(async () => {
+  // Wrap filter callbacks to also clear article/item selection
+  const handleToggleUnreadOnly = useCallback(async () => {
     setArticle(undefined);
     setSelectedItem(undefined);
-    setUnreadOnly(!unreadOnly);
-  }, [unreadOnly]);
+    showUnreadOnly();
+  }, [showUnreadOnly]);
+
+  const handleToggleBookmarkedOnly = useCallback(async () => {
+    setArticle(undefined);
+    setSelectedItem(undefined);
+    showBookmarkedOnly();
+  }, [showBookmarkedOnly]);
 
   /**
    * Get the unread counts for category with unread items
@@ -794,8 +801,10 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
             ReactDOM.createPortal(
               <TopNavMenu
                 unreadOnly={unreadOnly}
+                bookmarkedOnly={bookmarkedOnly}
                 onMarkAllRead={markItemsRead}
-                onToggleUnreadOnly={showUnreadOnly}
+                onToggleUnreadOnly={handleToggleUnreadOnly}
+                onToggleBookmarkedOnly={handleToggleBookmarkedOnly}
               />,
               topMenu.current
             )}

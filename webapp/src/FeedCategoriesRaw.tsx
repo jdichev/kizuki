@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import ReactDOM from "react-dom";
 import DataService from "./service/DataService";
 import CategoriesMain from "./components/CategoriesMain";
+import TopNavMenu from "./components/TopNavMenu";
+import { useFilterState } from "./hooks/useFilterState";
 
 const ds = DataService.getInstance();
 
@@ -19,6 +21,9 @@ export default function FeedCategoriesRaw({ topMenu }: HomeProps) {
   const [size, setSize] = useState<number>(100);
 
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
+
+  const { unreadOnly, bookmarkedOnly, showUnreadOnly, showBookmarkedOnly } =
+    useFilterState();
 
   const loadingStartedAt = useRef<number | null>(null);
   const loadingHideTimer = useRef<number | null>(null);
@@ -61,11 +66,12 @@ export default function FeedCategoriesRaw({ topMenu }: HomeProps) {
     let res;
 
     try {
-      // Always fetch unread items
+      // Fetch items using filter state
       res = await ds
         .getItemsDeferred({
           size,
-          unreadOnly: true,
+          unreadOnly,
+          bookmarkedOnly,
           selectedFeedCategory,
           selectedFeed,
         })
@@ -455,6 +461,15 @@ export default function FeedCategoriesRaw({ topMenu }: HomeProps) {
     [loadMore, showItems]
   );
 
+  // Wrap filter callbacks to also clear any selection state
+  const handleToggleUnreadOnly = useCallback(async () => {
+    showUnreadOnly();
+  }, [showUnreadOnly]);
+
+  const handleToggleBookmarkedOnly = useCallback(async () => {
+    showBookmarkedOnly();
+  }, [showBookmarkedOnly]);
+
   return (
     <>
       <CategoriesMain
@@ -474,20 +489,29 @@ export default function FeedCategoriesRaw({ topMenu }: HomeProps) {
         <div id="prompt-panel" ref={promptRef} onScroll={handleScroll}>
           {topMenu.current &&
             ReactDOM.createPortal(
-              <button
-                type="button"
-                className="btn btn-sm"
-                id="copy-prompt"
-                title="Copy prompt to clipboard"
-                onClick={() => {
-                  const text = generatePromptText();
-                  navigator.clipboard.writeText(text).then(() => {
-                    console.log("Prompt copied to clipboard");
-                  });
-                }}
-              >
-                <i className="bi bi-clipboard"></i>
-              </button>,
+              <>
+                <TopNavMenu
+                  unreadOnly={unreadOnly}
+                  bookmarkedOnly={bookmarkedOnly}
+                  onMarkAllRead={() => {}} // No mark all read for raw view
+                  onToggleUnreadOnly={handleToggleUnreadOnly}
+                  onToggleBookmarkedOnly={handleToggleBookmarkedOnly}
+                />
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  id="copy-prompt"
+                  title="Copy prompt to clipboard"
+                  onClick={() => {
+                    const text = generatePromptText();
+                    navigator.clipboard.writeText(text).then(() => {
+                      console.log("Prompt copied to clipboard");
+                    });
+                  }}
+                >
+                  <i className="bi bi-clipboard"></i>
+                </button>
+              </>,
               topMenu.current
             )}
 

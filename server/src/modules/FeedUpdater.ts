@@ -22,7 +22,7 @@ export default class FeedUpdater {
   private static readonly WEEK_LENGTH = 1000 * 60 * 60 * 24 * 7;
   private static readonly HALF_DAY_LENGTH = 1000 * 60 * 60 * 12;
   private static readonly QUARTER_DAY_LENGTH = 1000 * 60 * 60 * 6;
-  private static readonly DOMAIN_REQUEST_DELAY = 1000; // 1 second between requests to same domain
+  private static readonly DOMAIN_REQUEST_DELAY = 700; // 700 milliseconds between requests to same domain
 
   private chunkSize = 4;
   private feedsProcCacheFilePath: string;

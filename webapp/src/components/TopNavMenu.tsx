@@ -2,14 +2,18 @@ import React from "react";
 
 interface TopNavMenuProps {
   unreadOnly: boolean;
+  bookmarkedOnly: boolean;
   onMarkAllRead: () => void;
   onToggleUnreadOnly: () => void;
+  onToggleBookmarkedOnly: () => void;
 }
 
 export default function TopNavMenu({
   unreadOnly,
+  bookmarkedOnly,
   onMarkAllRead,
   onToggleUnreadOnly,
+  onToggleBookmarkedOnly,
 }: TopNavMenuProps) {
   return (
     <div className="top-nav-icon-buttons">
@@ -26,7 +30,11 @@ export default function TopNavMenu({
         aria-label="Toggle unread only filter"
         aria-pressed={unreadOnly}
       >
-        <i className={unreadOnly ? "bi bi-filter-circle" : "bi bi-filter-circle-fill"} />
+        <i
+          className={
+            unreadOnly ? "bi bi-filter-circle-fill" : "bi bi-filter-circle"
+          }
+        />
       </button>
 
       <button
@@ -38,6 +46,24 @@ export default function TopNavMenu({
         aria-label="Mark all items as read"
       >
         <i className="bi bi-check2-circle" />
+      </button>
+
+      <button
+        type="button"
+        className="top-nav-icon-btn"
+        id="items-bookmark-filter"
+        title={
+          bookmarkedOnly
+            ? "Showing bookmarked only (click to show all)"
+            : "Show bookmarked only"
+        }
+        onClick={onToggleBookmarkedOnly}
+        aria-label="Toggle bookmarked only filter"
+        aria-pressed={bookmarkedOnly}
+      >
+        <i
+          className={bookmarkedOnly ? "bi bi-bookmark-fill" : "bi bi-bookmark"}
+        />
       </button>
     </div>
   );

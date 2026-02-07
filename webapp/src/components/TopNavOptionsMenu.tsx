@@ -3,15 +3,21 @@ import React from "react";
 interface TopNavOptionsMenuProps {
   onSummarize: () => void;
   onRetrieveLatest: () => void;
+  onBookmark: () => void;
   isLoadingSummary: boolean;
   isLoadingContent: boolean;
+  isBookmarking: boolean;
+  isBookmarked: boolean;
 }
 
 export default function TopNavOptionsMenu({
   onSummarize,
   onRetrieveLatest,
+  onBookmark,
   isLoadingSummary,
   isLoadingContent,
+  isBookmarking,
+  isBookmarked,
 }: TopNavOptionsMenuProps) {
   return (
     <div className="top-nav-icon-buttons">
@@ -41,6 +47,28 @@ export default function TopNavOptionsMenu({
         <i
           className={
             isLoadingContent ? "bi bi-hourglass-split" : "bi bi-cloud-download"
+          }
+        />
+      </button>
+
+      <button
+        type="button"
+        className="top-nav-icon-btn"
+        title={
+          isBookmarked ? "Bookmarked (click to remove)" : "Bookmark article"
+        }
+        onClick={onBookmark}
+        disabled={isBookmarking}
+        aria-label="Bookmark article"
+        aria-pressed={isBookmarked}
+      >
+        <i
+          className={
+            isBookmarking
+              ? "bi bi-hourglass-split"
+              : isBookmarked
+                ? "bi bi-bookmark-fill"
+                : "bi bi-bookmark"
           }
         />
       </button>

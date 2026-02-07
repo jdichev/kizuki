@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS "items" (
 	"published"	INTEGER NOT NULL DEFAULT 0,
 	"comments"	TEXT,
 	"read"	INTEGER NOT NULL DEFAULT 0,
+	"bookmarked"	INTEGER NOT NULL DEFAULT 0,
 	"created"	INTEGER,
 	"json_content"	TEXT,
 	"itemCategoryId"	INTEGER DEFAULT 0,
@@ -1061,6 +1062,7 @@ export default class DataService {
         items.json_content,
         items.published,
         items.read,
+        items.bookmarked,
         items.url,
         items.feed_id AS feedId,
         feeds.title AS feedTitle,
@@ -1133,10 +1135,37 @@ export default class DataService {
     });
   }
 
+  public async toggleItemBookmark(item: Item) {
+    const currentBookmarkStatus = item.bookmarked ? 0 : 1;
+    const query = `
+      UPDATE items
+      SET bookmarked = ?
+      WHERE id = ?
+    `;
+
+    return new Promise((resolve) => {
+      this.database.run(
+        query,
+        [currentBookmarkStatus, item.id],
+        (error: Error) => {
+          if (error) {
+            pino.error(error);
+          }
+
+          resolve({
+            id: item.id,
+            bookmarked: currentBookmarkStatus,
+          });
+        }
+      );
+    });
+  }
+
   public async getItems(
     params: {
       size: number | undefined;
       unreadOnly?: boolean;
+      bookmarkedOnly?: boolean;
       selectedFeedCategory?: FeedCategory | undefined;
       selectedFeed?: Feed | undefined;
       selectedItemCategory?: Category | undefined;
@@ -1144,22 +1173,20 @@ export default class DataService {
     } = {
       size: 50,
       unreadOnly: false,
+      bookmarkedOnly: false,
       selectedFeedCategory: undefined,
       selectedFeed: undefined,
       selectedItemCategory: undefined,
       order: "published",
     }
   ): Promise<Item[]> {
-    if (typeof params.size === "undefined") {
-      params.size = 50;
-    }
-
     let query = `
       SELECT
         items.id,
         items.title,
         items.published,
         items.read,
+        items.bookmarked,
         items.feed_id AS feedId,
         feeds.title AS feedTitle,
         feeds.feedCategoryId
@@ -1173,7 +1200,8 @@ export default class DataService {
       LIMIT ?
     `;
 
-    pino.trace({ params }, "Parameters for getItems");
+    pino.debug({ params }, "Parameters for getItems");
+    console.log("Parameters for getItems", params);
 
     let whereQuery1 = `
       WHERE
@@ -1217,20 +1245,26 @@ export default class DataService {
       query = query.replace("__WHERE_PLACEHOLDER1__", "");
     }
 
-    let whereQuery2 = `
-      items.read = 0
-    `;
+    let whereQuery2 = "";
     let operator;
 
-    if (params.unreadOnly) {
+    if (params.unreadOnly || params.bookmarkedOnly) {
       if (filteredById) {
         operator = "AND";
       } else {
         operator = "WHERE";
       }
 
+      const conditions = [];
+      if (params.unreadOnly) {
+        conditions.push("items.read = 0");
+      }
+      if (params.bookmarkedOnly) {
+        conditions.push("items.bookmarked = 1");
+      }
+
       whereQuery2 = `
-      ${operator} ${whereQuery2}
+      ${operator} ${conditions.join(" AND ")}
     `;
       query = query.replace("__WHERE_PLACEHOLDER2__", whereQuery2);
     } else {
@@ -1238,6 +1272,17 @@ export default class DataService {
     }
 
     pino.trace({ query }, "Final items query");
+    pino.debug(
+      {
+        query,
+        params: {
+          unreadOnly: params.unreadOnly,
+          bookmarkedOnly: params.bookmarkedOnly,
+          size: params.size,
+        },
+      },
+      "Executing getItems query"
+    );
 
     return new Promise((resolve) => {
       this.database.all(query, [params.size], (error, rows) => {

@@ -3,7 +3,10 @@ import ReactDOM from "react-dom";
 /* eslint-disable react/no-danger */
 import FormattedDate from "./FormattedDate";
 import serverConfig from "../config/serverConfig";
+import DataService from "../service/DataService";
 import TopNavOptionsMenu from "./TopNavOptionsMenu";
+
+const ds = DataService.getInstance();
 
 // @ts-ignore
 export default function Article({
@@ -24,6 +27,7 @@ export default function Article({
   const [retrieveError, setRetrieveError] = useState<string | null>(null);
   const [isRetrievedContentExpanded, setIsRetrievedContentExpanded] =
     useState(false);
+  const [isBookmarking, setIsBookmarking] = useState(false);
 
   useEffect(() => {
     setVideoId(undefined);
@@ -236,6 +240,22 @@ export default function Article({
     }
   };
 
+  const handleBookmark = async () => {
+    if (!article) return;
+
+    setIsBookmarking(true);
+
+    try {
+      const result = await ds.toggleItemBookmark(article);
+      // Update the article with the new bookmark status
+      article.bookmarked = result.bookmarked;
+    } catch (error: any) {
+      console.error("Error bookmarking article:", error);
+    } finally {
+      setIsBookmarking(false);
+    }
+  };
+
   // Keyboard shortcut handler
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
@@ -275,8 +295,11 @@ export default function Article({
             <TopNavOptionsMenu
               onSummarize={handleSummarize}
               onRetrieveLatest={handleRetrieveLatest}
+              onBookmark={handleBookmark}
               isLoadingSummary={isLoadingSummary}
               isLoadingContent={isLoadingContent}
+              isBookmarking={isBookmarking}
+              isBookmarked={article?.bookmarked === 1}
             />,
             topOptions.current
           )}

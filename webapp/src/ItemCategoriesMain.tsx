@@ -6,6 +6,7 @@ import Article from "./components/Article";
 import ItemsTable from "./components/ItemsTable";
 import ItemCategoriesNav from "./components/ItemCategoriesNav";
 import TopNavMenu from "./components/TopNavMenu";
+import { useFilterState } from "./hooks/useFilterState";
 
 const ds = DataService.getInstance();
 
@@ -20,7 +21,13 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
   >([]);
   const [size, setSize] = useState<number>(50);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
-  const [unreadOnly, setUnreadOnly] = useState<boolean>(false);
+  const {
+    unreadOnly,
+    bookmarkedOnly,
+    showUnreadOnly,
+    showBookmarkedOnly,
+    clearFilters,
+  } = useFilterState();
   const [selectedItemCategory, setSelectedItemCategory] =
     useState<ItemCategory>();
   const [article, setArticle] = useState<Item>();
@@ -74,6 +81,7 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
         .getItemsDeferred({
           size,
           unreadOnly,
+          bookmarkedOnly,
           selectedItemCategory,
         })
         .catch((e) => {
@@ -110,7 +118,13 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
         setLoadingMore(false);
       }
     }
-  }, [size, selectedItemCategory, unreadOnly, updateItemCategoryReadStats]);
+  }, [
+    size,
+    selectedItemCategory,
+    unreadOnly,
+    bookmarkedOnly,
+    updateItemCategoryReadStats,
+  ]);
 
   useEffect(() => {
     showItems();
@@ -215,7 +229,7 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
 
       if (e.code === "KeyE") {
         setActiveNav("categories");
-        showUnreadOnly();
+        handleToggleUnreadOnly();
       }
     };
 
@@ -287,7 +301,7 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
   );
 
   const markItemsRead = useCallback(async () => {
-    setUnreadOnly(false);
+    clearFilters();
     setItems((prevItems) => {
       const nextItems = prevItems.map((prevItem) => {
         prevItem.read = 1;
@@ -306,7 +320,7 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
       });
 
     await updateItemCategoryReadStats();
-  }, [selectedItemCategory, updateItemCategoryReadStats]);
+  }, [selectedItemCategory, updateItemCategoryReadStats, clearFilters]);
 
   const selectItemCategory = useCallback(
     (
@@ -319,7 +333,7 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
       setSelectedItem(undefined);
       listRef.current?.scrollTo(0, 0);
       setActiveNav("categories");
-      setUnreadOnly(false);
+      clearFilters();
       updateUrlForSelection(itemCategory?.id);
       document
         .getElementById(
@@ -327,7 +341,7 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
         )
         ?.focus();
     },
-    [updateUrlForSelection]
+    [updateUrlForSelection, clearFilters]
   );
 
   const selectNextItemCategory = useCallback(() => {
@@ -384,11 +398,18 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
     article && window.open(article.url, "", "noopener,noreferrer");
   }, [article]);
 
-  const showUnreadOnly = useCallback(async () => {
+  // Wrap filter callbacks to also clear article/item selection
+  const handleToggleUnreadOnly = useCallback(async () => {
     setArticle(undefined);
     setSelectedItem(undefined);
-    setUnreadOnly(!unreadOnly);
-  }, [unreadOnly]);
+    showUnreadOnly();
+  }, [showUnreadOnly]);
+
+  const handleToggleBookmarkedOnly = useCallback(async () => {
+    setArticle(undefined);
+    setSelectedItem(undefined);
+    showBookmarkedOnly();
+  }, [showBookmarkedOnly]);
 
   const getUnreadCountForItemCategory = useCallback(
     (itemCategoryId: number | undefined) => {
@@ -463,8 +484,10 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
             ReactDOM.createPortal(
               <TopNavMenu
                 unreadOnly={unreadOnly}
+                bookmarkedOnly={bookmarkedOnly}
                 onMarkAllRead={markItemsRead}
-                onToggleUnreadOnly={showUnreadOnly}
+                onToggleUnreadOnly={handleToggleUnreadOnly}
+                onToggleBookmarkedOnly={handleToggleBookmarkedOnly}
               />,
               topMenu.current
             )}

@@ -90,12 +90,14 @@ export default class DataService {
     params: {
       size: number;
       unreadOnly: boolean;
+      bookmarkedOnly: boolean;
       selectedFeedCategory?: FeedCategory | undefined;
       selectedFeed?: Feed | undefined;
       selectedItemCategory?: ItemCategory | undefined;
     } = {
       size: 50,
       unreadOnly: false,
+      bookmarkedOnly: false,
       selectedFeedCategory: undefined,
       selectedFeed: undefined,
       selectedItemCategory: undefined,
@@ -119,12 +121,14 @@ export default class DataService {
     params: {
       size: number;
       unreadOnly: boolean;
+      bookmarkedOnly: boolean;
       selectedFeedCategory?: FeedCategory | undefined;
       selectedFeed?: Feed | undefined;
       selectedItemCategory?: ItemCategory | undefined;
     } = {
       size: 50,
       unreadOnly: false,
+      bookmarkedOnly: false,
       selectedFeedCategory: undefined,
       selectedFeed: undefined,
       selectedItemCategory: undefined,
@@ -136,7 +140,13 @@ export default class DataService {
       query.set("size", JSON.stringify(params.size));
     }
 
-    query.set("unread", JSON.stringify(params.unreadOnly));
+    if (params.unreadOnly) {
+      query.set("unread", "true");
+    }
+
+    if (params.bookmarkedOnly) {
+      query.set("bookmarked", "true");
+    }
 
     if (params.selectedFeedCategory) {
       query.set("cid", JSON.stringify(params.selectedFeedCategory.id));
@@ -233,6 +243,20 @@ export default class DataService {
     const queryString = query.toString();
 
     const response = await fetch(this.makeUrl(`/item/read?${queryString}`));
+
+    const result = await response.json();
+
+    return Promise.resolve(result);
+  }
+
+  public async toggleItemBookmark(item: Item) {
+    const query = new URLSearchParams();
+
+    query.set("id", JSON.stringify(item.id));
+
+    const queryString = query.toString();
+
+    const response = await fetch(this.makeUrl(`/item/bookmark?${queryString}`));
 
     const result = await response.json();
 
