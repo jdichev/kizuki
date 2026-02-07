@@ -5,6 +5,7 @@ import { JSDOM } from "jsdom";
 import pinoLib from "pino";
 import { MediumFeedResolver } from "../helpers/MediumFeedResolver";
 import { SubstackFeedResolver } from "../helpers/SubstackFeedResolver";
+import { YouTubeFeedResolver } from "../helpers/YouTubeFeedResolver";
 
 const pino = pinoLib({
   level: process.env.LOG_LEVEL || "info",
@@ -23,6 +24,8 @@ export default class FeedFinder {
 
   private substackFeedResolver: SubstackFeedResolver;
 
+  private youTubeFeedResolver: YouTubeFeedResolver;
+
   constructor() {
     this.rssParser = new RssParser({
       xml2js: {
@@ -31,6 +34,7 @@ export default class FeedFinder {
     });
     this.mediumFeedResolver = new MediumFeedResolver(this.rssParser);
     this.substackFeedResolver = new SubstackFeedResolver(this.rssParser);
+    this.youTubeFeedResolver = new YouTubeFeedResolver(this.rssParser);
   }
 
   private async loadFeedData(feedUrl: string): Promise<Feed | null> {
@@ -128,6 +132,11 @@ export default class FeedFinder {
       return substackFeeds;
     }
 
+    const youTubeFeeds = await this.youTubeFeedResolver.resolveFeeds(resUrl);
+    if (youTubeFeeds.length) {
+      return youTubeFeeds;
+    }
+
     if (depth < this.maxDepth) {
       const foundFeedUrls = await this.searchForFeeds(resUrl.href, depth + 1);
 
@@ -213,7 +222,22 @@ export default class FeedFinder {
       pino.warn({ error }, "Failed to resolve Substack feeds from HTML");
     }
 
-    if (foundUrls.length || specialFeeds.length || substackFeeds.length) {
+    let youTubeFeeds: Feed[] = [];
+    try {
+      youTubeFeeds = await this.youTubeFeedResolver.resolveFeeds(
+        new URL(url),
+        body
+      );
+    } catch (error) {
+      pino.warn({ error }, "Failed to resolve YouTube feeds from HTML");
+    }
+
+    if (
+      foundUrls.length ||
+      specialFeeds.length ||
+      substackFeeds.length ||
+      youTubeFeeds.length
+    ) {
       let combinedResult = await Promise.all(
         foundUrls.map(async (foundUrl) => {
           const checkedFeedData = await this.checkFeed(foundUrl, depth);
@@ -230,6 +254,7 @@ export default class FeedFinder {
       finalArr = finalArr.concat(
         specialFeeds,
         substackFeeds,
+        youTubeFeeds,
         ...combinedResult
       );
 
