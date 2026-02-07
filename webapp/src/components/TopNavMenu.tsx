@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React from "react";
 
 interface TopNavMenuProps {
   unreadOnly: boolean;
@@ -11,95 +11,34 @@ export default function TopNavMenu({
   onMarkAllRead,
   onToggleUnreadOnly,
 }: TopNavMenuProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
-
-  // Close menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => {
-        document.removeEventListener("mousedown", handleClickOutside);
-      };
-    }
-  }, [isOpen]);
-
-  const handleMarkAllRead = () => {
-    onMarkAllRead();
-    setIsOpen(false);
-  };
-
-  const handleToggleUnreadOnly = () => {
-    onToggleUnreadOnly();
-    setIsOpen(false);
-  };
-
-  const handleToggleMenu = () => {
-    if (!isOpen && buttonRef.current) {
-      const rect = buttonRef.current.getBoundingClientRect();
-      setDropdownPos({
-        top: rect.bottom,
-        left: rect.left,
-      });
-    }
-    setIsOpen(!isOpen);
-  };
-
   return (
-    <div className="top-nav-menu-wrapper" ref={menuRef}>
+    <div className="top-nav-icon-buttons">
       <button
-        ref={buttonRef}
         type="button"
-        className="btn btn-sm top-nav-menu-toggle"
-        title="Menu"
-        onClick={handleToggleMenu}
-        aria-label="Toggle menu"
-        aria-expanded={isOpen}
+        className="top-nav-icon-btn"
+        id="unread-only"
+        title={
+          unreadOnly
+            ? "Showing unread only (click to show all)"
+            : "Show unread only"
+        }
+        onClick={onToggleUnreadOnly}
+        aria-label="Toggle unread only filter"
+        aria-pressed={unreadOnly}
       >
-        <i className="bi bi-three-dots-vertical" />
+        <i className={unreadOnly ? "bi bi-filter-circle" : "bi bi-filter-circle-fill"} />
       </button>
 
-      {isOpen && (
-        <div
-          className="top-nav-menu-dropdown"
-          style={{
-            top: `${dropdownPos.top}px`,
-            left: `${dropdownPos.left}px`,
-          }}
-        >
-          <button
-            type="button"
-            className="top-nav-menu-item"
-            id="unread-only"
-            title="Show unread only"
-            onClick={handleToggleUnreadOnly}
-          >
-            <span className="menu-item-icon">
-              {unreadOnly && <i className="bi bi-check-lg" />}
-            </span>
-            <span className="menu-item-label">Show unread only</span>
-          </button>
-
-          <button
-            type="button"
-            className="top-nav-menu-item"
-            id="items-check-all-read-x"
-            title="Mark all as read"
-            onClick={handleMarkAllRead}
-          >
-            <span className="menu-item-icon" />
-            <span className="menu-item-label">Mark all as read</span>
-          </button>
-        </div>
-      )}
+      <button
+        type="button"
+        className="top-nav-icon-btn"
+        id="items-check-all-read-x"
+        title="Mark all as read"
+        onClick={onMarkAllRead}
+        aria-label="Mark all items as read"
+      >
+        <i className="bi bi-check2-circle" />
+      </button>
     </div>
   );
 }
