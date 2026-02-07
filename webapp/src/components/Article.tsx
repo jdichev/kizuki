@@ -350,14 +350,17 @@ export default function Article({
               <></>
             )}
 
-            {summary && (
+            {(isLoadingSummary || summary || summaryError) && (
               <div className="text-summary">
-                <h4>Summary</h4>
-                <div
-                  dangerouslySetInnerHTML={{
-                    __html: summary,
-                  }}
-                />
+                {summary && <h4>Summary</h4>}
+                {summary && (
+                  <div
+                    dangerouslySetInnerHTML={{
+                      __html: summary,
+                    }}
+                  />
+                )}
+                {isLoadingSummary && !summary && <div>Summarizing...</div>}
               </div>
             )}
 
@@ -367,7 +370,7 @@ export default function Article({
               </div>
             )}
 
-            {retrievedContent && (
+            {(isLoadingContent || retrievedContent || retrieveError) && (
               <div className="text-summary">
                 <h4>
                   Retrieved Latest Content{" "}
@@ -376,11 +379,18 @@ export default function Article({
                       setIsRetrievedContentExpanded(!isRetrievedContentExpanded)
                     }
                     className="btn-collapse-expand"
+                    disabled={!retrievedContent}
                   >
                     {isRetrievedContentExpanded ? "[hide]" : "[preview]"}
                   </button>
                 </h4>
-                {isRetrievedContentExpanded && (
+                {isLoadingContent && !retrievedContent && (
+                  <div>Retrieving latest content...</div>
+                )}
+                {isLoadingContent && retrievedContent && (
+                  <div>Updating retrieved content...</div>
+                )}
+                {isRetrievedContentExpanded && retrievedContent && (
                   <div
                     dangerouslySetInnerHTML={{
                       __html: retrievedContent,
