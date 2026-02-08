@@ -99,7 +99,7 @@ describe("FeedUpdater - Domain Rate Limiting", () => {
   });
 
   describe("rate limiting behavior", () => {
-    it("should delay requests to the same domain by at least 1 second", async () => {
+    it("should delay requests to the same domain by at least 700ms", async () => {
       const feeds = [
         { id: 1, feedUrl: "https://youtube.com/feed1.xml", title: "Feed 1" },
         { id: 2, feedUrl: "https://youtube.com/feed2.xml", title: "Feed 2" },
@@ -115,10 +115,10 @@ describe("FeedUpdater - Domain Rate Limiting", () => {
       const youtubeTimes = callTimes.get("youtube.com")!;
       expect(youtubeTimes).toHaveLength(3);
 
-      // Check that each request is at least 1000ms apart
+      // Check that each request is at least 700ms apart
       for (let i = 1; i < youtubeTimes.length; i++) {
         const timeDiff = youtubeTimes[i] - youtubeTimes[i - 1];
-        expect(timeDiff).toBeGreaterThanOrEqual(999); // Allow 1ms margin
+        expect(timeDiff).toBeGreaterThanOrEqual(650); // Allow 50ms margin
       }
     });
 
@@ -169,16 +169,16 @@ describe("FeedUpdater - Domain Rate Limiting", () => {
       // Check delays between YouTube requests
       for (let i = 1; i < youtubeTimes.length; i++) {
         const timeDiff = youtubeTimes[i] - youtubeTimes[i - 1];
-        expect(timeDiff).toBeGreaterThanOrEqual(999); // Allow 1ms margin
+        expect(timeDiff).toBeGreaterThanOrEqual(650); // Allow 50ms margin
       }
 
       // Other domains should have 1 call each
       expect(callTimes.get("reddit.com")).toHaveLength(1);
       expect(callTimes.get("twitter.com")).toHaveLength(1);
 
-      // Total time should be ~2 seconds (2 delays for YouTube)
-      expect(endTime - startTime).toBeGreaterThanOrEqual(1998);
-      expect(endTime - startTime).toBeLessThan(2500);
+      // Total time should be ~1.4 seconds (2 delays for YouTube at 700ms each)
+      expect(endTime - startTime).toBeGreaterThanOrEqual(1300);
+      expect(endTime - startTime).toBeLessThan(2000);
     });
 
     it("should not delay the first request to a domain", async () => {
@@ -230,7 +230,7 @@ describe("FeedUpdater - Domain Rate Limiting", () => {
       const domainATimes = callTimes.get("domaina.com")!;
       expect(domainATimes).toHaveLength(2);
       const actualDelay = domainATimes[1] - domainATimes[0];
-      expect(actualDelay).toBeGreaterThanOrEqual(999);
+      expect(actualDelay).toBeGreaterThanOrEqual(650); // Allow 50ms margin with 700ms delay
     });
   });
 
