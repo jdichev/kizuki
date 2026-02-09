@@ -13,3 +13,6 @@ release
 
 # But do NOT ignore .env.example
 !.env.example
+
+# Feature development todos
+todos.md
