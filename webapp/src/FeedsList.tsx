@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { FieldValues, useForm } from "react-hook-form";
 import DataService from "./service/DataService";
 import FeedsTable from "./components/FeedsTable";
@@ -130,6 +130,41 @@ export default function Feeds({ topMenu }: FeedsProps) {
   }, []);
 
   const [renameCategoryId, setRenameCategoryId] = useState();
+
+  const [sortField, setSortField] = useState<"name" | "items" | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+
+  const handleSort = useCallback(
+    (field: "name" | "items") => {
+      if (sortField === field) {
+        setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+      } else {
+        setSortField(field);
+        setSortDirection("asc");
+      }
+    },
+    [sortField]
+  );
+
+  const sortedFeeds = useMemo(() => {
+    if (!sortField) return feeds;
+
+    const sorted = [...feeds].sort((a, b) => {
+      let compareValue = 0;
+
+      if (sortField === "name") {
+        const aTitle = (a.title || "").toLowerCase();
+        const bTitle = (b.title || "").toLowerCase();
+        compareValue = aTitle.localeCompare(bTitle);
+      } else if (sortField === "items") {
+        compareValue = (a.itemsCount || 0) - (b.itemsCount || 0);
+      }
+
+      return sortDirection === "asc" ? compareValue : -compareValue;
+    });
+
+    return sorted;
+  }, [feeds, sortField, sortDirection]);
 
   const beginRenameFeedCategory = useCallback((category: FieldValues) => {
     if (category.id !== 0) {
@@ -277,7 +312,13 @@ export default function Feeds({ topMenu }: FeedsProps) {
             </div>
           </form>
 
-          <FeedsTable feeds={feeds} removeFeed={removeFeed} />
+          <FeedsTable
+            feeds={sortedFeeds}
+            removeFeed={removeFeed}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSort={handleSort}
+          />
         </div>
       </main>
     </>

@@ -4,6 +4,7 @@ import FeedsTable from "./FeedsTable";
 
 test("renders formatted date", async () => {
   const handleRemoveFeed = jest.fn();
+  const handleSort = jest.fn();
 
   const feeds = [
     {
@@ -22,7 +23,13 @@ test("renders formatted date", async () => {
 
   render(
     <BrowserRouter>
-      <FeedsTable removeFeed={handleRemoveFeed} feeds={feeds} />
+      <FeedsTable
+        removeFeed={handleRemoveFeed}
+        feeds={feeds}
+        sortField={null}
+        sortDirection="asc"
+        onSort={handleSort}
+      />
     </BrowserRouter>
   );
 

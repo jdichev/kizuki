@@ -104,6 +104,9 @@ interface FeedsProps {
 interface FeedsTableProps {
   feeds: Feed[];
   removeFeed: (feedId: number) => void;
+  sortField: "name" | "items" | null;
+  sortDirection: "asc" | "desc";
+  onSort: (field: "name" | "items") => void;
 }
 
 interface CategoriesMainProps {

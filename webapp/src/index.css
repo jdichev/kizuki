@@ -475,6 +475,11 @@ a:hover {
   width: calc(100% - 58px);
 }
 
+#table-panel {
+  font-size: 0.85rem;
+  padding: 10px 16px;
+}
+
 table.feeds-table {
   margin: 0 16px;
   width: calc(100% - 32px);
