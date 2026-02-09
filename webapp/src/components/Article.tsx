@@ -189,7 +189,11 @@ export default function Article({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ content: contentToSummarize, format: "html" }),
+        body: JSON.stringify({
+          content: contentToSummarize,
+          format: "html",
+          url: article.url,
+        }),
       });
 
       if (!response.ok) {
@@ -373,7 +377,7 @@ export default function Article({
               <></>
             )}
 
-            {(isLoadingSummary || summary || summaryError) && (
+            {(isLoadingSummary || summary) && (
               <div className="text-summary">
                 {summary && <h4>Summary</h4>}
                 {summary && (

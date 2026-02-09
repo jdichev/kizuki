@@ -462,7 +462,7 @@ app.delete("/settings/:key", (req: Request, res: Response) => {
 
 app.post("/api/summarize", jsonParser, async (req: Request, res: Response) => {
   try {
-    const { content, format } = req.body;
+    const { content, format, url } = req.body;
 
     if (!content) {
       return res.status(400).json({
@@ -479,8 +479,31 @@ app.post("/api/summarize", jsonParser, async (req: Request, res: Response) => {
       });
     }
 
-    pino.info({ contentLength: content.length }, "Summarizing article content");
-    const summary = await aiService.summarizeArticle(content);
+    let summary: string | null = null;
+    let fromCache = false;
+
+    // Check if summary already exists in database
+    if (url) {
+      summary = await dataModel.getItemSummary(url);
+      if (summary) {
+        fromCache = true;
+        pino.info({ url }, "Summary retrieved from cache");
+      }
+    }
+
+    // Generate summary if not cached
+    if (!summary) {
+      pino.info(
+        { contentLength: content.length },
+        "Summarizing article content"
+      );
+      summary = await aiService.summarizeArticle(content);
+
+      // Save summary to database if URL is provided
+      if (url) {
+        await dataModel.updateItemSummary(url, summary);
+      }
+    }
 
     let responseContent = summary;
     if (format === "html") {
@@ -490,6 +513,7 @@ app.post("/api/summarize", jsonParser, async (req: Request, res: Response) => {
     res.json({
       summary,
       html: format === "html" ? responseContent : undefined,
+      fromCache,
     });
   } catch (error: any) {
     pino.error(
@@ -517,15 +541,35 @@ app.post(
         });
       }
 
-      pino.info({ url }, "Retrieving latest article content");
-      const markdown = await convertArticleToMarkdown(url);
+      let markdown: string | null = null;
+      let fromCache = false;
+
+      // Check if latest content already exists in database
+      markdown = await dataModel.getItemLatestContent(url);
+      if (markdown) {
+        fromCache = true;
+        pino.info({ url }, "Latest content retrieved from cache");
+      }
+
+      // Fetch latest content if not cached
+      if (!markdown) {
+        pino.info({ url }, "Retrieving latest article content");
+        markdown = await convertArticleToMarkdown(url);
+
+        // Save latest content to database
+        await dataModel.updateItemLatestContent(url, markdown);
+      }
 
       let content = markdown;
       if (format === "html") {
         content = marked(markdown) as string;
       }
 
-      res.json({ markdown, html: format === "html" ? content : undefined });
+      res.json({
+        markdown,
+        html: format === "html" ? content : undefined,
+        fromCache,
+      });
     } catch (error: any) {
       pino.error(
         { error: error.message || String(error) },

@@ -58,6 +58,8 @@ CREATE TABLE IF NOT EXISTS "items" (
 	"created"	INTEGER,
 	"json_content"	TEXT,
 	"itemCategoryId"	INTEGER DEFAULT 0,
+	"summary"	TEXT,
+	"latest_content"	TEXT,
 	PRIMARY KEY("id" AUTOINCREMENT)
 );
 
@@ -178,6 +180,9 @@ export default class DataService {
             pino.error(seedErr, "Error seeding data");
           }
 
+          // Run migrations for new columns
+          this.runMigrations();
+
           pino.debug(
             `Database initialized in mode ${tempInstance ? "temp" : "not-temp"}`
           );
@@ -218,6 +223,38 @@ export default class DataService {
     }
 
     return this.instance;
+  }
+
+  private runMigrations(): void {
+    // Migration: Add summary column if it doesn't exist
+    const addSummaryColumn = `
+      ALTER TABLE items ADD COLUMN summary TEXT;
+    `;
+
+    // Migration: Add latest_content column if it doesn't exist
+    const addLatestContentColumn = `
+      ALTER TABLE items ADD COLUMN latest_content TEXT;
+    `;
+
+    // Try to add summary column (will fail silently if it already exists)
+    this.database.run(addSummaryColumn, (error) => {
+      if (error && !error.message.includes("duplicate column")) {
+        pino.debug("Summary column might already exist or migration skipped");
+      } else if (!error) {
+        pino.info("Added summary column to items table");
+      }
+    });
+
+    // Try to add latest_content column (will fail silently if it already exists)
+    this.database.run(addLatestContentColumn, (error) => {
+      if (error && !error.message.includes("duplicate column")) {
+        pino.debug(
+          "Latest_content column might already exist or migration skipped"
+        );
+      } else if (!error) {
+        pino.info("Added latest_content column to items table");
+      }
+    });
   }
 
   public async getFeedByUrl(feedUrl: string): Promise<Feed> {
@@ -1531,5 +1568,104 @@ export default class DataService {
     }
 
     pino.debug("Items updated with categories from AI grouping");
+  }
+
+  /**
+   * Retrieve the summary for an item by URL
+   * @param url The item URL
+   * @returns The summary text if it exists, null otherwise
+   */
+  public async getItemSummary(url: string): Promise<string | null> {
+    const query = `
+      SELECT summary
+      FROM items
+      WHERE url = ? AND summary IS NOT NULL
+    `;
+
+    return new Promise((resolve) => {
+      this.database.get(query, [url], (error, row: any) => {
+        if (error) {
+          pino.error({ error, url }, "Error retrieving item summary");
+          resolve(null);
+        } else {
+          resolve(row?.summary || null);
+        }
+      });
+    });
+  }
+
+  /**
+   * Retrieve the latest_content for an item by URL
+   * @param url The item URL
+   * @returns The latest content if it exists, null otherwise
+   */
+  public async getItemLatestContent(url: string): Promise<string | null> {
+    const query = `
+      SELECT latest_content
+      FROM items
+      WHERE url = ? AND latest_content IS NOT NULL
+    `;
+
+    return new Promise((resolve) => {
+      this.database.get(query, [url], (error, row: any) => {
+        if (error) {
+          pino.error({ error, url }, "Error retrieving item latest content");
+          resolve(null);
+        } else {
+          resolve(row?.latest_content || null);
+        }
+      });
+    });
+  }
+
+  /**
+   * Update the summary column for an item by URL
+   * @param url The item URL
+   * @param summary The summary text to save
+   */
+  public async updateItemSummary(url: string, summary: string): Promise<void> {
+    const query = `
+      UPDATE items
+      SET summary = ?
+      WHERE url = ?
+    `;
+
+    return new Promise((resolve) => {
+      this.database.run(query, [summary, url], (error) => {
+        if (error) {
+          pino.error({ error, url }, "Error updating item summary");
+        } else {
+          pino.debug({ url }, "Item summary updated successfully");
+        }
+        resolve();
+      });
+    });
+  }
+
+  /**
+   * Update the latest_content column for an item by URL
+   * @param url The item URL
+   * @param content The latest content to save
+   */
+  public async updateItemLatestContent(
+    url: string,
+    content: string
+  ): Promise<void> {
+    const query = `
+      UPDATE items
+      SET latest_content = ?
+      WHERE url = ?
+    `;
+
+    return new Promise((resolve) => {
+      this.database.run(query, [content, url], (error) => {
+        if (error) {
+          pino.error({ error, url }, "Error updating item latest content");
+        } else {
+          pino.debug({ url }, "Item latest content updated successfully");
+        }
+        resolve();
+      });
+    });
   }
 }
