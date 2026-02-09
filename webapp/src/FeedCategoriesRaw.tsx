@@ -235,18 +235,7 @@ export default function FeedCategoriesRaw({ topMenu }: HomeProps) {
       feedCategory: FeedCategory | undefined,
       e: React.MouseEvent<HTMLButtonElement, MouseEvent> | undefined
     ) => {
-      setSelectedFeed(undefined);
-      setSize(100);
-      setSelectedFeedCategory(feedCategory);
-      promptRef.current?.scrollTo(0, 0);
-      setActiveNav("categories");
-
-      document
-        .getElementById(`category-${feedCategory ? feedCategory.id : "all"}`)
-        ?.focus();
-
-      await updateFeedReadStats();
-
+      // If clicking the chevron, only toggle expansion
       if (
         e &&
         (e.target as HTMLElement).classList.contains("categoryChevron")
@@ -265,6 +254,19 @@ export default function FeedCategoriesRaw({ topMenu }: HomeProps) {
 
         await loadCategoryFeeds(feedCategory);
       }
+
+      // Normal selection logic
+      setSelectedFeed(undefined);
+      setSize(100);
+      setSelectedFeedCategory(feedCategory);
+      promptRef.current?.scrollTo(0, 0);
+      setActiveNav("categories");
+
+      document
+        .getElementById(`category-${feedCategory ? feedCategory.id : "all"}`)
+        ?.focus();
+
+      await updateFeedReadStats();
     },
     [loadCategoryFeeds, setFeedCategories, updateFeedReadStats]
   );

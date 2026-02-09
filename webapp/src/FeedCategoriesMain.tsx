@@ -28,8 +28,13 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
 
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
 
-  const { unreadOnly, bookmarkedOnly, showUnreadOnly, showBookmarkedOnly } =
-    useFilterState();
+  const {
+    unreadOnly,
+    bookmarkedOnly,
+    showUnreadOnly,
+    showBookmarkedOnly,
+    clearFilters,
+  } = useFilterState();
 
   const loadingStartedAt = useRef<number | null>(null);
   const loadingHideTimer = useRef<number | null>(null);
@@ -201,7 +206,7 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
         setSize(50);
         setArticle(undefined);
         setSelectedItem(undefined);
-        setUnreadOnly(false);
+        clearFilters();
         setActiveNav("categories");
 
         if (feedId) {
@@ -216,7 +221,7 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
     }
 
     initializedFromUrl.current = true;
-  }, [feedCategories, location.search]);
+  }, [feedCategories, location.search, clearFilters]);
 
   useEffect(() => {
     if (!selectedFeedCategory || !initializedFromUrl.current) {
@@ -454,7 +459,7 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
    * the filter wll be marked as read
    */
   const markItemsRead = useCallback(async () => {
-    setUnreadOnly(false);
+    clearFilters();
     setItems((prevItems) => {
       const nextItems = prevItems.map((prevItem) => {
         prevItem.read = 1;
@@ -481,6 +486,7 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
     selectedFeed,
     updateFeedCategoryReadStats,
     updateFeedReadStats,
+    clearFilters,
   ]);
 
   const loadCategoryFeeds = useCallback(
@@ -518,20 +524,7 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
       feedCategory: FeedCategory | undefined,
       e: React.MouseEvent<HTMLButtonElement, MouseEvent> | undefined
     ) => {
-      setSelectedFeed(undefined);
-      setSize(50);
-      setSelectedFeedCategory(feedCategory);
-      setArticle(undefined);
-      setSelectedItem(undefined);
-      listRef.current?.scrollTo(0, 0);
-      setActiveNav("categories");
-
-      setUnreadOnly(false);
-      updateUrlForSelection(feedCategory?.id, undefined);
-      document
-        .getElementById(`category-${feedCategory ? feedCategory.id : "all"}`)
-        ?.focus();
-
+      // If clicking the chevron, only toggle expansion
       if (
         e &&
         (e.target as HTMLElement).classList.contains("categoryChevron")
@@ -551,12 +544,28 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
         await loadCategoryFeeds(feedCategory);
         await updateFeedReadStats();
       }
+
+      // Normal selection logic
+      setSelectedFeed(undefined);
+      setSize(50);
+      setSelectedFeedCategory(feedCategory);
+      setArticle(undefined);
+      setSelectedItem(undefined);
+      listRef.current?.scrollTo(0, 0);
+      setActiveNav("categories");
+
+      clearFilters();
+      updateUrlForSelection(feedCategory?.id, undefined);
+      document
+        .getElementById(`category-${feedCategory ? feedCategory.id : "all"}`)
+        ?.focus();
     },
     [
       loadCategoryFeeds,
       setFeedCategories,
       updateFeedReadStats,
       updateUrlForSelection,
+      clearFilters,
     ]
   );
 
@@ -571,13 +580,13 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
 
       setSize(50);
       setSelectedFeed(nextFeed);
-      setUnreadOnly(false);
+      clearFilters();
       setActiveNav("categories");
       listRef.current?.scrollTo(0, 0);
       updateUrlForSelection(nextCategoryId, nextFeed?.id);
       document.getElementById(`feed-${nextFeed?.id}`)?.focus();
     },
-    [selectedFeedCategory?.id, setSize, updateUrlForSelection]
+    [selectedFeedCategory?.id, setSize, updateUrlForSelection, clearFilters]
   );
 
   const selectNextFeedOrCategory = useCallback(() => {
