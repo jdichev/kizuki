@@ -25,6 +25,25 @@ jest.mock("./service/DataService", () => {
   };
 });
 
+beforeAll(() => {
+  Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+    value: jest.fn(),
+    writable: true,
+  });
+});
+
+beforeEach(() => {
+  const ds = (DataService as unknown as { __mock: any }).__mock;
+  ds.getFeedCategories.mockReset();
+  ds.getFeedCategoryReadStats.mockReset();
+  ds.getFeedReadStats.mockReset();
+  ds.getItemsDeferred.mockReset();
+  ds.getFeeds.mockReset();
+  ds.markItemRead.mockReset();
+  ds.getItemDeferred.mockReset();
+  ds.markItemsRead.mockReset();
+});
+
 test("clicking category chevron expands and selects", async () => {
   const ds = (DataService as unknown as { __mock: any }).__mock;
 

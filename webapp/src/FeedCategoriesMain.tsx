@@ -51,7 +51,7 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
   const [selectedItem, setSelectedItem] = useState<Item>();
 
   const [categoryFeeds, setCategoryFeeds] = useState<{
-    [key: string]: FeedCategory[];
+    [key: string]: Feed[];
   }>({});
 
   const [activeNav, setActiveNav] = useState<string>("categories");

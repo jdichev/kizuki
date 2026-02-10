@@ -35,7 +35,7 @@ export default function FeedCategoriesRaw({ topMenu }: HomeProps) {
   const [selectedFeed, setSelectedFeed] = useState<Feed>();
 
   const [categoryFeeds, setCategoryFeeds] = useState<{
-    [key: string]: FeedCategory[];
+    [key: string]: Feed[];
   }>({});
 
   const [activeNav, setActiveNav] = useState<string>("categories");
@@ -275,9 +275,9 @@ export default function FeedCategoriesRaw({ topMenu }: HomeProps) {
    * Select a feed
    */
   const selectFeed = useCallback(
-    (feed: FeedCategory | undefined) => {
+    (feed: Feed | undefined) => {
       setSize(100);
-      setSelectedFeed(feed as Feed);
+      setSelectedFeed(feed);
       promptRef.current?.scrollTo(0, 0);
       document.getElementById(`feed-${feed?.id}`)?.focus();
     },

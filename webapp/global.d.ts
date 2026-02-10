@@ -113,7 +113,7 @@ interface CategoriesMainProps {
   activeNav: string;
   feedCategories: FeedCategory[];
   categoryFeeds: {
-    [key: string]: FeedCategory[];
+    [key: string]: Feed[];
   };
   selectedFeedCategory: FeedCategory | undefined;
   selectFeedCategory: function;
