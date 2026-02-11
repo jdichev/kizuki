@@ -62,7 +62,9 @@ export default function TopNavMenu({
         aria-pressed={bookmarkedOnly}
       >
         <i
-          className={bookmarkedOnly ? "bi bi-bookmark-fill" : "bi bi-bookmark"}
+          className={
+            bookmarkedOnly ? "bi bi-bookmarks-fill" : "bi bi-bookmarks"
+          }
         />
       </button>
     </div>
