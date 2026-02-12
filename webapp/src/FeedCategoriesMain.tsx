@@ -7,6 +7,7 @@ import ItemsTable from "./components/ItemsTable";
 import CategoriesMain from "./components/CategoriesMain";
 import TopNavMenu from "./components/TopNavMenu";
 import { useFilterState } from "./hooks/useFilterState";
+import { ensureSelectedItemInList } from "./utils/itemListUtils";
 
 const ds = DataService.getInstance();
 
@@ -136,13 +137,15 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
           });
       }
 
-      if (unreadOnly) {
-        setActiveNav("categories");
-        setSelectedItem(undefined);
-      }
-
       if (res && Array.isArray(res)) {
-        setItems(res);
+        // Ensure selected item remains visible when unreadOnly filter is active
+        const itemsWithSelected = ensureSelectedItemInList(
+          res,
+          selectedItem,
+          unreadOnly
+        );
+
+        setItems(itemsWithSelected);
         updateFeedCategoryReadStats();
       }
     } finally {

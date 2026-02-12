@@ -7,6 +7,7 @@ import ItemsTable from "./components/ItemsTable";
 import ItemCategoriesNav from "./components/ItemCategoriesNav";
 import TopNavMenu from "./components/TopNavMenu";
 import { useFilterState } from "./hooks/useFilterState";
+import { ensureSelectedItemInList } from "./utils/itemListUtils";
 
 const ds = DataService.getInstance();
 
@@ -89,13 +90,15 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
           return undefined;
         });
 
-      if (unreadOnly) {
-        setActiveNav("categories");
-        setSelectedItem(undefined);
-      }
-
       if (res && Array.isArray(res)) {
-        setItems(res);
+        // Ensure selected item remains visible when unreadOnly filter is active
+        const itemsWithSelected = ensureSelectedItemInList(
+          res,
+          selectedItem,
+          unreadOnly
+        );
+
+        setItems(itemsWithSelected);
         updateItemCategoryReadStats();
       }
     } finally {
@@ -419,9 +422,7 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
         }
       );
 
-      return itemCategoryReadStat?.unreadCount
-        ? `${itemCategoryReadStat.unreadCount}`
-        : "";
+      return itemCategoryReadStat?.unreadCount ?? 0;
     },
     [itemCategoryReadStats]
   );
@@ -434,7 +435,7 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
       0
     );
 
-    return totalItemCategoryStat > 0 ? `${totalItemCategoryStat}` : "";
+    return totalItemCategoryStat;
   }, [itemCategoryReadStats]);
 
   const handleScroll = useCallback(

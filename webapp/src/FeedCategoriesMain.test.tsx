@@ -141,3 +141,100 @@ test("clicking category name selects without expanding", async () => {
   expect(ds.getFeeds).not.toHaveBeenCalled();
   expect(screen.queryByText("Feed A")).toBeNull();
 });
+
+test("selected item remains visible when list is refreshed with unreadOnly filter in feeds view", async () => {
+  const ds = (DataService as unknown as { __mock: any }).__mock;
+
+  const mockItems = [
+    {
+      id: 1,
+      title: "Feed Item 1",
+      read: 0,
+      published: 1000,
+      feedTitle: "Feed A",
+      url: "https://example.com/1",
+    },
+    {
+      id: 2,
+      title: "Feed Item 2",
+      read: 0,
+      published: 2000,
+      feedTitle: "Feed A",
+      url: "https://example.com/2",
+    },
+    {
+      id: 3,
+      title: "Feed Item 3",
+      read: 0,
+      published: 3000,
+      feedTitle: "Feed A",
+      url: "https://example.com/3",
+    },
+  ];
+
+  // First call returns all items
+  ds.getItemsDeferred.mockResolvedValueOnce(mockItems);
+  ds.getFeedCategories.mockResolvedValue([
+    { id: 1, title: "Tech", expanded: false },
+  ]);
+  ds.getFeedCategoryReadStats.mockResolvedValue([{ id: 1, unreadCount: 3 }]);
+  ds.getFeedReadStats.mockResolvedValue([{ id: 10, unreadCount: 3 }]);
+  ds.getFeeds.mockResolvedValue([
+    {
+      id: 10,
+      title: "Feed A",
+      url: "https://example.com",
+      feedUrl: "https://example.com/rss",
+      feedCategoryId: 1,
+    },
+  ]);
+  ds.markItemRead.mockResolvedValue(undefined);
+  ds.getItemDeferred.mockResolvedValue({
+    ...mockItems[1],
+    content: "Content for Feed Item 2",
+  });
+
+  const topMenu = React.createRef<HTMLDivElement>();
+  const topOptions = React.createRef<HTMLDivElement>();
+
+  render(
+    <MemoryRouter>
+      <FeedsMain topMenu={topMenu} topOptions={topOptions} />
+    </MemoryRouter>
+  );
+
+  // Wait for items to load
+  await screen.findByText("Feed Item 1");
+  await screen.findByText("Feed Item 2");
+  await screen.findByText("Feed Item 3");
+
+  // Click on Feed Item 2 to select it (marks it as read)
+  const item2Element = await screen.findByText("Feed Item 2");
+  fireEvent.click(item2Element);
+
+  // Wait for the item to be marked as read
+  await waitFor(() => {
+    expect(ds.markItemRead).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 2 })
+    );
+  });
+
+  // Second call returns only unread items (1 and 3, not 2)
+  const unreadItems = [mockItems[0], mockItems[2]];
+  ds.getItemsDeferred.mockResolvedValueOnce(unreadItems);
+
+  // Trigger list refresh by scrolling to top
+  const listPanel = document.getElementById("list-panel");
+  if (listPanel) {
+    fireEvent.scroll(listPanel, { target: { scrollTop: 0 } });
+  }
+
+  // Feed Item 2 should still be visible even though it's not in the unread list
+  await waitFor(() => {
+    expect(screen.getByText("Feed Item 2")).toBeTruthy();
+  });
+
+  // Items 1 and 3 should also be visible
+  expect(screen.getByText("Feed Item 1")).toBeTruthy();
+  expect(screen.getByText("Feed Item 3")).toBeTruthy();
+});
