@@ -352,15 +352,11 @@ export default function Article({
           <div id="content">
             {videoId ? (
               <>
-                <div className="mb-2">
+                <div>
                   {videoKind === "short" ? (
-                    <span className="badge bg-info text-dark">
-                      YouTube Short
-                    </span>
+                    <span>YouTube Short</span>
                   ) : (
-                    <span className="badge bg-light text-dark">
-                      YouTube Video
-                    </span>
+                    <span>YouTube Video</span>
                   )}
                 </div>
                 <iframe
@@ -441,7 +437,7 @@ export default function Article({
             />
           </div>
 
-          <ul className="mt-4 fs-6" id="content-options">
+          <ul id="content-options">
             <li>
               <a
                 data-testid="lower-outbound-link"

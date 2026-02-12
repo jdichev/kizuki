@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import SettingsService from "./service/SettingsService";
 
 const ss = SettingsService.getInstance();
 
 export default function Settings() {
+  const navigate = useNavigate();
   const [settings, setSettings] = useState<{ [key: string]: string }>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -85,19 +87,31 @@ export default function Settings() {
 
   return (
     <>
-      <nav id="sidebar-menu" />
+      <nav id="sidebar-menu">
+        <ul>
+          <li>
+            <button
+              type="button"
+              className="btn btn-link text-decoration-none"
+              onClick={() => navigate("/item-categories/list")}
+            >
+              <i className="bi bi-tags" /> <span>Item Categories</span>
+            </button>
+          </li>
+        </ul>
+      </nav>
 
       <main id="main-content">
-        <div id="feed-panel" className="p-4">
+        <div id="feed-panel">
           <div id="panel-single-column">
             <h3>Settings</h3>
 
             {loading && <p>Loading settings...</p>}
 
-            {error && <div className="alert alert-warning mt-2">{error}</div>}
+            {error && <div>{error}</div>}
 
             {!loading && (
-              <div className="mt-3">
+              <div>
                 <table className="table table-striped table-hover">
                   <thead>
                     <tr>
@@ -109,9 +123,7 @@ export default function Settings() {
                   <tbody>
                     {Object.entries(settings).length === 0 ? (
                       <tr>
-                        <td colSpan={3} className="text-center text-muted">
-                          No settings configured yet
-                        </td>
+                        <td colSpan={3}>No settings configured yet</td>
                       </tr>
                     ) : (
                       Object.entries(settings).map(([key, value]) => (
@@ -123,21 +135,17 @@ export default function Settings() {
                             <code>{value}</code>
                           </td>
                           <td>
-                            <button
-                              onClick={() => handleDeleteSetting(key)}
-                              disabled={savingKey === key}
+                            <a
+                              href="/"
+                              className="text-decoration-none"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleDeleteSetting(key);
+                              }}
+                              title="Delete setting"
                             >
-                              {savingKey === key ? (
-                                <>
-                                  <span className="spinner-border spinner-border-sm me-2"></span>
-                                  Deleting...
-                                </>
-                              ) : (
-                                <>
-                                  <i className="bi bi-trash"></i> Delete
-                                </>
-                              )}
-                            </button>
+                              <i className="bi bi-trash"></i>
+                            </a>
                           </td>
                         </tr>
                       ))
@@ -147,18 +155,18 @@ export default function Settings() {
               </div>
             )}
 
-            <div className="pt-5">
+            <div>
               <form onSubmit={handleAddSetting}>
                 <h3>Add new setting</h3>
 
-                <div className="row g-3 mt-1">
-                  <div className="col-md-5">
+                <div>
+                  <div>
                     <label htmlFor="settingKey" className="form-label">
                       Setting Key
                     </label>
                     <input
                       type="text"
-                      className="form-control input input-group-sm"
+                      className="form-control input"
                       id="settingKey"
                       placeholder="e.g. myCustomSetting"
                       value={newKey}
@@ -166,13 +174,13 @@ export default function Settings() {
                       disabled={savingKey !== null}
                     />
                   </div>
-                  <div className="col-md-5">
+                  <div>
                     <label htmlFor="settingValue" className="form-label">
                       Setting Value
                     </label>
                     <input
                       type="text"
-                      className="form-control input input-group-sm"
+                      className="form-control input"
                       id="settingValue"
                       placeholder="e.g. myValue"
                       value={newValue}
@@ -180,13 +188,14 @@ export default function Settings() {
                       disabled={savingKey !== null}
                     />
                   </div>
-                  <div className="col-md-2 d-flex align-items-end">
-                    <button type="submit" disabled={savingKey !== null}>
+                  <div>
+                    <button
+                      type="submit"
+                      className="btn btn-primary"
+                      disabled={savingKey !== null}
+                    >
                       {savingKey !== null ? (
-                        <>
-                          <span className="spinner-border spinner-border-sm me-2"></span>
-                          Adding...
-                        </>
+                        <>Adding...</>
                       ) : (
                         <>
                           <i className="bi bi-plus-circle"></i> Add Setting

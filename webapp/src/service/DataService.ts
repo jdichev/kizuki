@@ -464,4 +464,103 @@ export default class DataService {
       throw error;
     }
   }
+
+  // Item Categories Management Methods
+  public async addItemCategory(itemCategory: ItemCategory): Promise<boolean> {
+    const itemCategoryJson = JSON.stringify(itemCategory);
+
+    const response = await fetch(this.makeUrl("/item-categories"), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: itemCategoryJson,
+    });
+
+    const result = await response.json();
+
+    return Promise.resolve(result.success || false);
+  }
+
+  public async updateItemCategory(
+    itemCategory: ItemCategory
+  ): Promise<boolean> {
+    const itemCategoryJson = JSON.stringify(itemCategory);
+
+    const response = await fetch(this.makeUrl("/item-categories"), {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: itemCategoryJson,
+    });
+
+    const result = await response.json();
+
+    return Promise.resolve(result.success || false);
+  }
+
+  public async removeItemCategory(itemCategoryId: number): Promise<boolean> {
+    const query = new URLSearchParams();
+
+    query.set("id", JSON.stringify(itemCategoryId));
+
+    const queryString = query.toString();
+
+    const response = await fetch(
+      `${this.makeUrl("/item-categories")}?${queryString}`,
+      {
+        method: "DELETE",
+      }
+    );
+
+    const result = await response.json();
+
+    return Promise.resolve(result.success || false);
+  }
+
+  public async getItemCategoryById(
+    itemCategoryId: number
+  ): Promise<ItemCategory | null> {
+    try {
+      const response = await fetch(
+        this.makeUrl(`/item-categories/${itemCategoryId}`)
+      );
+      if (!response.ok) {
+        console.error("Failed to fetch item category:", response.status);
+        return null;
+      }
+      const category = await response.json();
+      return Promise.resolve(category);
+    } catch (error) {
+      console.error("Error fetching item category:", error);
+      return null;
+    }
+  }
+
+  public async assignItemToCategory(
+    itemId: number,
+    itemCategoryId: number
+  ): Promise<boolean> {
+    const data = {
+      itemId,
+      itemCategoryId,
+    };
+
+    try {
+      const response = await fetch(this.makeUrl("/items"), {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+      return Promise.resolve(result.success || false);
+    } catch (error) {
+      console.error("Error updating item category:", error);
+      return false;
+    }
+  }
 }

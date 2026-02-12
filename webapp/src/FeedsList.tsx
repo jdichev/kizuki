@@ -129,8 +129,6 @@ export default function Feeds({ topMenu }: FeedsProps) {
     });
   }, []);
 
-  const [renameCategoryId, setRenameCategoryId] = useState();
-
   const [sortField, setSortField] = useState<"name" | "items" | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
@@ -166,50 +164,14 @@ export default function Feeds({ topMenu }: FeedsProps) {
     return sorted;
   }, [feeds, sortField, sortDirection]);
 
-  const beginRenameFeedCategory = useCallback((category: FieldValues) => {
-    if (category.id !== 0) {
-      setRenameCategoryId(category.id);
-    }
-  }, []);
-
-  const stopRenameFeedCategory = useCallback(() => {
-    setRenameCategoryId(undefined);
-  }, []);
-
-  const onRenameFeedCategory = useCallback(
-    async (data: FieldValues) => {
-      const feedCategoryInput: FeedCategory = {
-        id: selectedFeedCategory?.id,
-        title: data.feedCategoryName,
-        text: data.feedCategoryName,
-      };
-
-      const result = await ds.updateFeedCategory(feedCategoryInput);
-
-      if (result) {
-        setRenameCategoryId(undefined);
-
-        await loadFeedCategories();
-      }
-    },
-    [selectedFeedCategory?.id, loadFeedCategories]
-  );
-
-  useEffect(() => {
-    if (showNewCategoryFeedForm || renameCategoryId !== undefined) {
-      const inputEl = document.getElementById("feedCategoryName");
-      inputEl && inputEl.focus();
-    }
-  }, [showNewCategoryFeedForm, renameCategoryId]);
-
   return (
     <>
       <nav id="sidebar-menu">
-        <ul className="list-unstyled fw-normal small">
+        <ul>
           <li className={!selectedFeedCategory ? "feedcategory-selected" : ""}>
             <button
               type="button"
-              className="btn btn-sm btn-link text-decoration-none text-truncate"
+              className="btn btn-link text-decoration-none"
               onClick={(e) => selectFeedCategory(null, e)}
               tabIndex={0}
             >
@@ -226,43 +188,24 @@ export default function Feeds({ topMenu }: FeedsProps) {
                     : ""
                 }
               >
-                {renameCategoryId === feedCategory.id ? (
-                  <form onSubmit={handleSubmit(onRenameFeedCategory)}>
-                    <div className="input-group-sm">
-                      <input
-                        type="text"
-                        className="form-control input"
-                        {...register("feedCategoryName")}
-                        id="feedCategoryName"
-                        onBlur={stopRenameFeedCategory}
-                        onKeyUp={(e) => {
-                          e.code === "Escape" && stopRenameFeedCategory();
-                        }}
-                        defaultValue={feedCategory.title}
+                <button
+                  type="button"
+                  className="btn btn-link text-decoration-none"
+                  onClick={(e) => selectFeedCategory(feedCategory, e)}
+                  tabIndex={0}
+                >
+                  <span>{feedCategory.title}</span>
+                  {feedCategory.id !== 0 ? (
+                    <span className="menu-marker">
+                      <i
+                        className="bi bi-trash deleteIcon"
+                        data-category-id={feedCategory.id}
                       />
-                    </div>
-                  </form>
-                ) : (
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-link text-decoration-none text-truncate"
-                    onClick={(e) => selectFeedCategory(feedCategory, e)}
-                    onDoubleClick={() => beginRenameFeedCategory(feedCategory)}
-                    tabIndex={0}
-                  >
-                    <span>{feedCategory.title}</span>
-                    {feedCategory.id !== 0 ? (
-                      <span className="menu-marker">
-                        <i
-                          className="bi bi-trash deleteIcon"
-                          data-category-id={feedCategory.id}
-                        />
-                      </span>
-                    ) : (
-                      ""
-                    )}
-                  </button>
-                )}
+                    </span>
+                  ) : (
+                    ""
+                  )}
+                </button>
               </li>
             );
           })}
@@ -270,7 +213,7 @@ export default function Feeds({ topMenu }: FeedsProps) {
 
         {showNewCategoryFeedForm && (
           <form onSubmit={handleSubmit(onAddFeedCategory)}>
-            <div className="input-group-sm">
+            <div>
               <input
                 type="text"
                 className="form-control input"
@@ -287,7 +230,7 @@ export default function Feeds({ topMenu }: FeedsProps) {
 
         {!showNewCategoryFeedForm && (
           <button
-            className="btn btn-sm"
+            className="btn"
             onClick={showCategoryFeedForm}
             style={{
               display: showNewCategoryFeedForm ? "none" : "",
@@ -301,7 +244,7 @@ export default function Feeds({ topMenu }: FeedsProps) {
       <main id="main-content">
         <div id="table-panel">
           <form onSubmit={handleSubmit(onFeedSearch)}>
-            <div className="input-group-sm">
+            <div>
               <input
                 type="text"
                 className="form-control input"

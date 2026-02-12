@@ -65,14 +65,14 @@ export default function FeedEdit() {
       <nav id="sidebar-menu" />
 
       <main id="main-content">
-        <div id="feed-panel" className="p-4">
+        <div id="feed-panel">
           <div id="panel-single-column">
-            <form className="p-4" onSubmit={handleSubmit(onSubmit)}>
+            <form onSubmit={handleSubmit(onSubmit)}>
               <h3>
                 Edit feed{" "}
                 {formFeedData?.title ? formFeedData.title : "NO_TITLE"}
               </h3>
-              <div className="mb-3  input-group-sm">
+              <div>
                 <label htmlFor="feedUrl" className="form-label">
                   Feed URL
                 </label>
@@ -85,7 +85,7 @@ export default function FeedEdit() {
                 />
                 {errors.feedUrl && <p>Feed URL is needed</p>}
               </div>
-              <div className="mb-3  input-group-sm">
+              <div>
                 <label htmlFor="title" className="form-label">
                   Feed Title
                 </label>
@@ -97,7 +97,7 @@ export default function FeedEdit() {
                   {...register("title")}
                 />
               </div>
-              <div className="mb-3  input-group-sm">
+              <div>
                 <label htmlFor="feedCategory" className="form-label">
                   Feed Category
                 </label>
@@ -123,14 +123,11 @@ export default function FeedEdit() {
                   })}
                 </select>
               </div>
-              <button type="submit" className="btn btn-primary btn-sm">
+              <button type="submit" className="btn btn-primary">
                 Save
               </button>
 
-              <Link
-                to="/feeds/list"
-                className="btn btn-outline-secondary btn-sm ms-3"
-              >
+              <Link to="/feeds/list" className="btn btn-outline-secondary">
                 Back
               </Link>
             </form>

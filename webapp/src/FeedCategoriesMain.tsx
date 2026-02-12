@@ -193,12 +193,12 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
       : undefined;
     const feedId = params.get("feed") ? Number(params.get("feed")) : undefined;
 
-    if (!categoryId && !feedId) {
+    if (categoryId === undefined && !feedId) {
       initializedFromUrl.current = true;
       return;
     }
 
-    if (categoryId) {
+    if (categoryId !== undefined) {
       const targetCategory = feedCategories.find((c) => c.id === categoryId);
 
       if (targetCategory) {

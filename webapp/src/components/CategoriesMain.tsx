@@ -17,14 +17,13 @@ export default function CategoriesMain({
       id="sidebar-menu"
       data-activenav={activeNav === "categories" ? "true" : "false"}
     >
-      <ul className="list-unstyled fw-normal small">
+      <ul>
         <li className={!selectedFeedCategory ? "feedcategory-selected" : ""}>
           <button
             id="category-all"
             type="button"
-            className="btn btn-sm btn-link text-decoration-none text-truncate"
+            className="btn btn-link text-decoration-none"
             onClick={(e) => selectFeedCategory(null, e)}
-            onDoubleClick={(e) => selectFeedCategory(null, e)}
           >
             <i className="bi bi-asterisk" /> <span>All</span>
             <span className="menu-marker">{getTotalUnreadCount()}</span>
@@ -43,7 +42,7 @@ export default function CategoriesMain({
                 <button
                   id={`category-${feedCategory.id}`}
                   type="button"
-                  className="btn btn-sm btn-link text-decoration-none text-truncate"
+                  className="btn btn-link text-decoration-none"
                   onClick={(e) => selectFeedCategory(feedCategory, e)}
                   // onDoubleClick={(e) => selectFeedCategory(feedCategory, e)}
                   title={`${feedCategory.title} ${getUnreadCountForFeedCategory(
@@ -76,7 +75,7 @@ export default function CategoriesMain({
                           <button
                             id={`feed-${categoryFeed.id}`}
                             type="button"
-                            className="btn btn-sm btn-link text-decoration-none text-truncate"
+                            className="btn btn-link text-decoration-none"
                             onClick={() => selectFeed(categoryFeed)}
                             title={`${
                               categoryFeed.title

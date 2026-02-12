@@ -23,7 +23,7 @@
     --content-body-color: #353535;
     --button-color-highlight: #f55;
     --weak-color: #898989;
-    --highlight-color: #97c279;
+    --highlight-color: #e3c470;
   }
 }
 
@@ -52,7 +52,7 @@
     --content-body-color: #e4e4e4;
     --button-color-highlight: #f55;
     --weak-color: #585858;
-    --highlight-color: #97c279;
+    --highlight-color: #e3c470;
   }
 }
 
@@ -175,7 +175,7 @@ a:hover {
   z-index: 10;
   user-select: none;
   transition: background 0.2s ease-out;
-  background: rgba(128, 128, 128, 0.02);
+  background: rgba(128, 128, 128, 0.07);
 }
 
 #sidebar-divider:hover {
@@ -285,6 +285,7 @@ a:hover {
 
 #side-menu a.active {
   opacity: 1;
+  color: var(--highlight-color);
 }
 
 #side-menu a:hover {
@@ -488,7 +489,7 @@ table.feeds-table {
 #list-panel {
   user-select: none;
   padding-top: 8px;
-  padding-left: 8px;
+  padding-left: 4px;
   padding-right: 4px;
 }
 
@@ -578,7 +579,7 @@ table.feeds-table {
 
 #content-panel {
   padding: 8px 24px 16px 16px;
-  box-shadow: inset 1px 0 rgba(128, 128, 128, 0.02);
+  box-shadow: inset 1px 0 rgba(128, 128, 128, 0.1);
 }
 
 #content-panel img,
@@ -657,30 +658,32 @@ table.feeds-table {
   background-color: var(--btn-bg-color);
   color: var(--btn-fg-color);
   text-decoration: none;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  display: inline-block;
+  box-sizing: border-box;
+}
+
+button.btn {
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.btn + .btn {
+  margin-left: 16px;
 }
 
 .btn-primary {
   background-color: var(--link-color);
   color: var(--items-list-bg);
-  border: 1px solid var(--link-color);
-}
-
-.btn-sm {
-  padding: 0.25rem 0.5rem;
-  font-size: 0.875rem;
-  line-height: 1.5;
-  border-radius: 0;
+  border-color: var(--link-color);
 }
 
 .btn-outline-secondary {
   color: var(--btn-fg-color);
   background-color: transparent;
-  background-image: none;
-  border: 1px solid var(--btn-fg-color);
-}
-
-.ms-3 {
-  margin-left: 1rem;
+  border-color: var(--btn-fg-color);
 }
 
 .table {
@@ -697,14 +700,6 @@ table.feeds-table {
 .table-sm > tbody > tr > td,
 .table-sm > tbody > tr > th {
   padding: 0.3rem;
-}
-
-form.p-4 {
-  padding: 1rem;
-}
-
-.mb-3 {
-  margin-bottom: 1rem;
 }
 
 .form-label {

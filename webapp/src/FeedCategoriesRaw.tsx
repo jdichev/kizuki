@@ -501,7 +501,7 @@ export default function FeedCategoriesRaw({ topMenu }: HomeProps) {
                 />
                 <button
                   type="button"
-                  className="btn btn-sm"
+                  className="btn"
                   id="copy-prompt"
                   title="Copy prompt to clipboard"
                   onClick={() => {

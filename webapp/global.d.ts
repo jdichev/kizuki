@@ -61,6 +61,7 @@ interface Item {
   comments?: string;
   feedId?: number;
   feedCategoryId?: number;
+  itemCategoryId?: number;
   jsonContent?: {
     "yt-id"?: string;
   };

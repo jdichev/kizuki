@@ -7,6 +7,8 @@ import ItemCategoriesMain from "./ItemCategoriesMain";
 import FeedsList from "./FeedsList";
 import FeedAdd from "./FeedAdd";
 import FeedEdit from "./FeedEdit";
+import ItemCategoryEdit from "./ItemCategoryEdit";
+import ItemCategoryList from "./ItemCategoryList";
 import Settings from "./Settings";
 import { useSidebarDivider } from "./hooks/useSidebarDivider";
 
@@ -88,6 +90,15 @@ export default function App() {
           <Route path="/feeds/add" element={<FeedAdd />} />
 
           <Route path="/feeds/edit/:feedId" element={<FeedEdit />} />
+
+          <Route path="/item-categories/list" element={<ItemCategoryList />} />
+
+          <Route
+            path="/item-categories/edit/:categoryId"
+            element={<ItemCategoryEdit />}
+          />
+
+          <Route path="/item-categories/new" element={<ItemCategoryEdit />} />
 
           <Route path="/settings" element={<Settings />} />
         </Routes>

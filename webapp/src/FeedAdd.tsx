@@ -115,12 +115,12 @@ export default function FeedAdd() {
       <nav id="sidebar-menu" />
 
       <main id="main-content">
-        <div id="feed-panel" className="p-4">
+        <div id="feed-panel">
           <div id="panel-single-column">
             <form onSubmit={handleSubmit(onSubmitFirstStep)}>
               <h3>Add new feed</h3>
 
-              <div className="mb-3 input-group-sm">
+              <div>
                 <label htmlFor="feedUrlInitial" className="form-label">
                   Enter site or feed URL
                 </label>
@@ -133,38 +133,32 @@ export default function FeedAdd() {
                   {...register("feedUrlInitial")}
                 />
 
-                {initialFormError && (
-                  <p className="alert alert-warning">Feed not found</p>
-                )}
+                {initialFormError && <p>Feed not found</p>}
               </div>
 
               <button
                 type="submit"
-                className="btn btn-sm btn-primary me-3"
+                className="btn btn-primary"
                 id="feedSubmitInitial"
               >
                 Go
               </button>
 
-              <Link
-                to="/feeds/list"
-                className="btn btn-sm btn-outline-secondary ms-3"
-              >
+              <Link to="/feeds/list" className="btn btn-outline-secondary">
                 Back
               </Link>
             </form>
 
-            <div className="container mt-5">
+            <div>
               {formFeedData.map((feedData, i) => {
                 return (
                   <form
                     key={feedData.feedUrl}
-                    className="mt-3"
                     // onSubmit={handleSubmit(onSubmitSecondStep)}
                   >
-                    <div className="row">
-                      <div className="col-6">{feedData.title}</div>
-                      <div className="col">
+                    <div>
+                      <div>{feedData.title}</div>
+                      <div>
                         <input
                           type="hidden"
                           {...register(`title-${i}`)}
@@ -181,7 +175,7 @@ export default function FeedAdd() {
                           value={feedData.feedUrl}
                         />
                         <select
-                          className="form-select form-select-sm"
+                          className="form-select"
                           {...register(`feedCategory-${i}`)}
                         >
                           {feedCategories.map((feedCategory) => {
@@ -196,7 +190,7 @@ export default function FeedAdd() {
                           })}
                         </select>
                       </div>
-                      <div className="col">
+                      <div>
                         {checkedFeeds.includes(feedData.feedUrl) ? (
                           <div>Added</div>
                         ) : (
@@ -206,7 +200,7 @@ export default function FeedAdd() {
                               onSubmitSecondStep(i);
                             }}
                             type="submit"
-                            className="btn btn-primary btn-sm"
+                            className="btn btn-primary"
                           >
                             Add
                           </button>
@@ -218,11 +212,11 @@ export default function FeedAdd() {
               })}
             </div>
 
-            <div className="pt-5">
+            <div>
               <form onSubmit={useFormMethods2.handleSubmit(onSubmitFileImport)}>
                 <h3>Import OPML file</h3>
 
-                <div className="mb-3 input-group-sm">
+                <div>
                   <label htmlFor="importFile" className="form-label">
                     Choose OPML file
                   </label>
@@ -238,14 +232,14 @@ export default function FeedAdd() {
 
                 <button
                   type="submit"
-                  className="btn btn-sm btn-primary me-3"
+                  className="btn btn-primary"
                   id="opmlImportSubmit"
                 >
                   Import
                 </button>
               </form>
 
-              <div className="pt-4">
+              <div>
                 <h3>Export OPML file</h3>
                 <p>Download all your feeds in OPML format</p>
 
@@ -253,7 +247,7 @@ export default function FeedAdd() {
 
                 <button
                   type="button"
-                  className="btn btn-sm btn-outline-primary"
+                  className="btn btn-outline-primary"
                   onClick={async () => {
                     try {
                       setExportStatus({ type: null, message: "" });

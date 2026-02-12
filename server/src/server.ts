@@ -117,6 +117,31 @@ app.get("/items/:itemId", async (req: Request, res: Response) => {
   res.json(item);
 });
 
+app.put("/items", jsonParser, async (req: Request, res: Response) => {
+  try {
+    const { itemId, itemCategoryId } = req.body;
+
+    if (itemId === undefined || itemCategoryId === undefined) {
+      res.status(400).json({
+        error: "Missing itemId or itemCategoryId",
+      });
+      return;
+    }
+
+    const result = await dataModel.assignItemToCategory(itemId, itemCategoryId);
+    res.json({ success: result });
+  } catch (error: any) {
+    pino.error(
+      { error: error.message || String(error) },
+      "Error updating item category"
+    );
+    res.status(500).json({
+      error: "Failed to update item category",
+      message: error.message || String(error),
+    });
+  }
+});
+
 app.delete("/items", async (req: Request, res: Response) => {
   const result = await dataModel.removeItems();
 
@@ -237,6 +262,88 @@ app.get("/item-categories", async (req: Request, res: Response) => {
     );
     res.status(500).json({
       error: "Failed to fetch item categories",
+      message: error.message || String(error),
+    });
+  }
+});
+
+app.post(
+  "/item-categories",
+  jsonParser,
+  async (req: Request, res: Response) => {
+    try {
+      pino.trace("Creating item category");
+      const itemCategory = req.body;
+      const result = await dataModel.insertItemCategory(itemCategory);
+      res.json({ success: result });
+    } catch (error: any) {
+      pino.error(
+        { error: error.message || String(error) },
+        "Error creating item category"
+      );
+      res.status(500).json({
+        error: "Failed to create item category",
+        message: error.message || String(error),
+      });
+    }
+  }
+);
+
+app.put("/item-categories", jsonParser, async (req: Request, res: Response) => {
+  try {
+    pino.trace("Updating item category");
+    const itemCategory = req.body;
+    const result = await dataModel.updateItemCategory(itemCategory);
+    res.json({ success: result });
+  } catch (error: any) {
+    pino.error(
+      { error: error.message || String(error) },
+      "Error updating item category"
+    );
+    res.status(500).json({
+      error: "Failed to update item category",
+      message: error.message || String(error),
+    });
+  }
+});
+
+app.delete("/item-categories", async (req: Request, res: Response) => {
+  try {
+    pino.trace("Deleting item category");
+    const itemCategoryId = req.query.id
+      ? parseInt(req.query.id as string)
+      : undefined;
+    if (itemCategoryId === undefined) {
+      res.status(400).json({ error: "Missing item category ID" });
+      return;
+    }
+    const result = await dataModel.deleteItemCategory(itemCategoryId);
+    res.json({ success: result });
+  } catch (error: any) {
+    pino.error(
+      { error: error.message || String(error) },
+      "Error deleting item category"
+    );
+    res.status(500).json({
+      error: "Failed to delete item category",
+      message: error.message || String(error),
+    });
+  }
+});
+
+app.get("/item-categories/:id", async (req: Request, res: Response) => {
+  try {
+    pino.trace("Fetching item category by ID");
+    const id = parseInt(req.params.id);
+    const itemCategory = await dataModel.getItemCategoryById(id);
+    res.json(itemCategory);
+  } catch (error: any) {
+    pino.error(
+      { error: error.message || String(error) },
+      "Error fetching item category"
+    );
+    res.status(500).json({
+      error: "Failed to fetch item category",
       message: error.message || String(error),
     });
   }

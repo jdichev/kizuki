@@ -949,6 +949,70 @@ export default class DataService {
     });
   }
 
+  public async updateItemCategory(itemCategory: Category): Promise<boolean> {
+    const query = `
+      UPDATE item_categories
+      SET title = ?, text = ?
+      WHERE id = ?
+    `;
+
+    pino.debug(itemCategory);
+
+    return new Promise((resolve) => {
+      this.database.run(
+        query,
+        [itemCategory.title, itemCategory.text, itemCategory.id],
+        (error) => {
+          if (error) {
+            pino.error(error);
+            resolve(false);
+          } else {
+            resolve(true);
+          }
+        }
+      );
+    });
+  }
+
+  public async deleteItemCategory(itemCategoryId: number): Promise<boolean> {
+    const query = `
+      DELETE FROM item_categories
+      WHERE id = ?
+    `;
+
+    return new Promise((resolve) => {
+      this.database.run(query, [itemCategoryId], (error) => {
+        if (error) {
+          pino.error(error);
+          resolve(false);
+        } else {
+          resolve(true);
+        }
+      });
+    });
+  }
+
+  public async getItemCategoryById(
+    itemCategoryId: number
+  ): Promise<Category | null> {
+    const query = `
+      SELECT id, title, text
+      FROM item_categories
+      WHERE id = ?
+    `;
+
+    return new Promise((resolve) => {
+      this.database.get(query, [itemCategoryId], (error, row) => {
+        if (error) {
+          pino.error(error);
+          resolve(null);
+        } else {
+          resolve((row as Category) || null);
+        }
+      });
+    });
+  }
+
   public async exportOpml(): Promise<string> {
     const categories = await this.getFeedCategories();
     const feeds = await this.getFeeds();
@@ -1195,6 +1259,28 @@ export default class DataService {
           });
         }
       );
+    });
+  }
+
+  public async assignItemToCategory(
+    itemId: number,
+    itemCategoryId: number
+  ): Promise<boolean> {
+    const query = `
+      UPDATE items
+      SET itemCategoryId = ?
+      WHERE id = ?
+    `;
+
+    return new Promise((resolve) => {
+      this.database.run(query, [itemCategoryId, itemId], (error: Error) => {
+        if (error) {
+          pino.error(error);
+          resolve(false);
+        } else {
+          resolve(true);
+        }
+      });
     });
   }
 
