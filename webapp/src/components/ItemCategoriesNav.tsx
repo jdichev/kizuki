@@ -35,7 +35,9 @@ export default function ItemCategoriesNav({
               onClick={(e) => selectItemCategory(undefined, e)}
             >
               <i className="bi bi-asterisk" /> <span>All</span>
-              <span className="menu-marker">{getTotalUnreadCount()}</span>
+              {getTotalUnreadCount() > 0 && (
+                <span className="menu-marker">{getTotalUnreadCount()}</span>
+              )}
             </button>
           </li>
 
@@ -60,9 +62,11 @@ export default function ItemCategoriesNav({
                 >
                   {/* <i className="bi bi-tag" /> */}
                   <span> {itemCategory.title}</span>
-                  <span className="menu-marker">
-                    {getUnreadCountForItemCategory(itemCategory.id)}
-                  </span>
+                  {getUnreadCountForItemCategory(itemCategory.id) > 0 && (
+                    <span className="menu-marker">
+                      {getUnreadCountForItemCategory(itemCategory.id)}
+                    </span>
+                  )}
                 </button>
               </li>
             );

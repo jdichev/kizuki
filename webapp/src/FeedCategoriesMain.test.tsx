@@ -238,3 +238,121 @@ test("selected item remains visible when list is refreshed with unreadOnly filte
   expect(screen.getByText("Feed Item 1")).toBeTruthy();
   expect(screen.getByText("Feed Item 3")).toBeTruthy();
 });
+
+test("feed unread counts are loaded when entering from deeplink with feedId", async () => {
+  const ds = (DataService as unknown as { __mock: any }).__mock;
+
+  ds.getFeedCategories.mockResolvedValue([
+    { id: 1, title: "Tech", expanded: false },
+  ]);
+  ds.getFeedCategoryReadStats.mockResolvedValue([{ id: 1, unreadCount: 5 }]);
+  ds.getFeedReadStats.mockResolvedValue([
+    { id: 10, unreadCount: 3 },
+    { id: 11, unreadCount: 2 },
+  ]);
+  ds.getItemsDeferred.mockResolvedValue([]);
+  ds.getFeeds.mockResolvedValue([
+    {
+      id: 10,
+      title: "Feed A",
+      url: "https://example.com/a",
+      feedUrl: "https://example.com/a/rss",
+      feedCategoryId: 1,
+    },
+    {
+      id: 11,
+      title: "Feed B",
+      url: "https://example.com/b",
+      feedUrl: "https://example.com/b/rss",
+      feedCategoryId: 1,
+    },
+  ]);
+  ds.markItemRead.mockResolvedValue(undefined);
+  ds.getItemDeferred.mockResolvedValue(undefined);
+  ds.markItemsRead.mockResolvedValue(undefined);
+
+  const topMenu = React.createRef<HTMLDivElement>();
+  const topOptions = React.createRef<HTMLDivElement>();
+
+  // Render with deeplink specifying category 1 and feed 10
+  render(
+    <MemoryRouter initialEntries={["/?category=1&feed=10"]}>
+      <FeedsMain topMenu={topMenu} topOptions={topOptions} />
+    </MemoryRouter>
+  );
+
+  // Wait for feeds to load
+  await screen.findByText("Feed A");
+  await screen.findByText("Feed B");
+
+  // Verify that getFeedReadStats was called to load individual feed counts
+  await waitFor(() => {
+    expect(ds.getFeedReadStats).toHaveBeenCalled();
+  });
+
+  // Verify that getFeeds was called for the category
+  expect(ds.getFeeds).toHaveBeenCalledWith(
+    expect.objectContaining({
+      selectedFeedCategory: expect.objectContaining({ id: 1, title: "Tech" }),
+    })
+  );
+});
+
+test("feed unread counts are loaded and displayed when entering from deeplink with only categoryId", async () => {
+  const ds = (DataService as unknown as { __mock: any }).__mock;
+
+  ds.getFeedCategories.mockResolvedValue([
+    { id: 1, title: "Tech", expanded: false },
+  ]);
+  ds.getFeedCategoryReadStats.mockResolvedValue([{ id: 1, unreadCount: 5 }]);
+  ds.getFeedReadStats.mockResolvedValue([
+    { id: 10, unreadCount: 3 },
+    { id: 11, unreadCount: 1 },
+  ]);
+  ds.getItemsDeferred.mockResolvedValue([]);
+  ds.getFeeds.mockResolvedValue([
+    {
+      id: 10,
+      title: "Feed A",
+      url: "https://example.com/a",
+      feedUrl: "https://example.com/a/rss",
+      feedCategoryId: 1,
+    },
+    {
+      id: 11,
+      title: "Feed B",
+      url: "https://example.com/b",
+      feedUrl: "https://example.com/b/rss",
+      feedCategoryId: 1,
+    },
+  ]);
+  ds.markItemRead.mockResolvedValue(undefined);
+  ds.getItemDeferred.mockResolvedValue(undefined);
+  ds.markItemsRead.mockResolvedValue(undefined);
+
+  const topMenu = React.createRef<HTMLDivElement>();
+  const topOptions = React.createRef<HTMLDivElement>();
+
+  // Render with deeplink specifying only category 1 (no feedId)
+  render(
+    <MemoryRouter initialEntries={["/?category=1"]}>
+      <FeedsMain topMenu={topMenu} topOptions={topOptions} />
+    </MemoryRouter>
+  );
+
+  // Wait for category to be selected
+  await screen.findByText("Tech");
+
+  // Verify that getFeedReadStats was called to load individual feed counts
+  // even though the category is not expanded on screen yet
+  await waitFor(() => {
+    expect(ds.getFeedReadStats).toHaveBeenCalled();
+  });
+
+  // Verify that getFeeds was called for the category
+  expect(ds.getFeeds).toHaveBeenCalledWith(
+    expect.objectContaining({
+      selectedFeedCategory: expect.objectContaining({ id: 1, title: "Tech" }),
+    })
+  );
+});

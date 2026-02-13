@@ -126,3 +126,47 @@ test("selected item remains visible when list is refreshed with unreadOnly filte
   expect(screen.getByText("Item 1")).toBeTruthy();
   expect(screen.getByText("Item 3")).toBeTruthy();
 });
+
+test("unread count badge is not shown when count is zero", async () => {
+  const ds = (DataService as unknown as { __mock: any }).__mock;
+
+  ds.getItemCategories.mockResolvedValue([
+    { id: 1, title: "Category A" },
+    { id: 2, title: "Category B" },
+  ]);
+  ds.getItemCategoryReadStats.mockResolvedValue([
+    { id: 1, unreadCount: 0 },
+    { id: 2, unreadCount: 5 },
+  ]);
+  ds.getItemsDeferred.mockResolvedValue([]);
+
+  const topMenu = React.createRef<HTMLDivElement>();
+  const topOptions = React.createRef<HTMLDivElement>();
+
+  render(
+    <MemoryRouter>
+      <ItemCategoriesMain topMenu={topMenu} topOptions={topOptions} />
+    </MemoryRouter>
+  );
+
+  // Wait for categories to render
+  await screen.findByText("Category A");
+  await screen.findByText("Category B");
+
+  // Category A has 0 unread, should not show badge
+  const categoryAButton = screen.getByRole("button", { name: /Category A/i });
+  const categoryAMenuMarker = categoryAButton.querySelector(".menu-marker");
+  expect(categoryAMenuMarker).toBeNull();
+
+  // Category B has 5 unread, should show badge with "5"
+  const categoryBButton = screen.getByRole("button", { name: /Category B/i });
+  const categoryBMenuMarker = categoryBButton.querySelector(".menu-marker");
+  expect(categoryBMenuMarker).toBeTruthy();
+  expect(categoryBMenuMarker?.textContent).toBe("5");
+
+  // Total unread count (0 + 5 = 5) should be shown for "All"
+  const allButton = screen.getByRole("button", { name: /All/i });
+  const allMenuMarker = allButton.querySelector(".menu-marker");
+  expect(allMenuMarker).toBeTruthy();
+  expect(allMenuMarker?.textContent).toBe("5");
+});

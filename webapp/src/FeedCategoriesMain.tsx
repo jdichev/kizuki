@@ -219,12 +219,67 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
               expanded: c.id === categoryId,
             }))
           );
+          // Load feeds and stats for the selected category when a specific feed is specified
+          const loadCategoryData = async () => {
+            const feedIdStr = `${targetCategory.id}`;
+
+            if (!categoryFeeds[feedIdStr]) {
+              const feeds = await ds.getFeeds({
+                selectedFeedCategory: targetCategory,
+              });
+
+              const sortedFeeds = feeds.sort((a, b) =>
+                a.title.localeCompare(b.title)
+              );
+
+              setCategoryFeeds((prev) => {
+                const next = { ...prev };
+                next[feedIdStr] = sortedFeeds;
+                return next;
+              });
+            }
+
+            await updateFeedReadStats();
+          };
+
+          loadCategoryData();
+        } else {
+          // Load feeds for the selected category when no specific feed is specified
+          const loadCategoryData = async () => {
+            const feedIdStr = `${targetCategory.id}`;
+
+            if (!categoryFeeds[feedIdStr]) {
+              const feeds = await ds.getFeeds({
+                selectedFeedCategory: targetCategory,
+              });
+
+              const sortedFeeds = feeds.sort((a, b) =>
+                a.title.localeCompare(b.title)
+              );
+
+              setCategoryFeeds((prev) => {
+                const next = { ...prev };
+                next[feedIdStr] = sortedFeeds;
+                return next;
+              });
+            }
+
+            await updateFeedReadStats();
+          };
+
+          loadCategoryData();
         }
       }
     }
 
     initializedFromUrl.current = true;
-  }, [feedCategories, location.search, clearFilters]);
+  }, [
+    feedCategories,
+    location.search,
+    clearFilters,
+    categoryFeeds,
+    updateFeedReadStats,
+  ]);
 
   useEffect(() => {
     if (!selectedFeedCategory || !initializedFromUrl.current) {
@@ -268,10 +323,17 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
           setSelectedFeed(targetFeed);
         }
       }
+
+      await updateFeedReadStats();
     };
 
     loadFeedsAndSelect();
-  }, [selectedFeedCategory, location.search, categoryFeeds]);
+  }, [
+    selectedFeedCategory,
+    location.search,
+    categoryFeeds,
+    updateFeedReadStats,
+  ]);
 
   useEffect(() => {
     const updatesInterval = setInterval(() => {
