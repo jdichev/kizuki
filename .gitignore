@@ -4,6 +4,7 @@ dist
 
 release
 
+# OS generated files
 .DS_Store
 
 *.log
@@ -16,3 +17,7 @@ release
 
 # Feature development todos
 todos.md
+
+# Ignore plan and implementation markdown files
+*_PLAN.md
+*_IMPLEMENTATION.md
