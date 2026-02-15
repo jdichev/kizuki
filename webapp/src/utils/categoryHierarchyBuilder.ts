@@ -19,18 +19,13 @@ export interface CategoryHierarchy {
  * ID range mappings corresponding to database seed data
  * Parent categories use negative IDs: -1, -2, -3, etc.
  * Allows extensibility for new parent categories
+ *
+ * Note: Object.entries() preserves insertion order, so "Uncategorized" appears last
  */
 export const CATEGORY_RANGES: Record<
   string,
   { id: number; min: number; max: number; title: string; description: string }
 > = {
-  uncategorized: {
-    id: -1,
-    min: 0,
-    max: 0,
-    title: "Uncategorized",
-    description: "Items without a specific category",
-  },
   "1-99": {
     id: -2,
     min: 1,
@@ -70,6 +65,13 @@ export const CATEGORY_RANGES: Record<
     title: "Hardware & Consumer Tech",
     description:
       "Semiconductors, robotics, AR/VR, wearables, and space technology",
+  },
+  uncategorized: {
+    id: -1,
+    min: 0,
+    max: 0,
+    title: "Uncategorized",
+    description: "Items without a specific category",
   },
 };
 
