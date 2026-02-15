@@ -8,6 +8,12 @@ import ItemCategoriesNav from "./components/ItemCategoriesNav";
 import TopNavMenu from "./components/TopNavMenu";
 import { useFilterState } from "./hooks/useFilterState";
 import { ensureSelectedItemInList } from "./utils/itemListUtils";
+import {
+  buildCategoryHierarchy,
+  getUnreadCountForParent,
+  getParentRangeForCategoryId,
+  type ParentCategory,
+} from "./utils/categoryHierarchyBuilder";
 
 const ds = DataService.getInstance();
 
@@ -16,7 +22,12 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
   const navigate = useNavigate();
 
   const [items, setItems] = useState<Item[]>([]);
-  const [itemCategories, setItemCategories] = useState<ItemCategory[]>([]);
+  const [parentCategories, setParentCategories] = useState<ParentCategory[]>(
+    []
+  );
+  const [categoryChildren, setCategoryChildren] = useState<
+    Map<number, ItemCategory[]>
+  >(new Map());
   const [itemCategoryReadStats, setItemCategoryReadStats] = useState<
     ItemCategoryReadStat[]
   >([]);
@@ -29,6 +40,8 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
     showBookmarkedOnly,
     clearFilters,
   } = useFilterState();
+  const [selectedParentCategory, setSelectedParentCategory] =
+    useState<ParentCategory>();
   const [selectedItemCategory, setSelectedItemCategory] =
     useState<ItemCategory>();
   const [article, setArticle] = useState<Item>();
@@ -65,8 +78,9 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
 
   const showItemCategories = useCallback(async () => {
     const res = await ds.getItemCategories();
-    res.sort((a, b) => a.title.localeCompare(b.title));
-    setItemCategories(res);
+    const hierarchy = buildCategoryHierarchy(res);
+    setParentCategories(hierarchy.parentCategories);
+    setCategoryChildren(hierarchy.childrenByParent);
   }, []);
 
   const updateItemCategoryReadStats = useCallback(async () => {
@@ -78,12 +92,27 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
     let res;
 
     try {
+      // Collect category IDs: either the selected child category or all children of selected parent
+      let selectedItemCategoryIds: number[] | undefined;
+      
+      if (selectedItemCategory) {
+        selectedItemCategoryIds = [selectedItemCategory.id!];
+      } else if (selectedParentCategory) {
+        // When parent is selected, get all its children
+        const childCategories = categoryChildren.get(selectedParentCategory.id) || [];
+        if (childCategories.length > 0) {
+          selectedItemCategoryIds = childCategories
+            .map((cat) => cat.id)
+            .filter((id) => id !== undefined) as number[];
+        }
+      }
+
       res = await ds
         .getItemsDeferred({
           size,
           unreadOnly,
           bookmarkedOnly,
-          selectedItemCategory,
+          selectedItemCategoryIds,
         })
         .catch((e) => {
           console.error("Error fetching items:", e);
@@ -124,6 +153,8 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
   }, [
     size,
     selectedItemCategory,
+    selectedParentCategory,
+    categoryChildren,
     unreadOnly,
     bookmarkedOnly,
     updateItemCategoryReadStats,
@@ -139,7 +170,7 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
   }, [showItemCategories, updateItemCategoryReadStats]);
 
   useEffect(() => {
-    if (initializedFromUrl.current || itemCategories.length === 0) {
+    if (initializedFromUrl.current || parentCategories.length === 0) {
       return;
     }
 
@@ -149,15 +180,43 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
     if (categoryIdStr) {
       const categoryId = parseInt(categoryIdStr, 10);
       if (!isNaN(categoryId)) {
-        const category = itemCategories.find((c) => c.id === categoryId);
-        if (category) {
-          setSelectedItemCategory(category);
+        // Search for the category in all children across all parent categories
+        let foundCategory: ItemCategory | undefined;
+        for (const [_, children] of categoryChildren) {
+          const found = children.find((c) => c.id === categoryId);
+          if (found) {
+            foundCategory = found;
+            break;
+          }
+        }
+        if (foundCategory) {
+          setSelectedItemCategory(foundCategory);
+          
+          // Find and expand the parent category
+          const parentId = getParentRangeForCategoryId(foundCategory.id);
+          if (parentId !== undefined) {
+            const parentCategory = parentCategories.find((p) => p.id === parentId);
+            if (parentCategory) {
+              // Set the parent as selected and expanded
+              const expandedParent = { ...parentCategory, expanded: true };
+              setSelectedParentCategory(expandedParent);
+              
+              // Update the parentCategories array to mark this parent as expanded
+              setParentCategories((prev) =>
+                prev.map((p) =>
+                  p.id === parentId
+                    ? { ...p, expanded: true }
+                    : { ...p, expanded: false }
+                )
+              );
+            }
+          }
         }
       }
     }
 
     initializedFromUrl.current = true;
-  }, [location.search, itemCategories]);
+  }, [location.search, parentCategories, categoryChildren]);
 
   useEffect(() => {
     const updatesInterval = setInterval(() => {
@@ -196,20 +255,74 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
       if (["KeyA", "KeyH", "ArrowLeft"].includes(e.code)) {
         if (activeNav === "items") {
           setActiveNav("categories");
-          document
-            .getElementById(
-              `item-category-${selectedItemCategory ? selectedItemCategory.id : "all"}`
-            )
-            ?.focus();
+
+          // Use setTimeout to ensure DOM is updated before focusing
+          setTimeout(() => {
+            if (selectedItemCategory) {
+              document
+                .getElementById(
+                  `item-category-child-${selectedItemCategory.id}`
+                )
+                ?.focus();
+            } else {
+              document
+                .getElementById(
+                  `item-category-${
+                    selectedParentCategory ? selectedParentCategory.id : "all"
+                  }`
+                )
+                ?.focus();
+            }
+          }, 0);
+        } else {
+          // In categories mode - handle expand/collapse with accordion behavior
+          if (selectedParentCategory) {
+            if (selectedParentCategory.expanded) {
+              // Collapse the expanded parent
+              setParentCategories((prev) => {
+                return prev.map((parent) => {
+                  if (parent.id === selectedParentCategory.id) {
+                    return { ...parent, expanded: false };
+                  }
+                  return parent;
+                });
+              });
+              // Update selected parent with collapsed state
+              setSelectedParentCategory({
+                ...selectedParentCategory,
+                expanded: false,
+              });
+              // Clear child selection when collapsing
+              setSelectedItemCategory(undefined);
+            } else {
+              // Expand the parent and collapse all others (accordion behavior)
+              const expandedCategory = {
+                ...selectedParentCategory,
+                expanded: true,
+              };
+              setParentCategories((prev) => {
+                return prev.map((parent) => {
+                  if (parent.id === selectedParentCategory.id) {
+                    return expandedCategory;
+                  } else {
+                    return { ...parent, expanded: false };
+                  }
+                });
+              });
+              // Update selected parent with expanded state
+              setSelectedParentCategory(expandedCategory);
+            }
+          }
         }
       }
 
       if (["KeyD", "KeyL", "ArrowRight"].includes(e.code)) {
-        if (items.length === 0) {
-          return;
-        }
-
         if (activeNav === "categories") {
+          // Move to items view
+          if (items.length === 0) {
+            return;
+          }
+
           setActiveNav("items");
           if (!article) {
             selectNextItem();
@@ -325,6 +438,61 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
     await updateItemCategoryReadStats();
   }, [selectedItemCategory, updateItemCategoryReadStats, clearFilters]);
 
+  const selectParentCategory = useCallback(
+    (
+      parentCategory: ParentCategory | undefined,
+      e: React.MouseEvent<HTMLButtonElement> | undefined
+    ) => {
+      // If clicking the chevron, toggle expansion and collapse all others
+      if (
+        e &&
+        (e.target as HTMLElement).classList.contains("categoryChevron")
+      ) {
+        // Create the updated category object with toggled expanded state
+        const updatedCategory = parentCategory
+          ? { ...parentCategory, expanded: !parentCategory.expanded }
+          : undefined;
+
+        setParentCategories((prev) => {
+          return prev.map((parent) => {
+            if (parent.id === parentCategory?.id) {
+              // Return the updated category
+              return updatedCategory!;
+            } else {
+              // Collapse all others
+              return { ...parent, expanded: false };
+            }
+          });
+        });
+        // Select the updated category when expanding
+        setSelectedItemCategory(undefined);
+        setSize(50);
+        setSelectedParentCategory(updatedCategory);
+        setArticle(undefined);
+        setSelectedItem(undefined);
+        listRef.current?.scrollTo(0, 0);
+        setActiveNav("categories");
+        return;
+      }
+
+      // Normal selection logic
+      setSelectedItemCategory(undefined);
+      setSize(50);
+      setSelectedParentCategory(parentCategory);
+      setArticle(undefined);
+      setSelectedItem(undefined);
+      listRef.current?.scrollTo(0, 0);
+      setActiveNav("categories");
+      clearFilters();
+      document
+        .getElementById(
+          `item-category-${parentCategory ? parentCategory.id : "all"}`
+        )
+        ?.focus();
+    },
+    [clearFilters]
+  );
+
   const selectItemCategory = useCallback(
     (
       itemCategory: ItemCategory | undefined,
@@ -332,46 +500,133 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
     ) => {
       setSize(50);
       setSelectedItemCategory(itemCategory);
+
+      // When selecting a child category, find and set its parent
+      if (itemCategory) {
+        for (const parent of parentCategories) {
+          const childCategories = categoryChildren.get(parent.id) || [];
+          if (childCategories.some((cat) => cat.id === itemCategory.id)) {
+            setSelectedParentCategory(parent);
+            break;
+          }
+        }
+      }
+
       setArticle(undefined);
       setSelectedItem(undefined);
       listRef.current?.scrollTo(0, 0);
       setActiveNav("categories");
       clearFilters();
       updateUrlForSelection(itemCategory?.id);
-      document
-        .getElementById(
-          `item-category-${itemCategory ? itemCategory.id : "all"}`
-        )
-        ?.focus();
+      setTimeout(() => {
+        document
+          .getElementById(
+            `item-category-child-${itemCategory ? itemCategory.id : "all"}`
+          )
+          ?.focus();
+      }, 0);
     },
-    [updateUrlForSelection, clearFilters]
+    [parentCategories, categoryChildren, updateUrlForSelection, clearFilters]
   );
 
   const selectNextItemCategory = useCallback(() => {
-    const index = itemCategories.findIndex((itemCategory) => {
-      return itemCategory.id === selectedItemCategory?.id;
-    });
+    // If a parent category is selected and expanded
+    if (selectedParentCategory?.expanded) {
+      const childCategories =
+        categoryChildren.get(selectedParentCategory.id) || [];
 
-    const newIndex = index + 1;
+      if (selectedItemCategory) {
+        // If a child is already selected, move to next child
+        const index = childCategories.findIndex(
+          (child) => child.id === selectedItemCategory.id
+        );
+        const newIndex = index + 1;
 
-    if (newIndex < itemCategories.length) {
-      selectItemCategory(itemCategories[newIndex], undefined);
+        if (newIndex < childCategories.length) {
+          selectItemCategory(childCategories[newIndex], undefined);
+          return;
+        }
+      } else {
+        // If parent is expanded but no child is selected, select first child
+        if (childCategories.length > 0) {
+          selectItemCategory(childCategories[0], undefined);
+          return;
+        }
+      }
     }
-  }, [itemCategories, selectedItemCategory, selectItemCategory]);
+
+    // Move to next parent category
+    const parentIndex = parentCategories.findIndex(
+      (parent) => parent.id === selectedParentCategory?.id
+    );
+    const newParentIndex = parentIndex + 1;
+
+    if (newParentIndex < parentCategories.length) {
+      selectParentCategory(parentCategories[newParentIndex], undefined);
+    }
+  }, [
+    parentCategories,
+    selectedParentCategory,
+    categoryChildren,
+    selectedItemCategory,
+    selectItemCategory,
+    selectParentCategory,
+  ]);
 
   const selectPrevItemCategory = useCallback(() => {
-    const index = itemCategories.findIndex((itemCategory) => {
-      return itemCategory.id === selectedItemCategory?.id;
-    });
+    // If current parent is expanded and there's a selected child
+    if (selectedParentCategory?.expanded && selectedItemCategory) {
+      const childCategories =
+        categoryChildren.get(selectedParentCategory.id) || [];
+      const index = childCategories.findIndex(
+        (child) => child.id === selectedItemCategory.id
+      );
+      const newIndex = index - 1;
 
-    const newIndex = index - 1;
-
-    if (newIndex === -1) {
-      selectItemCategory(undefined, undefined);
-    } else if (newIndex >= 0) {
-      selectItemCategory(itemCategories[newIndex], undefined);
+      if (newIndex === -1) {
+        // Move to parent level (deselect child and select parent)
+        setSelectedItemCategory(undefined);
+        document
+          .getElementById(`item-category-${selectedParentCategory.id}`)
+          ?.focus();
+        return;
+      } else if (newIndex >= 0) {
+        selectItemCategory(childCategories[newIndex], undefined);
+        return;
+      }
     }
-  }, [itemCategories, selectedItemCategory, selectItemCategory]);
+
+    // Move to previous parent category
+    const parentIndex = parentCategories.findIndex(
+      (parent) => parent.id === selectedParentCategory?.id
+    );
+    const newParentIndex = parentIndex - 1;
+
+    if (newParentIndex === -1) {
+      selectParentCategory(undefined, undefined);
+    } else if (newParentIndex >= 0) {
+      const selectedParentCategoryInner = parentCategories[newParentIndex];
+      selectParentCategory(selectedParentCategoryInner, undefined);
+
+      if (selectedParentCategoryInner?.expanded) {
+        const selectedChildCategories =
+          categoryChildren.get(selectedParentCategoryInner.id) || [];
+        if (selectedChildCategories.length > 0) {
+          selectItemCategory(
+            selectedChildCategories[selectedChildCategories.length - 1],
+            undefined
+          );
+        }
+      }
+    }
+  }, [
+    parentCategories,
+    selectedParentCategory,
+    categoryChildren,
+    selectedItemCategory,
+    selectItemCategory,
+    selectParentCategory,
+  ]);
 
   const selectNextItem = useCallback(() => {
     const index = items.findIndex((item) => {
@@ -438,6 +693,13 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
     return totalItemCategoryStat;
   }, [itemCategoryReadStats]);
 
+  const getUnreadCountForParentCategory = useCallback(
+    (parentId: number) => {
+      return getUnreadCountForParent(parentId, itemCategoryReadStats);
+    },
+    [itemCategoryReadStats]
+  );
+
   const handleScroll = useCallback(
     (e: React.UIEvent<HTMLDivElement>) => {
       if (scrollDebounceTimer.current) {
@@ -467,10 +729,14 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
     <>
       <ItemCategoriesNav
         activeNav={activeNav}
-        itemCategories={itemCategories}
+        parentCategories={parentCategories}
+        categoryChildren={categoryChildren}
+        selectedParentCategory={selectedParentCategory}
         selectedItemCategory={selectedItemCategory}
+        selectParentCategory={selectParentCategory}
         selectItemCategory={selectItemCategory}
         getTotalUnreadCount={getTotalUnreadCount}
+        getUnreadCountForParent={getUnreadCountForParentCategory}
         getUnreadCountForItemCategory={getUnreadCountForItemCategory}
       />
 
@@ -504,6 +770,7 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
           <Article
             article={article}
             selectedItemCategory={selectedItemCategory}
+            selectedParentCategory={selectedParentCategory}
             topOptions={topOptions}
           />
         </div>

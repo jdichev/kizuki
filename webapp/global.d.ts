@@ -80,6 +80,7 @@ interface ArticleProps {
   selectedFeedCategory?: FeedCategory;
   selectedFeed?: Feed;
   selectedItemCategory?: ItemCategory;
+  selectedParentCategory?: ParentCategory;
   topOptions?: React.RefObject<HTMLDivElement | null>;
 }
 

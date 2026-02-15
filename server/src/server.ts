@@ -82,9 +82,14 @@ app.get("/items", async (req: Request, res: Response) => {
     ? parseInt(req.query.icid as string)
     : undefined;
 
+  const selectedItemCategoryIds = req.query.icids
+    ? JSON.parse(req.query.icids as string)
+    : undefined;
+
   let selectedFeed;
   let selectedFeedCategory;
   let selectedItemCategory;
+  let selectedItemCategoryIdArray;
 
   if (selectedFeedId !== undefined) {
     selectedFeed = await dataModel.getFeedById(selectedFeedId);
@@ -92,6 +97,9 @@ app.get("/items", async (req: Request, res: Response) => {
     selectedFeedCategory = await dataModel.getFeedCategoryById(
       selectedFeedCategoryId
     );
+  } else if (selectedItemCategoryIds !== undefined) {
+    // Use the array of category IDs
+    selectedItemCategoryIdArray = selectedItemCategoryIds;
   } else if (selectedItemCategoryId !== undefined) {
     const itemCategories = await dataModel.getItemCategories();
     selectedItemCategory = itemCategories.find(
@@ -106,6 +114,7 @@ app.get("/items", async (req: Request, res: Response) => {
     selectedFeed,
     selectedFeedCategory,
     selectedItemCategory,
+    selectedItemCategoryIds: selectedItemCategoryIdArray,
     order: "published",
   });
   res.json(items);

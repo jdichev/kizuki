@@ -34,7 +34,7 @@ beforeEach(() => {
   const ds = (DataService as unknown as { __mock: any }).__mock;
   ds.getItemCategories.mockReset();
   ds.getItemCategoryReadStats.mockReset();
-  ds.getItemsDeferred.mockReset();
+  ds.getItemsDeferred.mockReset().mockResolvedValue([]);
   ds.markItemRead.mockReset();
   ds.getItemDeferred.mockReset();
   ds.markItemsRead.mockReset();
@@ -70,8 +70,10 @@ test("selected item remains visible when list is refreshed with unreadOnly filte
     },
   ];
 
-  // First call returns all items
-  ds.getItemsDeferred.mockResolvedValueOnce(mockItems);
+  // Set up the mock to return mockItems for calls with these parameters
+  ds.getItemsDeferred
+    .mockResolvedValueOnce(mockItems)
+    .mockResolvedValueOnce(mockItems); // Also set up second call in case component calls it twice
   ds.getItemCategories.mockResolvedValue([{ id: 1, title: "Category A" }]);
   ds.getItemCategoryReadStats.mockResolvedValue([{ id: 1, unreadCount: 3 }]);
   ds.markItemRead.mockResolvedValue(undefined);
@@ -149,11 +151,23 @@ test("unread count badge is not shown when count is zero", async () => {
     </MemoryRouter>
   );
 
-  // Wait for categories to render
+  // Wait for parent category to render (both categories fall into 1-99 range)
+  await screen.findByText("General News & Lifestyle");
+
+  //Click on the chevron to expand the parent category
+  const parentButton = screen.getByRole("button", {
+    name: /General News & Lifestyle/i,
+  });
+  const chevron = parentButton.querySelector(".categoryChevron");
+  if (chevron) {
+    fireEvent.click(chevron);
+  }
+
+  // Now wait for the child categories to render
   await screen.findByText("Category A");
   await screen.findByText("Category B");
 
-  // Category A has 0 unread, should not show badge
+  // Category A has 0 unread, should not show badge for the child
   const categoryAButton = screen.getByRole("button", { name: /Category A/i });
   const categoryAMenuMarker = categoryAButton.querySelector(".menu-marker");
   expect(categoryAMenuMarker).toBeNull();

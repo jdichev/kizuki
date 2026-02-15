@@ -1292,6 +1292,7 @@ export default class DataService {
       selectedFeedCategory?: FeedCategory | undefined;
       selectedFeed?: Feed | undefined;
       selectedItemCategory?: Category | undefined;
+      selectedItemCategoryIds?: number[] | undefined;
       order?: string;
     } = {
       size: 50,
@@ -1300,6 +1301,7 @@ export default class DataService {
       selectedFeedCategory: undefined,
       selectedFeed: undefined,
       selectedItemCategory: undefined,
+      selectedItemCategoryIds: undefined,
       order: "published",
     }
   ): Promise<Item[]> {
@@ -1332,7 +1334,19 @@ export default class DataService {
     `;
 
     let filteredById = false;
-    if (params.selectedItemCategory) {
+    if (
+      params.selectedItemCategoryIds &&
+      params.selectedItemCategoryIds.length > 0
+    ) {
+      // Filter by multiple item category IDs
+      whereQuery1 = `
+      WHERE
+      items.itemCategoryId IN (${params.selectedItemCategoryIds.join(", ")})
+    `;
+      query = query.replace("__WHERE_PLACEHOLDER1__", whereQuery1);
+
+      filteredById = true;
+    } else if (params.selectedItemCategory) {
       whereQuery1 = `
       WHERE
       items.itemCategoryId = ${params.selectedItemCategory.id}

@@ -14,6 +14,7 @@ export default function Article({
   selectedFeedCategory,
   selectedFeed,
   selectedItemCategory,
+  selectedParentCategory,
   topOptions,
 }: ArticleProps) {
   const [videoId, setVideoId] = useState<String>();
@@ -492,6 +493,14 @@ export default function Article({
     return (
       <article data-testid="article-placeholder">
         <h2>{selectedItemCategory.title}</h2>
+      </article>
+    );
+  }
+
+  if (selectedParentCategory) {
+    return (
+      <article data-testid="article-placeholder">
+        <h2>{selectedParentCategory.title}</h2>
       </article>
     );
   }

@@ -93,14 +93,14 @@ export default class DataService {
       bookmarkedOnly: boolean;
       selectedFeedCategory?: FeedCategory | undefined;
       selectedFeed?: Feed | undefined;
-      selectedItemCategory?: ItemCategory | undefined;
+      selectedItemCategoryIds?: number[] | undefined;
     } = {
       size: 50,
       unreadOnly: false,
       bookmarkedOnly: false,
       selectedFeedCategory: undefined,
       selectedFeed: undefined,
-      selectedItemCategory: undefined,
+      selectedItemCategoryIds: undefined,
     }
   ): Promise<Item[]> {
     this.itemsTimeout && clearTimeout(this.itemsTimeout);
@@ -124,14 +124,14 @@ export default class DataService {
       bookmarkedOnly: boolean;
       selectedFeedCategory?: FeedCategory | undefined;
       selectedFeed?: Feed | undefined;
-      selectedItemCategory?: ItemCategory | undefined;
+      selectedItemCategoryIds?: number[] | undefined;
     } = {
       size: 50,
       unreadOnly: false,
       bookmarkedOnly: false,
       selectedFeedCategory: undefined,
       selectedFeed: undefined,
-      selectedItemCategory: undefined,
+      selectedItemCategoryIds: undefined,
     }
   ): Promise<Item[]> {
     const query = new URLSearchParams();
@@ -156,8 +156,11 @@ export default class DataService {
       query.set("fid", JSON.stringify(params.selectedFeed.id));
     }
 
-    if (params.selectedItemCategory) {
-      query.set("icid", JSON.stringify(params.selectedItemCategory.id));
+    if (
+      params.selectedItemCategoryIds &&
+      params.selectedItemCategoryIds.length > 0
+    ) {
+      query.set("icids", JSON.stringify(params.selectedItemCategoryIds));
     }
 
     const queryString = query.toString();
