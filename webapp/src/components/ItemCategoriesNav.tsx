@@ -58,7 +58,9 @@ export default function ItemCategoriesNav({
             }}
           >
             <i className="bi bi-asterisk" /> <span>All</span>
-            <span className="menu-marker">{getTotalUnreadCount()}</span>
+            {getTotalUnreadCount() > 0 && (
+              <span className="menu-marker">{getTotalUnreadCount()}</span>
+            )}
           </button>
         </li>
 
