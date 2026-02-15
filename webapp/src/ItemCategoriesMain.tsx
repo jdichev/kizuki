@@ -94,12 +94,13 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
     try {
       // Collect category IDs: either the selected child category or all children of selected parent
       let selectedItemCategoryIds: number[] | undefined;
-      
+
       if (selectedItemCategory) {
         selectedItemCategoryIds = [selectedItemCategory.id!];
       } else if (selectedParentCategory) {
         // When parent is selected, get all its children
-        const childCategories = categoryChildren.get(selectedParentCategory.id) || [];
+        const childCategories =
+          categoryChildren.get(selectedParentCategory.id) || [];
         if (childCategories.length > 0) {
           selectedItemCategoryIds = childCategories
             .map((cat) => cat.id)
@@ -191,16 +192,18 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
         }
         if (foundCategory) {
           setSelectedItemCategory(foundCategory);
-          
+
           // Find and expand the parent category
           const parentId = getParentRangeForCategoryId(foundCategory.id);
           if (parentId !== undefined) {
-            const parentCategory = parentCategories.find((p) => p.id === parentId);
+            const parentCategory = parentCategories.find(
+              (p) => p.id === parentId
+            );
             if (parentCategory) {
               // Set the parent as selected and expanded
               const expandedParent = { ...parentCategory, expanded: true };
               setSelectedParentCategory(expandedParent);
-              
+
               // Update the parentCategories array to mark this parent as expanded
               setParentCategories((prev) =>
                 prev.map((p) =>
@@ -427,16 +430,36 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
       return nextItems;
     });
 
-    await ds
-      .markItemsRead({
-        itemCategory: selectedItemCategory,
-      })
-      .catch((reason) => {
-        console.error(reason);
-      });
+    // Determine which categories to mark as read
+    // If a child category is selected, use it
+    // If only a parent category is selected, use all its children
+    let categoriesToMark: ItemCategory[] = [];
+
+    if (selectedItemCategory) {
+      categoriesToMark = [selectedItemCategory];
+    } else if (selectedParentCategory) {
+      categoriesToMark = categoryChildren.get(selectedParentCategory.id) || [];
+    }
+
+    // Mark items as read for each category
+    for (const category of categoriesToMark) {
+      await ds
+        .markItemsRead({
+          itemCategory: category,
+        })
+        .catch((reason) => {
+          console.error(reason);
+        });
+    }
 
     await updateItemCategoryReadStats();
-  }, [selectedItemCategory, updateItemCategoryReadStats, clearFilters]);
+  }, [
+    selectedItemCategory,
+    selectedParentCategory,
+    categoryChildren,
+    updateItemCategoryReadStats,
+    clearFilters,
+  ]);
 
   const selectParentCategory = useCallback(
     (
