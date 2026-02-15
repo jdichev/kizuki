@@ -212,7 +212,7 @@ export default class DataService {
   public async markItemsRead(params: {
     feed?: Feed;
     feedCategory?: FeedCategory;
-    itemCategory?: ItemCategory;
+    itemCategories?: ItemCategory[];
   }) {
     const query = new URLSearchParams();
 
@@ -220,15 +220,17 @@ export default class DataService {
       query.set("fid", JSON.stringify(params.feed.id));
     } else if (params.feedCategory) {
       query.set("cid", JSON.stringify(params.feedCategory.id));
-    } else if (params.itemCategory) {
-      query.set("icid", JSON.stringify(params.itemCategory.id));
+    } else if (params.itemCategories && params.itemCategories.length > 0) {
+      // Add multiple item category IDs as an array
+      const ids = params.itemCategories.map((cat) => cat.id);
+      query.set("icids", JSON.stringify(ids));
     }
 
     const queryString = query.toString();
 
     const response = await fetch(
       `${this.makeUrl("/itemsread")}?${
-        params.feed || params.feedCategory || params.itemCategory
+        params.feed || params.feedCategory || params.itemCategories
           ? queryString
           : ""
       }`

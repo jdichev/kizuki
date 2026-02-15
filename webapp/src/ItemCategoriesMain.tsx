@@ -441,11 +441,11 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
       categoriesToMark = categoryChildren.get(selectedParentCategory.id) || [];
     }
 
-    // Mark items as read for each category
-    for (const category of categoriesToMark) {
+    // Mark all categories' items as read in a single request
+    if (categoriesToMark.length > 0) {
       await ds
         .markItemsRead({
-          itemCategory: category,
+          itemCategories: categoriesToMark,
         })
         .catch((reason) => {
           console.error(reason);

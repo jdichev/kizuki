@@ -367,9 +367,12 @@ app.get("/itemsread", async (req: Request, res: Response) => {
     ? parseInt(req.query.cid as string)
     : undefined;
 
-  const selectedItemCategoryId = req.query.icid
-    ? parseInt(req.query.icid as string)
-    : undefined;
+  // Support both single icid and multiple icids
+  const selectedItemCategoryIds: number[] | undefined = req.query.icids
+    ? JSON.parse(req.query.icids as string)
+    : req.query.icid
+      ? [parseInt(req.query.icid as string)]
+      : undefined;
 
   if (selectedFeedId !== undefined) {
     const feed = await dataModel.getFeedById(selectedFeedId);
@@ -393,19 +396,19 @@ app.get("/itemsread", async (req: Request, res: Response) => {
     } else {
       res.json({ message: "Feed category not found" });
     }
-  } else if (selectedItemCategoryId !== undefined) {
-    const itemCategories = await dataModel.getItemCategories();
-    const itemCategory = itemCategories.find(
-      (cat) => cat.id === selectedItemCategoryId
+  } else if (selectedItemCategoryIds !== undefined && selectedItemCategoryIds.length > 0) {
+    const allItemCategories = await dataModel.getItemCategories();
+    const itemCategories = allItemCategories.filter(
+      (cat) => selectedItemCategoryIds.includes(cat.id)
     );
 
-    if (itemCategory) {
+    if (itemCategories.length > 0) {
       const result = await dataModel.markItemsRead({
-        itemCategory: itemCategory,
+        itemCategories: itemCategories,
       });
       res.json(result);
     } else {
-      res.json({ message: "Item category not found" });
+      res.json({ message: "Item categories not found" });
     }
   } else {
     const result = await dataModel.markItemsRead({});

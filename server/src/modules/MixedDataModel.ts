@@ -1082,7 +1082,7 @@ export default class DataService {
   public async markItemsRead(params: {
     feedCategory?: FeedCategory;
     feed?: Feed;
-    itemCategory?: Category;
+    itemCategories?: Category[];
   }) {
     let query = `
       UPDATE items
@@ -1090,9 +1090,10 @@ export default class DataService {
       __WHERE_PLACEHOLDER__
     `;
 
-    if (params.itemCategory) {
+    if (params.itemCategories && params.itemCategories.length > 0) {
+      const categoryIds = params.itemCategories.map((cat) => cat.id).join(", ");
       const whereQuery = `
-        WHERE itemCategoryId = ${params.itemCategory.id}
+        WHERE itemCategoryId IN (${categoryIds})
       `;
 
       query = query.replace("__WHERE_PLACEHOLDER__", whereQuery);
@@ -1116,7 +1117,7 @@ export default class DataService {
       );
       query = query.replace("__WHERE_PLACEHOLDER__", whereQuery);
     } else {
-      if (!params.itemCategory && !params.feed) {
+      if (!params.itemCategories && !params.feed) {
         query = query.replace("__WHERE_PLACEHOLDER__", "");
       }
     }
