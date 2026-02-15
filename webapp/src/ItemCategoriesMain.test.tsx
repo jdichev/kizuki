@@ -184,3 +184,176 @@ test("unread count badge is not shown when count is zero", async () => {
   expect(allMenuMarker).toBeTruthy();
   expect(allMenuMarker?.textContent).toBe("5");
 });
+
+test("toggles unreadOnly filter and refreshes items with correct parameters", async () => {
+  const ds = (DataService as unknown as { __mock: any }).__mock;
+
+  const allItems = [
+    {
+      id: 1,
+      title: "Unread Item 1",
+      read: 0,
+      published: 1000,
+      feedTitle: "Feed A",
+      url: "https://example.com/1",
+    },
+    {
+      id: 2,
+      title: "Read Item 2",
+      read: 1,
+      published: 2000,
+      feedTitle: "Feed A",
+      url: "https://example.com/2",
+    },
+    {
+      id: 3,
+      title: "Unread Item 3",
+      read: 0,
+      published: 3000,
+      feedTitle: "Feed A",
+      url: "https://example.com/3",
+    },
+  ];
+
+  const unreadItems = [allItems[0], allItems[2]];
+
+  // First call returns all items, subsequent calls return filtered items
+  ds.getItemsDeferred
+    .mockResolvedValueOnce(allItems)
+    .mockResolvedValueOnce(unreadItems);
+  ds.getItemCategories.mockResolvedValue([{ id: 1, title: "Category A" }]);
+  ds.getItemCategoryReadStats.mockResolvedValue([{ id: 1, unreadCount: 2 }]);
+
+  const topMenu = React.createRef<HTMLDivElement>();
+  const topOptions = React.createRef<HTMLDivElement>();
+
+  render(
+    <MemoryRouter>
+      <ItemCategoriesMain topMenu={topMenu} topOptions={topOptions} />
+    </MemoryRouter>
+  );
+
+  // Wait for initial items to load
+  await screen.findByText("Unread Item 1");
+  await screen.findByText("Read Item 2");
+  await screen.findByText("Unread Item 3");
+
+  // Verify initial call was made without unreadOnly filter
+  expect(ds.getItemsDeferred).toHaveBeenCalledWith(
+    expect.objectContaining({
+      unreadOnly: false,
+    })
+  );
+
+  // Find and click the "E" key to toggle unreadOnly filter
+  // Since we can't directly trigger the keyboard handler, we'll use the TopNavMenu button
+  // For now, let's simulate the keydown event
+  fireEvent.keyDown(window, { code: "KeyE" });
+
+  // Wait for the component to refetch items with unreadOnly filter
+  await waitFor(() => {
+    expect(ds.getItemsDeferred).toHaveBeenCalledWith(
+      expect.objectContaining({
+        unreadOnly: true,
+      })
+    );
+  });
+
+  // Verify that only unread items are displayed
+  expect(screen.getByText("Unread Item 1")).toBeTruthy();
+  expect(screen.getByText("Unread Item 3")).toBeTruthy();
+  expect(screen.queryByText("Read Item 2")).toBeNull();
+});
+
+test("marks items as read with all child categories when parent category is selected", async () => {
+  const ds = (DataService as unknown as { __mock: any }).__mock;
+
+  const parentCategory = {
+    id: 0,
+    title: "General News & Lifestyle",
+    expanded: false,
+  };
+
+  const childCategories = [
+    { id: 1, title: "Politics & Government" },
+    { id: 2, title: "Business & Finance" },
+    { id: 3, title: "Science & Environment" },
+  ];
+
+  const mockItems = [
+    {
+      id: 1,
+      title: "Item 1",
+      read: 0,
+      published: 1000,
+      feedTitle: "Feed A",
+      url: "https://example.com/1",
+    },
+    {
+      id: 2,
+      title: "Item 2",
+      read: 0,
+      published: 2000,
+      feedTitle: "Feed B",
+      url: "https://example.com/2",
+    },
+  ];
+
+  ds.getItemCategories.mockResolvedValue([...childCategories]);
+  ds.getItemCategoryReadStats.mockResolvedValue([
+    { id: 1, unreadCount: 2 },
+    { id: 2, unreadCount: 1 },
+    { id: 3, unreadCount: 0 },
+  ]);
+  ds.getItemsDeferred.mockResolvedValue(mockItems);
+  ds.markItemsRead.mockResolvedValue({});
+
+  const topMenu = React.createRef<HTMLDivElement>();
+  const topOptions = React.createRef<HTMLDivElement>();
+
+  render(
+    <MemoryRouter>
+      <ItemCategoriesMain topMenu={topMenu} topOptions={topOptions} />
+    </MemoryRouter>
+  );
+
+  // Wait for parent category to render
+  await screen.findByText("General News & Lifestyle");
+
+  // Click on the parent category to select it and expand it
+  const parentButton = screen.getByRole("button", {
+    name: /General News & Lifestyle/i,
+  });
+  const chevron = parentButton.querySelector(".categoryChevron");
+  if (chevron) {
+    fireEvent.click(chevron);
+  }
+
+  // Wait for child categories to render
+  await screen.findByText("Politics & Government");
+  await screen.findByText("Business & Finance");
+  await screen.findByText("Science & Environment");
+
+  // Wait for items to load
+  await screen.findByText("Item 1");
+  await screen.findByText("Item 2");
+
+  // Press "Q" to mark all items as read (for the selected parent category)
+  fireEvent.keyDown(window, { code: "KeyQ" });
+
+  // Verify markItemsRead was called with array of all child categories
+  await waitFor(() => {
+    expect(ds.markItemsRead).toHaveBeenCalledWith(
+      expect.objectContaining({
+        itemCategories: expect.arrayContaining([
+          expect.objectContaining({ id: 1, title: "Politics & Government" }),
+          expect.objectContaining({ id: 2, title: "Business & Finance" }),
+          expect.objectContaining({ id: 3, title: "Science & Environment" }),
+        ]),
+      })
+    );
+  });
+
+  // Verify items are marked as read locally
+  expect(ds.markItemsRead).toHaveBeenCalledTimes(1);
+});

@@ -396,10 +396,13 @@ app.get("/itemsread", async (req: Request, res: Response) => {
     } else {
       res.json({ message: "Feed category not found" });
     }
-  } else if (selectedItemCategoryIds !== undefined && selectedItemCategoryIds.length > 0) {
+  } else if (
+    selectedItemCategoryIds !== undefined &&
+    selectedItemCategoryIds.length > 0
+  ) {
     const allItemCategories = await dataModel.getItemCategories();
     const itemCategories = allItemCategories.filter(
-      (cat) => selectedItemCategoryIds.includes(cat.id)
+      (cat) => cat.id !== undefined && selectedItemCategoryIds.includes(cat.id)
     );
 
     if (itemCategories.length > 0) {
