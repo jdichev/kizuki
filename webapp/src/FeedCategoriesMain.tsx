@@ -8,6 +8,12 @@ import UnifiedCategoriesView from "./components/UnifiedCategoriesView";
 import TopNavMenu from "./components/TopNavMenu";
 import { useFilterState } from "./hooks/useFilterState";
 import { ensureSelectedItemInList } from "./utils/itemListUtils";
+import {
+  SIDEBAR_MENU_HIDE_REQUEST_EVENT,
+  SIDEBAR_MENU_VISIBILITY_EVENT,
+  SIDEBAR_VISIBILITY_MODE,
+  type SidebarMenuHideRequestDetail,
+} from "./utils/sidebarMenuVisibility";
 
 const ds = DataService.getInstance();
 
@@ -28,6 +34,7 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
   const [size, setSize] = useState<number>(50);
 
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
+  const [isItemsLoading, setIsItemsLoading] = useState<boolean>(false);
 
   const {
     unreadOnly,
@@ -65,8 +72,6 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
     (categoryId?: number, feedId?: number) => {
       const params = new URLSearchParams(location.search);
 
-      console.log("updateUrlForSelection called with:", { categoryId, feedId });
-
       if (categoryId !== undefined) {
         params.set("category", `${categoryId}`);
       } else {
@@ -82,8 +87,6 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
       const search = params.toString();
       const nextUrl = `${location.pathname}${search ? `?${search}` : ""}`;
       const currentUrl = `${location.pathname}${location.search}`;
-
-      console.log("updateUrlForSelection result:", { nextUrl, currentUrl });
 
       if (nextUrl !== currentUrl) {
         navigate(nextUrl, { replace: true });
@@ -116,6 +119,8 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
     let res;
 
     try {
+      setIsItemsLoading(true);
+
       if (selectedFeed) {
         res = await ds
           .getItemsDeferred({ size, unreadOnly, bookmarkedOnly, selectedFeed })
@@ -167,6 +172,8 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
       } else {
         setLoadingMore(false);
       }
+
+      setIsItemsLoading(false);
     }
   }, [
     size,
@@ -371,6 +378,11 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
 
       if (["KeyA", "KeyH", "ArrowLeft"].includes(e.code)) {
         if (activeNav === "items") {
+          window.dispatchEvent(
+            new CustomEvent(SIDEBAR_MENU_VISIBILITY_EVENT, {
+              detail: { mode: SIDEBAR_VISIBILITY_MODE.temporaryShow },
+            })
+          );
           setActiveNav("categories");
 
           if (selectedFeed) {
@@ -409,11 +421,16 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
       }
 
       if (["KeyD", "KeyL", "ArrowRight"].includes(e.code)) {
-        if (items.length === 0) {
+        if (items.length === 0 || isItemsLoading || loadingMore) {
           return;
         }
 
         if (activeNav === "categories") {
+          window.dispatchEvent(
+            new CustomEvent(SIDEBAR_MENU_VISIBILITY_EVENT, {
+              detail: { mode: SIDEBAR_VISIBILITY_MODE.temporaryClear },
+            })
+          );
           setActiveNav("items");
           if (!article) {
             selectNextItem();
@@ -518,6 +535,39 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
     },
     [article, updateFeedCategoryReadStats, updateFeedReadStats]
   );
+
+  useEffect(() => {
+    const handleSidebarHideRequest = (event: Event) => {
+      const customEvent = event as CustomEvent<SidebarMenuHideRequestDetail>;
+
+      if (!customEvent.detail?.shouldSelectFirstItem) {
+        return;
+      }
+
+      if (activeNav !== "categories") {
+        return;
+      }
+
+      if (items.length === 0 || isItemsLoading || loadingMore) {
+        return;
+      }
+
+      setActiveNav("items");
+      selectItem(undefined, items[0]);
+    };
+
+    window.addEventListener(
+      SIDEBAR_MENU_HIDE_REQUEST_EVENT,
+      handleSidebarHideRequest as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        SIDEBAR_MENU_HIDE_REQUEST_EVENT,
+        handleSidebarHideRequest as EventListener
+      );
+    };
+  }, [activeNav, isItemsLoading, items, loadingMore, selectItem]);
 
   /**
    * Mark items as read. If filtered, only the ones matching

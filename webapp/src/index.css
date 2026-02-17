@@ -131,6 +131,15 @@ a:hover {
   grid-template-rows: var(--header-height) calc(100vh - var(--header-height));
 }
 
+#wrapper.sidebar-menu-hidden {
+  grid-template-columns: var(--side-menu-width) 0 var(--main-column-size);
+}
+
+#wrapper.sidebar-menu-hidden #sidebar-menu,
+#wrapper.sidebar-menu-hidden #sidebar-divider {
+  display: none;
+}
+
 #top-nav-options {
   text-align: left;
 }
@@ -428,6 +437,11 @@ a:hover {
   overflow: hidden;
   display: grid;
   grid-template-columns: var(--center-column-size) var(--right-column-size);
+}
+
+#main-content {
+  grid-column-start: 3;
+  grid-column-end: 4;
 }
 
 #panel-single-column {

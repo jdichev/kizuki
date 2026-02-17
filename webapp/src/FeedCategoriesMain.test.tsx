@@ -1,8 +1,19 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import FeedsMain from "./FeedCategoriesMain";
 import DataService from "./service/DataService";
+import {
+  SIDEBAR_MENU_HIDE_REQUEST_EVENT,
+  SIDEBAR_MENU_VISIBILITY_EVENT,
+  SIDEBAR_VISIBILITY_MODE,
+} from "./utils/sidebarMenuVisibility";
 
 jest.mock("./service/DataService", () => {
   const mockDs = {
@@ -355,4 +366,136 @@ test("feed unread counts are loaded and displayed when entering from deeplink wi
       selectedFeedCategory: expect.objectContaining({ id: 1, title: "Tech" }),
     })
   );
+});
+
+test("does not navigate to items with right arrow while items are loading", async () => {
+  const ds = (DataService as unknown as { __mock: any }).__mock;
+
+  const loadedItems = [
+    {
+      id: 1,
+      title: "Feed Item 1",
+      read: 0,
+      published: 1000,
+      feedTitle: "Feed A",
+      url: "https://example.com/1",
+    },
+  ];
+
+  let resolvePendingItems: ((items: unknown[]) => void) | undefined;
+  const pendingItemsPromise = new Promise<unknown[]>((resolve) => {
+    resolvePendingItems = resolve;
+  });
+
+  ds.getFeedCategories.mockResolvedValue([
+    { id: 1, title: "Tech", expanded: false },
+  ]);
+  ds.getFeedCategoryReadStats.mockResolvedValue([{ id: 1, unreadCount: 1 }]);
+  ds.getFeedReadStats.mockResolvedValue([{ id: 10, unreadCount: 1 }]);
+  ds.getFeeds.mockResolvedValue([
+    {
+      id: 10,
+      title: "Feed A",
+      url: "https://example.com",
+      feedUrl: "https://example.com/rss",
+      feedCategoryId: 1,
+    },
+  ]);
+  ds.getItemsDeferred.mockResolvedValue(loadedItems);
+  ds.markItemRead.mockResolvedValue(undefined);
+  ds.getItemDeferred.mockResolvedValue(undefined);
+  ds.markItemsRead.mockResolvedValue(undefined);
+
+  const dispatchSpy = jest.spyOn(window, "dispatchEvent");
+
+  const topMenu = React.createRef<HTMLDivElement>();
+  const topOptions = React.createRef<HTMLDivElement>();
+
+  render(
+    <MemoryRouter>
+      <FeedsMain topMenu={topMenu} topOptions={topOptions} />
+    </MemoryRouter>
+  );
+
+  await screen.findByText("Feed Item 1");
+
+  const callCountBeforeRefresh = ds.getItemsDeferred.mock.calls.length;
+  ds.getItemsDeferred.mockImplementationOnce(() => pendingItemsPromise);
+
+  fireEvent.keyDown(window, { code: "KeyE" });
+
+  await waitFor(() => {
+    expect(ds.getItemsDeferred.mock.calls.length).toBeGreaterThan(
+      callCountBeforeRefresh
+    );
+  });
+
+  fireEvent.keyDown(window, { code: "ArrowRight" });
+
+  const temporaryClearCalls = dispatchSpy.mock.calls.filter(([event]) => {
+    if (!(event instanceof CustomEvent)) {
+      return false;
+    }
+
+    return (
+      event.type === SIDEBAR_MENU_VISIBILITY_EVENT &&
+      event.detail?.mode === SIDEBAR_VISIBILITY_MODE.temporaryClear
+    );
+  });
+
+  expect(temporaryClearCalls.length).toBe(0);
+
+  dispatchSpy.mockRestore();
+});
+
+test("selects first item when sidebar hide-request is triggered with sidebar focus", async () => {
+  const ds = (DataService as unknown as { __mock: any }).__mock;
+
+  ds.getFeedCategories.mockResolvedValue([
+    { id: 1, title: "Tech", expanded: false },
+  ]);
+  ds.getFeedCategoryReadStats.mockResolvedValue([{ id: 1, unreadCount: 1 }]);
+  ds.getFeedReadStats.mockResolvedValue([{ id: 10, unreadCount: 1 }]);
+  ds.getFeeds.mockResolvedValue([]);
+  ds.getItemsDeferred.mockResolvedValue([
+    {
+      id: 1,
+      title: "Feed Item 1",
+      read: 1,
+      published: 1000,
+      feedTitle: "Feed A",
+      url: "https://example.com/1",
+    },
+  ]);
+  ds.markItemRead.mockResolvedValue(undefined);
+  ds.getItemDeferred.mockResolvedValue(undefined);
+  ds.markItemsRead.mockResolvedValue(undefined);
+
+  const topMenu = React.createRef<HTMLDivElement>();
+  const topOptions = React.createRef<HTMLDivElement>();
+
+  render(
+    <MemoryRouter>
+      <FeedsMain topMenu={topMenu} topOptions={topOptions} />
+    </MemoryRouter>
+  );
+
+  await screen.findByText("Feed Item 1");
+
+  const categoryAllButton = document.getElementById("category-all");
+  expect(categoryAllButton).toBeTruthy();
+  (categoryAllButton as HTMLButtonElement).focus();
+  expect(document.activeElement).toBe(categoryAllButton);
+
+  await act(async () => {
+    window.dispatchEvent(
+      new CustomEvent(SIDEBAR_MENU_HIDE_REQUEST_EVENT, {
+        detail: { shouldSelectFirstItem: true },
+      })
+    );
+  });
+
+  await waitFor(() => {
+    expect(document.activeElement?.id).toBe("item-1");
+  });
 });

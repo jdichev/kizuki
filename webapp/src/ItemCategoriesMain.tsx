@@ -14,6 +14,12 @@ import {
   getParentRangeForCategoryId,
   type ParentCategory,
 } from "./utils/categoryHierarchyBuilder";
+import {
+  SIDEBAR_MENU_HIDE_REQUEST_EVENT,
+  SIDEBAR_MENU_VISIBILITY_EVENT,
+  SIDEBAR_VISIBILITY_MODE,
+  type SidebarMenuHideRequestDetail,
+} from "./utils/sidebarMenuVisibility";
 
 const ds = DataService.getInstance();
 
@@ -33,6 +39,7 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
   >([]);
   const [size, setSize] = useState<number>(50);
   const [loadingMore, setLoadingMore] = useState<boolean>(false);
+  const [isItemsLoading, setIsItemsLoading] = useState<boolean>(false);
   const {
     unreadOnly,
     bookmarkedOnly,
@@ -92,6 +99,8 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
     let res;
 
     try {
+      setIsItemsLoading(true);
+
       // Collect category IDs: either the selected child category or all children of selected parent
       let selectedItemCategoryIds: number[] | undefined;
 
@@ -150,6 +159,8 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
       } else {
         setLoadingMore(false);
       }
+
+      setIsItemsLoading(false);
     }
   }, [
     size,
@@ -257,6 +268,11 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
 
       if (["KeyA", "KeyH", "ArrowLeft"].includes(e.code)) {
         if (activeNav === "items") {
+          window.dispatchEvent(
+            new CustomEvent(SIDEBAR_MENU_VISIBILITY_EVENT, {
+              detail: { mode: SIDEBAR_VISIBILITY_MODE.temporaryShow },
+            })
+          );
           setActiveNav("categories");
 
           // Use setTimeout to ensure DOM is updated before focusing
@@ -322,10 +338,15 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
       if (["KeyD", "KeyL", "ArrowRight"].includes(e.code)) {
         if (activeNav === "categories") {
           // Move to items view
-          if (items.length === 0) {
+          if (items.length === 0 || isItemsLoading || loadingMore) {
             return;
           }
 
+          window.dispatchEvent(
+            new CustomEvent(SIDEBAR_MENU_VISIBILITY_EVENT, {
+              detail: { mode: SIDEBAR_VISIBILITY_MODE.temporaryClear },
+            })
+          );
           setActiveNav("items");
           if (!article) {
             selectNextItem();
@@ -418,6 +439,39 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
     },
     [article, updateItemCategoryReadStats]
   );
+
+  useEffect(() => {
+    const handleSidebarHideRequest = (event: Event) => {
+      const customEvent = event as CustomEvent<SidebarMenuHideRequestDetail>;
+
+      if (!customEvent.detail?.shouldSelectFirstItem) {
+        return;
+      }
+
+      if (activeNav !== "categories") {
+        return;
+      }
+
+      if (items.length === 0 || isItemsLoading || loadingMore) {
+        return;
+      }
+
+      setActiveNav("items");
+      selectItem(undefined, items[0]);
+    };
+
+    window.addEventListener(
+      SIDEBAR_MENU_HIDE_REQUEST_EVENT,
+      handleSidebarHideRequest as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        SIDEBAR_MENU_HIDE_REQUEST_EVENT,
+        handleSidebarHideRequest as EventListener
+      );
+    };
+  }, [activeNav, isItemsLoading, items, loadingMore, selectItem]);
 
   const markItemsRead = useCallback(async () => {
     clearFilters();

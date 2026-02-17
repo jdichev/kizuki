@@ -1,8 +1,19 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import ItemCategoriesMain from "./ItemCategoriesMain";
 import DataService from "./service/DataService";
+import {
+  SIDEBAR_MENU_HIDE_REQUEST_EVENT,
+  SIDEBAR_MENU_VISIBILITY_EVENT,
+  SIDEBAR_VISIBILITY_MODE,
+} from "./utils/sidebarMenuVisibility";
 
 jest.mock("./service/DataService", () => {
   const mockDs = {
@@ -356,4 +367,120 @@ test("marks items as read with all child categories when parent category is sele
 
   // Verify items are marked as read locally
   expect(ds.markItemsRead).toHaveBeenCalledTimes(1);
+});
+
+test("does not navigate to items with right arrow while items are loading", async () => {
+  const ds = (DataService as unknown as { __mock: any }).__mock;
+
+  const loadedItems = [
+    {
+      id: 1,
+      title: "Item 1",
+      read: 0,
+      published: 1000,
+      feedTitle: "Feed A",
+      url: "https://example.com/1",
+    },
+  ];
+
+  let resolvePendingItems: ((items: unknown[]) => void) | undefined;
+  const pendingItemsPromise = new Promise<unknown[]>((resolve) => {
+    resolvePendingItems = resolve;
+  });
+
+  ds.getItemCategories.mockResolvedValue([{ id: 1, title: "Category A" }]);
+  ds.getItemCategoryReadStats.mockResolvedValue([{ id: 1, unreadCount: 1 }]);
+  ds.getItemsDeferred.mockResolvedValue(loadedItems);
+  ds.markItemRead.mockResolvedValue(undefined);
+  ds.getItemDeferred.mockResolvedValue(undefined);
+  ds.markItemsRead.mockResolvedValue(undefined);
+
+  const dispatchSpy = jest.spyOn(window, "dispatchEvent");
+
+  const topMenu = React.createRef<HTMLDivElement>();
+  const topOptions = React.createRef<HTMLDivElement>();
+
+  render(
+    <MemoryRouter>
+      <ItemCategoriesMain topMenu={topMenu} topOptions={topOptions} />
+    </MemoryRouter>
+  );
+
+  await screen.findByText("Item 1");
+
+  const callCountBeforeRefresh = ds.getItemsDeferred.mock.calls.length;
+  ds.getItemsDeferred.mockImplementationOnce(() => pendingItemsPromise);
+
+  fireEvent.keyDown(window, { code: "KeyE" });
+
+  await waitFor(() => {
+    expect(ds.getItemsDeferred.mock.calls.length).toBeGreaterThan(
+      callCountBeforeRefresh
+    );
+  });
+
+  fireEvent.keyDown(window, { code: "ArrowRight" });
+
+  const temporaryClearCalls = dispatchSpy.mock.calls.filter(([event]) => {
+    if (!(event instanceof CustomEvent)) {
+      return false;
+    }
+
+    return (
+      event.type === SIDEBAR_MENU_VISIBILITY_EVENT &&
+      event.detail?.mode === SIDEBAR_VISIBILITY_MODE.temporaryClear
+    );
+  });
+
+  expect(temporaryClearCalls.length).toBe(0);
+
+  dispatchSpy.mockRestore();
+});
+
+test("selects first item when sidebar hide-request is triggered with sidebar focus", async () => {
+  const ds = (DataService as unknown as { __mock: any }).__mock;
+
+  ds.getItemCategories.mockResolvedValue([{ id: 1, title: "Category A" }]);
+  ds.getItemCategoryReadStats.mockResolvedValue([{ id: 1, unreadCount: 1 }]);
+  ds.getItemsDeferred.mockResolvedValue([
+    {
+      id: 1,
+      title: "Item 1",
+      read: 1,
+      published: 1000,
+      feedTitle: "Feed A",
+      url: "https://example.com/1",
+    },
+  ]);
+  ds.markItemRead.mockResolvedValue(undefined);
+  ds.getItemDeferred.mockResolvedValue(undefined);
+  ds.markItemsRead.mockResolvedValue(undefined);
+
+  const topMenu = React.createRef<HTMLDivElement>();
+  const topOptions = React.createRef<HTMLDivElement>();
+
+  render(
+    <MemoryRouter>
+      <ItemCategoriesMain topMenu={topMenu} topOptions={topOptions} />
+    </MemoryRouter>
+  );
+
+  await screen.findByText("Item 1");
+
+  const categoryAllButton = document.getElementById("item-category-all");
+  expect(categoryAllButton).toBeTruthy();
+  (categoryAllButton as HTMLButtonElement).focus();
+  expect(document.activeElement).toBe(categoryAllButton);
+
+  await act(async () => {
+    window.dispatchEvent(
+      new CustomEvent(SIDEBAR_MENU_HIDE_REQUEST_EVENT, {
+        detail: { shouldSelectFirstItem: true },
+      })
+    );
+  });
+
+  await waitFor(() => {
+    expect(document.activeElement?.id).toBe("item-1");
+  });
 });
