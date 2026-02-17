@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import DataService from "./service/DataService";
 import Article from "./components/Article";
 import ItemsTable from "./components/ItemsTable";
-import ItemCategoriesNav from "./components/ItemCategoriesNav";
+import UnifiedCategoriesView from "./components/UnifiedCategoriesView";
 import TopNavMenu from "./components/TopNavMenu";
 import { useFilterState } from "./hooks/useFilterState";
 import { ensureSelectedItemInList } from "./utils/itemListUtils";
@@ -750,17 +750,64 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
 
   return (
     <>
-      <ItemCategoriesNav
+      <UnifiedCategoriesView
         activeNav={activeNav}
-        parentCategories={parentCategories}
-        categoryChildren={categoryChildren}
-        selectedParentCategory={selectedParentCategory}
-        selectedItemCategory={selectedItemCategory}
-        selectParentCategory={selectParentCategory}
-        selectItemCategory={selectItemCategory}
-        getTotalUnreadCount={getTotalUnreadCount}
-        getUnreadCountForParent={getUnreadCountForParentCategory}
-        getUnreadCountForItemCategory={getUnreadCountForItemCategory}
+        parents={parentCategories}
+        getChildren={(parent) => categoryChildren.get(parent.id) || []}
+        parentKey={(parent) => parent.id}
+        childKey={(child) => child.id ?? `item-category-${child.title}`}
+        allRow={{
+          id: "item-category-all",
+          className:
+            !selectedParentCategory && !selectedItemCategory
+              ? "feedcategory-selected"
+              : "",
+          label: "All",
+          onClick: (e) => {
+            selectParentCategory(undefined, e);
+            selectItemCategory(undefined, undefined);
+          },
+          unreadCount: getTotalUnreadCount(),
+          showUnread: (count) => Number(count || 0) > 0,
+        }}
+        parentRow={{
+          id: (parentCategory) => `item-category-${parentCategory.id}`,
+          className: (parentCategory) =>
+            parentCategory.id === selectedParentCategory?.id &&
+            !selectedItemCategory
+              ? "feedcategory-selected"
+              : "",
+          label: (parentCategory) => parentCategory.title,
+          title: (parentCategory) =>
+            `${parentCategory.title} ${getUnreadCountForParentCategory(
+              parentCategory.id
+            )}`,
+          onClick: (parentCategory, e) =>
+            selectParentCategory(parentCategory, e),
+          unreadCount: (parentCategory) =>
+            getUnreadCountForParentCategory(parentCategory.id),
+          showUnread: (count) => Number(count || 0) > 0,
+          iconMode: "when-children",
+          isExpanded: (parentCategory) => parentCategory.expanded === true,
+        }}
+        childRow={{
+          id: (itemCategory) => `item-category-child-${itemCategory.id}`,
+          className: (itemCategory) =>
+            itemCategory === selectedItemCategory
+              ? "category-feed feedcategory-selected"
+              : "category-feed",
+          label: (itemCategory) => itemCategory.title,
+          title: (itemCategory) =>
+            `${itemCategory.title} ${getUnreadCountForItemCategory(
+              itemCategory.id
+            )}`,
+          onClick: (itemCategory) =>
+            selectItemCategory(itemCategory, undefined),
+          unreadCount: (itemCategory) =>
+            getUnreadCountForItemCategory(itemCategory.id),
+          showUnread: (count) => Number(count || 0) > 0,
+        }}
+        shouldRenderChildren={(parent) => parent.expanded === true}
       />
 
       <main id="main-content">
