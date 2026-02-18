@@ -66,9 +66,7 @@ function AppLayout() {
         return;
       }
 
-      if (
-        customEvent.detail?.mode === SIDEBAR_VISIBILITY_MODE.temporaryClear
-      ) {
+      if (customEvent.detail?.mode === SIDEBAR_VISIBILITY_MODE.temporaryClear) {
         setSidebarMenuTemporarilyShown(false);
         return;
       }

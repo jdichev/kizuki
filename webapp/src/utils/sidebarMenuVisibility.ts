@@ -1,5 +1,4 @@
-export const SIDEBAR_MENU_VISIBILITY_EVENT =
-  "sidebar-menu-visibility" as const;
+export const SIDEBAR_MENU_VISIBILITY_EVENT = "sidebar-menu-visibility" as const;
 export const SIDEBAR_MENU_HIDE_REQUEST_EVENT =
   "sidebar-menu-hide-request" as const;
 
