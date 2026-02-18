@@ -92,33 +92,68 @@ function AppLayout() {
     };
   }, []);
 
+  const toggleSidebarMenu = useCallback(() => {
+    const sidebarMenuElement = document.getElementById("sidebar-menu");
+    const shouldSelectFirstItem =
+      sidebarMenuFocusedBeforeClick.current ||
+      (!!sidebarMenuElement &&
+        !!document.activeElement &&
+        sidebarMenuElement.contains(document.activeElement)) ||
+      (!!sidebarMenuElement &&
+        sidebarMenuElement.getAttribute("data-activenav") === "true");
+
+    const nextExplicitHidden = !isSidebarMenuExplicitlyHidden;
+    setSidebarMenuExplicitlyHidden(nextExplicitHidden);
+
+    if (nextExplicitHidden) {
+      const detail: SidebarMenuHideRequestDetail = {
+        shouldSelectFirstItem,
+      };
+
+      window.dispatchEvent(
+        new CustomEvent(SIDEBAR_MENU_HIDE_REQUEST_EVENT, {
+          detail,
+        })
+      );
+    }
+
+    sidebarMenuFocusedBeforeClick.current = false;
+    setSidebarMenuTemporarilyShown(false);
+  }, [isSidebarMenuExplicitlyHidden]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const isToggleShortcut =
+        event.code === "KeyB" &&
+        (event.metaKey || event.ctrlKey) &&
+        !event.altKey &&
+        !event.shiftKey;
+
+      if (!isToggleShortcut) {
+        return;
+      }
+
+      const sidebarMenuElement = document.getElementById("sidebar-menu");
+      if (!sidebarMenuElement) {
+        return;
+      }
+
+      event.preventDefault();
+      toggleSidebarMenu();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [toggleSidebarMenu]);
+
   const onSideMenuClick = useCallback(
     (e: React.MouseEvent<HTMLAnchorElement>, targetPath: string) => {
       if (location.pathname === targetPath) {
         e.preventDefault();
-        const sidebarMenuElement = document.getElementById("sidebar-menu");
-        const shouldSelectFirstItem =
-          sidebarMenuFocusedBeforeClick.current ||
-          (!!sidebarMenuElement &&
-            sidebarMenuElement.getAttribute("data-activenav") === "true");
-
-        const nextExplicitHidden = !isSidebarMenuExplicitlyHidden;
-        setSidebarMenuExplicitlyHidden(nextExplicitHidden);
-
-        if (nextExplicitHidden) {
-          const detail: SidebarMenuHideRequestDetail = {
-            shouldSelectFirstItem,
-          };
-
-          window.dispatchEvent(
-            new CustomEvent(SIDEBAR_MENU_HIDE_REQUEST_EVENT, {
-              detail,
-            })
-          );
-        }
-
-        sidebarMenuFocusedBeforeClick.current = false;
-        setSidebarMenuTemporarilyShown(false);
+        toggleSidebarMenu();
         return;
       }
 
@@ -126,7 +161,7 @@ function AppLayout() {
       setSidebarMenuExplicitlyHidden(false);
       setSidebarMenuTemporarilyShown(false);
     },
-    [isSidebarMenuExplicitlyHidden, location.pathname]
+    [location.pathname, toggleSidebarMenu]
   );
 
   const onSideMenuMouseDown = useCallback(() => {
