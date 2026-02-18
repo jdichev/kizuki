@@ -62,7 +62,7 @@ export default function FeedEdit() {
 
   return (
     <>
-      <nav id="sidebar-menu" />
+      <nav id="main-sidebar" />
 
       <main id="main-content">
         <div id="feed-panel">

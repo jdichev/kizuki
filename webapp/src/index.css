@@ -131,12 +131,12 @@ a:hover {
   grid-template-rows: var(--header-height) calc(100vh - var(--header-height));
 }
 
-#wrapper.sidebar-menu-hidden {
+#wrapper.main-sidebar-hidden {
   grid-template-columns: var(--side-menu-width) 0 var(--main-column-size);
 }
 
-#wrapper.sidebar-menu-hidden #sidebar-menu,
-#wrapper.sidebar-menu-hidden #sidebar-divider {
+#wrapper.main-sidebar-hidden #main-sidebar,
+#wrapper.main-sidebar-hidden #sidebar-divider {
   display: none;
 }
 
@@ -276,11 +276,11 @@ a:hover {
   width: 80px;
 }
 
-#side-menu {
+#main-nav {
   background: var(--side-menu-bg);
 }
 
-#side-menu a {
+#main-nav a {
   color: var(--side-menu-fg);
   display: block;
   width: var(--side-menu-width);
@@ -292,12 +292,12 @@ a:hover {
   font-size: 1.36rem;
 }
 
-#side-menu a.active {
+#main-nav a.active {
   opacity: 1;
   color: var(--highlight-color);
 }
 
-#side-menu a:hover {
+#main-nav a:hover {
   color: var(--button-color-highlight);
   opacity: 1;
 }
@@ -308,7 +308,7 @@ a:hover {
   padding: 10% 15%;
 }
 
-#sidebar-menu {
+#main-sidebar {
   padding-top: 20px;
   padding-left: 4px;
   padding-right: 4px;
@@ -318,25 +318,25 @@ a:hover {
   box-sizing: border-box;
 }
 
-#sidebar-menu ul {
+#main-sidebar ul {
   display: block;
   width: 100%;
   margin: 0;
   padding: 0;
 }
 
-#sidebar-menu li {
+#main-sidebar li {
   display: block;
 }
 
-#sidebar-menu button {
+#main-sidebar button {
   color: var(--sidebar-fg);
   width: calc(100% - 1px);
   text-align: left;
   background: transparent;
 }
 
-#sidebar-menu li button {
+#main-sidebar li button {
   line-height: 25px;
   padding: 0 6px;
   vertical-align: middle;
@@ -350,83 +350,83 @@ a:hover {
   outline: none;
 }
 
-#sidebar-menu li button > * {
+#main-sidebar li button > * {
   display: flex;
   flex-direction: column;
   line-height: 25px;
   white-space: nowrap;
 }
 
-#sidebar-menu li.category-feed button {
+#main-sidebar li.category-feed button {
   font-size: 0.85em;
   margin-top: 0.25rem;
   margin-bottom: 0.25rem;
 }
 
-#sidebar-menu li button i::before {
+#main-sidebar li button i::before {
   display: inline-block;
   line-height: 25px;
   vertical-align: middle;
   white-space: nowrap;
 }
 
-#sidebar-menu li button i::before {
+#main-sidebar li button i::before {
   width: 16px;
 }
 
-#sidebar-menu li button span:not(.menu-marker) {
+#main-sidebar li button span:not(.menu-marker) {
   text-overflow: ellipsis;
   flex-grow: 1;
   overflow: hidden;
 }
 
-#sidebar-menu li button span.menu-marker {
+#main-sidebar li button span.menu-marker {
   padding-left: 4px;
 }
 
-#sidebar-menu li button:hover span.menu-marker {
+#main-sidebar li button:hover span.menu-marker {
   color: var(--link-color);
 }
 
-#sidebar-menu li button span.inner-label {
+#main-sidebar li button span.inner-label {
   display: block;
   width: 100%;
   text-overflow: ellipsis;
 }
 
-#sidebar-menu li:not(:first-child) button i:hover {
+#main-sidebar li:not(:first-child) button i:hover {
   color: var(--button-color-highlight);
 }
 
-#sidebar-menu .category-feed button {
+#main-sidebar .category-feed button {
   padding-left: 30px;
 }
 
-#sidebar-menu li.feed-selected button,
-#sidebar-menu li.feed-selected button:hover,
-#sidebar-menu li.feedcategory-selected button,
-#sidebar-menu li.feedcategory-selected button:hover {
+#main-sidebar li.feed-selected button,
+#main-sidebar li.feed-selected button:hover,
+#main-sidebar li.feedcategory-selected button,
+#main-sidebar li.feedcategory-selected button:hover {
   background: var(--sidebar-selected-bg);
   border: none;
 }
 
-#sidebar-menu[data-activenav="true"] li.feed-selected button,
-#sidebar-menu[data-activenav="true"] li.feed-selected button:hover,
-#sidebar-menu[data-activenav="true"] li.feedcategory-selected button,
-#sidebar-menu[data-activenav="true"] li.feedcategory-selected button:hover {
+#main-sidebar[data-activenav="true"] li.feed-selected button,
+#main-sidebar[data-activenav="true"] li.feed-selected button:hover,
+#main-sidebar[data-activenav="true"] li.feedcategory-selected button,
+#main-sidebar[data-activenav="true"] li.feedcategory-selected button:hover {
   box-shadow: 0 0 1px var(--link-color) inset;
   background: var(--sidebar-selected-active-bg);
 }
 
-#sidebar-menu li button:hover {
+#main-sidebar li button:hover {
   background: var(--btn-bg-color);
 }
 
-#sidebar-menu li:not(.feedcategory-selected):not(.feed-selected) button:focus {
+#main-sidebar li:not(.feedcategory-selected):not(.feed-selected) button:focus {
   background-color: var(--sidebar-focus-bg);
 }
 
-#sidebar-menu input {
+#main-sidebar input {
   padding: 0 10px;
   line-height: 25px;
   vertical-align: middle;
@@ -455,7 +455,7 @@ a:hover {
 }
 
 #list-panel,
-#sidebar-menu {
+#main-sidebar {
   -webkit-user-select: none; /* Safari */
   user-select: none;
 }

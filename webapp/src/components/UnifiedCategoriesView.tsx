@@ -90,7 +90,7 @@ export default function UnifiedCategoriesView<TParent, TChild>({
 
   return (
     <nav
-      id="sidebar-menu"
+      id="main-sidebar"
       data-activenav={activeNav === "categories" ? "true" : "false"}
     >
       <ul>

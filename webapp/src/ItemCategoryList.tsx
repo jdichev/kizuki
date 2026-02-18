@@ -63,7 +63,7 @@ export default function ItemCategoryList() {
 
   return (
     <>
-      <nav id="sidebar-menu" />
+      <nav id="main-sidebar" />
 
       <main id="main-content">
         <div id="table-panel">

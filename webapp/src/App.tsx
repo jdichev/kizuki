@@ -93,7 +93,7 @@ function AppLayout() {
   }, []);
 
   const toggleSidebarMenu = useCallback(() => {
-    const sidebarMenuElement = document.getElementById("sidebar-menu");
+    const sidebarMenuElement = document.getElementById("main-sidebar");
     const shouldSelectFirstItem =
       sidebarMenuFocusedBeforeClick.current ||
       (!!sidebarMenuElement &&
@@ -133,7 +133,7 @@ function AppLayout() {
         return;
       }
 
-      const sidebarMenuElement = document.getElementById("sidebar-menu");
+      const sidebarMenuElement = document.getElementById("main-sidebar");
       if (!sidebarMenuElement) {
         return;
       }
@@ -165,7 +165,7 @@ function AppLayout() {
   );
 
   const onSideMenuMouseDown = useCallback(() => {
-    const sidebarMenuElement = document.getElementById("sidebar-menu");
+    const sidebarMenuElement = document.getElementById("main-sidebar");
     sidebarMenuFocusedBeforeClick.current =
       !!sidebarMenuElement &&
       !!document.activeElement &&
@@ -176,7 +176,7 @@ function AppLayout() {
     <div
       id="wrapper"
       className={`${twoColLayout ? "two-columns" : ""} ${
-        isSidebarMenuHidden ? "sidebar-menu-hidden" : ""
+        isSidebarMenuHidden ? "main-sidebar-hidden" : ""
       }`.trim()}
     >
       <div id="top-nav-home"></div>
@@ -191,7 +191,7 @@ function AppLayout() {
         <div id="top-nav-options" ref={navOptions}></div>
       </div>
 
-      <div id="side-menu">
+      <div id="main-nav">
         <NavLink
           to="/feeds/read"
           className="text-decoration-none"

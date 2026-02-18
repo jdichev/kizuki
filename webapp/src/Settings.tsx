@@ -87,7 +87,7 @@ export default function Settings() {
 
   return (
     <>
-      <nav id="sidebar-menu">
+      <nav id="main-sidebar">
         <ul>
           <li>
             <button

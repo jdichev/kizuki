@@ -166,7 +166,7 @@ export default function Feeds({ topMenu }: FeedsProps) {
 
   return (
     <>
-      <nav id="sidebar-menu">
+      <nav id="main-sidebar">
         <ul>
           <li className={!selectedFeedCategory ? "feedcategory-selected" : ""}>
             <button

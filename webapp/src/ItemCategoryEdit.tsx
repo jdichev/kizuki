@@ -89,7 +89,7 @@ export default function ItemCategoryEdit() {
 
   return (
     <>
-      <nav id="sidebar-menu" />
+      <nav id="main-sidebar" />
 
       <main id="main-content">
         <div id="feed-panel">
