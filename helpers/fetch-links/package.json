@@ -1,0 +1,16 @@
+{
+  "name": "fetch-links",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "scripts": {
+    "build": "napi build --release --features napi-export",
+    "test": "cargo test",
+    "fetch": "node scripts/fetch-links.js"
+  },
+  "license": "ISC",
+  "devDependencies": {
+    "@napi-rs/cli": "^3.5.0"
+  }
+}
