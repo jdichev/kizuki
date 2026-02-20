@@ -12,6 +12,7 @@ import FeedCategoriesMain from "./FeedCategoriesMain";
 import ItemCategoriesMain from "./ItemCategoriesMain";
 import FeedsList from "./FeedsList";
 import FeedAdd from "./FeedAdd";
+import FeedOpmlOps from "./FeedOpmlOps";
 import FeedEdit from "./FeedEdit";
 import ItemCategoryEdit from "./ItemCategoryEdit";
 import ItemCategoryList from "./ItemCategoryList";
@@ -260,6 +261,8 @@ function AppLayout() {
         <Route path="/feeds/list" element={<FeedsList topMenu={navMenu} />} />
 
         <Route path="/feeds/add" element={<FeedAdd />} />
+
+        <Route path="/feeds/opml" element={<FeedOpmlOps />} />
 
         <Route path="/feeds/edit/:feedId" element={<FeedEdit />} />
 

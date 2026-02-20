@@ -87,9 +87,9 @@ export default function Settings() {
 
   return (
     <>
-      <nav id="main-sidebar">
+      <nav id="main-sidebar" data-activenav="true">
         <ul>
-          <li>
+          <li className="feed-selected">
             <button
               type="button"
               className="btn btn-link text-decoration-none"
@@ -112,7 +112,7 @@ export default function Settings() {
 
             {!loading && (
               <div>
-                <table className="table table-striped table-hover">
+                <table className="table table-striped table-borderless table-sm feeds-table">
                   <thead>
                     <tr>
                       <th>Key</th>

@@ -9,7 +9,6 @@ export default function FeedAdd() {
   const navigate = useNavigate();
 
   const { register, handleSubmit, getValues } = useForm();
-  const useFormMethods2 = useForm();
 
   const [feedCategories, setFeedCategories] = useState<FeedCategory[]>([]);
 
@@ -18,11 +17,6 @@ export default function FeedAdd() {
   const [checkedFeeds, setCheckedFeeds] = useState<string[]>([]);
 
   const [initialFormError, setInitialFormError] = useState(false);
-
-  const [exportStatus, setExportStatus] = useState<{
-    type: "success" | "error" | null;
-    message: string;
-  }>({ type: null, message: "" });
 
   useEffect(() => {
     const loadFeedCategories = async () => {
@@ -91,28 +85,28 @@ export default function FeedAdd() {
     [getValues, navigate, checkedFeeds, formFeedData]
   );
 
-  const onSubmitFileImport = useCallback((data: FieldValues) => {
-    console.log("Importing file:", data);
-    const file = data.importFile[0];
-
-    // Check if we're in Electron environment (has .path property)
-    if (file.path) {
-      // Electron: use file path directly
-      ds.importOpmlFile({ filePath: file.path });
-    } else {
-      // Browser: read file content
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const content = e.target?.result as string;
-        ds.importOpmlFile({ fileContent: content, fileName: file.name });
-      };
-      reader.readAsText(file);
-    }
-  }, []);
-
   return (
     <>
-      <nav id="main-sidebar" />
+      <nav id="main-sidebar" data-activenav="true">
+        <ul>
+          <li className="feed-selected">
+            <button type="button" className="btn btn-link text-decoration-none">
+              <i className="bi bi-plus-square" />
+              <span>Add feed view</span>
+            </button>
+          </li>
+          <li>
+            <button
+              type="button"
+              className="btn btn-link text-decoration-none"
+              onClick={() => navigate("/feeds/opml")}
+            >
+              <i className="bi bi-file-earmark-arrow-up" />
+              <span>OPML ops</span>
+            </button>
+          </li>
+        </ul>
+      </nav>
 
       <main id="main-content">
         <div id="feed-panel">
@@ -157,7 +151,7 @@ export default function FeedAdd() {
                     // onSubmit={handleSubmit(onSubmitSecondStep)}
                   >
                     <div>
-                      <div>{feedData.title}</div>
+                      <h1>{feedData.title}</h1>
                       <div>
                         <input
                           type="hidden"
@@ -210,71 +204,6 @@ export default function FeedAdd() {
                   </form>
                 );
               })}
-            </div>
-
-            <div>
-              <form onSubmit={useFormMethods2.handleSubmit(onSubmitFileImport)}>
-                <h3>Import OPML file</h3>
-
-                <div>
-                  <label htmlFor="importFile" className="form-label">
-                    Choose OPML file
-                  </label>
-
-                  <input
-                    className="form-control"
-                    type="file"
-                    id="importFile"
-                    required
-                    {...useFormMethods2.register("importFile")}
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  id="opmlImportSubmit"
-                >
-                  Import
-                </button>
-              </form>
-
-              <div>
-                <h3>Export OPML file</h3>
-                <p>Download all your feeds in OPML format</p>
-
-                {exportStatus.type && <div>{exportStatus.message}</div>}
-
-                <button
-                  type="button"
-                  className="btn btn-outline-primary"
-                  onClick={async () => {
-                    try {
-                      setExportStatus({ type: null, message: "" });
-                      await ds.exportOpmlFile();
-                      setExportStatus({
-                        type: "success",
-                        message: "OPML file exported successfully!",
-                      });
-                      setTimeout(() => {
-                        setExportStatus({ type: null, message: "" });
-                      }, 3000);
-                    } catch (error) {
-                      console.error("Export failed:", error);
-                      setExportStatus({
-                        type: "error",
-                        message:
-                          "Failed to export OPML file. Please try again.",
-                      });
-                      setTimeout(() => {
-                        setExportStatus({ type: null, message: "" });
-                      }, 5000);
-                    }
-                  }}
-                >
-                  Export OPML
-                </button>
-              </div>
             </div>
           </div>
         </div>
