@@ -40,13 +40,13 @@ export default function FeedOpmlOps() {
               onClick={() => navigate("/feeds/add")}
             >
               <i className="bi bi-plus-square" />
-              <span>Add feed view</span>
+              <span>Add feed</span>
             </button>
           </li>
           <li className="feed-selected">
             <button type="button" className="btn btn-link text-decoration-none">
               <i className="bi bi-file-earmark-arrow-up" />
-              <span>OPML ops</span>
+              <span>OPML</span>
             </button>
           </li>
         </ul>

@@ -92,7 +92,7 @@ export default function FeedAdd() {
           <li className="feed-selected">
             <button type="button" className="btn btn-link text-decoration-none">
               <i className="bi bi-plus-square" />
-              <span>Add feed view</span>
+              <span>Add feed</span>
             </button>
           </li>
           <li>
@@ -102,7 +102,7 @@ export default function FeedAdd() {
               onClick={() => navigate("/feeds/opml")}
             >
               <i className="bi bi-file-earmark-arrow-up" />
-              <span>OPML ops</span>
+              <span>OPML</span>
             </button>
           </li>
         </ul>
