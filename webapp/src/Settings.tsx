@@ -11,6 +11,7 @@ export default function Settings() {
   const [newKey, setNewKey] = useState<string>("");
   const [newValue, setNewValue] = useState<string>("");
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   // Load settings on component mount
   useEffect(() => {
@@ -84,6 +85,29 @@ export default function Settings() {
     }
   };
 
+  const isSensitiveSettingKey = (key: string) => {
+    return key.toLowerCase().includes("key");
+  };
+
+  const getObfuscatedValue = (value: string) => {
+    const maskLength = Math.min(12, Math.max(6, value.length));
+    return "•".repeat(maskLength);
+  };
+
+  const handleCopySettingValue = async (key: string, value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedKey(key);
+      setTimeout(() => {
+        setCopiedKey((prev) => (prev === key ? null : prev));
+      }, 1600);
+    } catch (err) {
+      setError(
+        `Failed to copy setting value: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  };
+
   return (
     <>
       <SettingsSubNavigation activeSection="settings" />
@@ -119,7 +143,27 @@ export default function Settings() {
                             <code>{key}</code>
                           </td>
                           <td>
-                            <code>{value}</code>
+                            <code>
+                              {isSensitiveSettingKey(key)
+                                ? getObfuscatedValue(value)
+                                : value}
+                            </code>
+                            {isSensitiveSettingKey(key) && (
+                              <button
+                                type="button"
+                                className="btn btn-link text-decoration-none"
+                                onClick={() =>
+                                  handleCopySettingValue(key, value)
+                                }
+                                title="Copy setting value"
+                              >
+                                <i
+                                  className={`bi ${
+                                    copiedKey === key ? "bi-check2" : "bi-copy"
+                                  }`}
+                                ></i>
+                              </button>
+                            )}
                           </td>
                           <td>
                             <a
