@@ -24,6 +24,7 @@
     --button-color-highlight: #f55;
     --weak-color: #898989;
     --highlight-color: #e3c470;
+    --heading-color: #412203;
   }
 }
 
@@ -53,6 +54,7 @@
     --button-color-highlight: #f55;
     --weak-color: #585858;
     --highlight-color: #e3c470;
+    --heading-color: #eee;
   }
 }
 
@@ -107,6 +109,7 @@ h4,
 h5,
 h6 {
   line-height: 1;
+  color: var(--heading-color);
 }
 
 .btn:focus-visible {
