@@ -6,7 +6,7 @@ import SettingsSubNavigation from "./components/SettingsSubNavigation";
 
 const ds = DataService.getInstance();
 
-export default function ItemCategoryEdit() {
+export default function FeedCategoryEdit() {
   const { categoryId } = useParams<{ categoryId: string }>();
   const isNew = !categoryId;
   const navigate = useNavigate();
@@ -18,49 +18,53 @@ export default function ItemCategoryEdit() {
     formState: { errors },
   } = useForm();
 
-  const [formItemCategoryData, setFormItemCategoryData] =
-    useState<ItemCategory>();
+  const [formFeedCategoryData, setFormFeedCategoryData] =
+    useState<FeedCategory>();
 
   useEffect(() => {
-    const loadFormItemCategoryData = async () => {
+    const loadFormFeedCategoryData = async () => {
       if (isNew) {
-        setFormItemCategoryData({ title: "", text: "" });
+        setFormFeedCategoryData({ title: "", text: "" });
       } else {
-        const categoryIdNum = parseInt(categoryId || "0");
-        const itemCategory = await ds.getItemCategoryById(categoryIdNum);
-        if (itemCategory) {
-          setFormItemCategoryData(itemCategory);
-          setValue("title", itemCategory.title);
-          setValue("text", itemCategory.text);
+        const categoryIdNum = parseInt(categoryId || "0", 10);
+        const feedCategories = await ds.getFeedCategories();
+        const feedCategory = feedCategories.find(
+          (category) => category.id === categoryIdNum
+        );
+
+        if (feedCategory) {
+          setFormFeedCategoryData(feedCategory);
+          setValue("title", feedCategory.title);
+          setValue("text", feedCategory.text);
         }
       }
     };
 
-    loadFormItemCategoryData();
+    loadFormFeedCategoryData();
   }, [categoryId, isNew, setValue]);
 
   const onSubmit = useCallback(
     async (data: FieldValues) => {
-      const itemCategory: ItemCategory = {
-        id: isNew ? undefined : parseInt(categoryId || "0"),
+      const feedCategory: FeedCategory = {
+        id: isNew ? undefined : parseInt(categoryId || "0", 10),
         title: data.title,
         text: data.text,
       };
 
       if (isNew) {
-        await ds.addItemCategory(itemCategory);
+        await ds.addFeedCategory(feedCategory);
       } else {
-        await ds.updateItemCategory(itemCategory);
+        await ds.updateFeedCategory(feedCategory);
       }
 
-      navigate("/item-categories/list");
+      navigate("/feed-categories/list");
     },
     [navigate, categoryId, isNew]
   );
 
   return (
     <>
-      <SettingsSubNavigation activeSection="item-categories" />
+      <SettingsSubNavigation activeSection="feed-categories" />
 
       <main id="main-content">
         <div id="feed-panel">
@@ -69,8 +73,8 @@ export default function ItemCategoryEdit() {
               <h3>
                 {isNew ? "New " : "Edit "}
                 Category{" "}
-                {formItemCategoryData?.title
-                  ? `- ${formItemCategoryData.title}`
+                {formFeedCategoryData?.title
+                  ? `- ${formFeedCategoryData.title}`
                   : ""}
               </h3>
               <div>
@@ -104,7 +108,7 @@ export default function ItemCategoryEdit() {
               </button>
 
               <Link
-                to="/item-categories/list"
+                to="/feed-categories/list"
                 className="btn btn-outline-secondary"
               >
                 Back

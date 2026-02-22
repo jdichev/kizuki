@@ -5,25 +5,25 @@ import SettingsSubNavigation from "./components/SettingsSubNavigation";
 
 const ds = DataService.getInstance();
 
-export default function ItemCategoryList() {
-  const [itemCategories, setItemCategories] = useState<ItemCategory[]>([]);
+export default function FeedCategoryList() {
+  const [feedCategories, setFeedCategories] = useState<FeedCategory[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadItemCategories = async () => {
+    const loadFeedCategories = async () => {
       setLoading(true);
       try {
-        const categories = await ds.getItemCategories();
+        const categories = await ds.getFeedCategories();
         categories.sort((a, b) => (a.id || 0) - (b.id || 0));
-        setItemCategories(categories);
+        setFeedCategories(categories);
       } catch (error) {
-        console.error("Error loading categories:", error);
+        console.error("Error loading feed categories:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    loadItemCategories();
+    loadFeedCategories();
   }, []);
 
   const handleDelete = async (categoryId: number | undefined) => {
@@ -34,63 +34,59 @@ export default function ItemCategoryList() {
 
     if (
       !window.confirm(
-        "Are you sure you want to delete this category? Items assigned to it will still be available."
+        "Are you sure you want to delete this category? Feeds assigned to it will still be available."
       )
     ) {
       return;
     }
 
     try {
-      const success = await ds.removeItemCategory(categoryId);
-      if (success) {
-        setLoading(true);
-        try {
-          const categories = await ds.getItemCategories();
-          categories.sort((a, b) => (a.id || 0) - (b.id || 0));
-          setItemCategories(categories);
-        } catch (error) {
-          console.error("Error reloading categories:", error);
-        } finally {
-          setLoading(false);
-        }
-      } else {
-        alert("Failed to delete category");
+      await ds.removeFeedCategory(categoryId);
+      setLoading(true);
+      try {
+        const categories = await ds.getFeedCategories();
+        categories.sort((a, b) => (a.id || 0) - (b.id || 0));
+        setFeedCategories(categories);
+      } catch (error) {
+        console.error("Error reloading feed categories:", error);
+      } finally {
+        setLoading(false);
       }
     } catch (error) {
-      console.error("Error deleting category:", error);
+      console.error("Error deleting feed category:", error);
       alert("Error deleting category");
     }
   };
 
   return (
     <>
-      <SettingsSubNavigation activeSection="item-categories" />
+      <SettingsSubNavigation activeSection="feed-categories" />
 
       <main id="main-content">
         <div id="table-panel">
           <div>
-            <h3>Item Categories</h3>
+            <h3>Feed Categories</h3>
 
-            <Link to="/item-categories/new" className="text-decoration-none">
+            <Link to="/feed-categories/new" className="text-decoration-none">
               <i className="bi bi-plus"></i> Add Category
             </Link>
 
             {loading ? (
               <p>Loading categories...</p>
-            ) : itemCategories.length === 0 ? (
-              <p>No item categories found</p>
+            ) : feedCategories.length === 0 ? (
+              <p>No feed categories found</p>
             ) : (
               <table className="table table-striped table-borderless table-sm feeds-table">
                 <thead>
                   <tr>
                     <th>ID</th>
-                    <th>Category {itemCategories.length}</th>
+                    <th>Category {feedCategories.length}</th>
                     <th>Description</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {itemCategories.map((category) => (
+                  {feedCategories.map((category) => (
                     <tr key={category.id}>
                       <td>{category.id}</td>
                       <td>
@@ -98,7 +94,7 @@ export default function ItemCategoryList() {
                           category.title
                         ) : (
                           <Link
-                            to={`/item-categories/edit/${category.id}`}
+                            to={`/feed-categories/edit/${category.id}`}
                             className="text-decoration-none"
                           >
                             {category.title}

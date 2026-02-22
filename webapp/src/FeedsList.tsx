@@ -12,8 +12,6 @@ export default function Feeds({ topMenu }: FeedsProps) {
 
   const [feedCategories, setFeedCategories] = useState<FeedCategory[]>([]);
 
-  const [showNewCategoryFeedForm, setShowNewCategoryFeedForm] = useState(false);
-
   const [selectedFeedCategory, setSelectedFeedCategory] =
     useState<FeedCategory>();
 
@@ -48,62 +46,12 @@ export default function Feeds({ topMenu }: FeedsProps) {
     [showFeeds]
   );
 
-  const onAddFeedCategory = useCallback(
-    async (data: FieldValues) => {
-      const feedCategoryInput: FeedCategory = {
-        title: data.feedCategoryName,
-        text: data.feedCategoryName,
-      };
-
-      await ds.addFeedCategory(feedCategoryInput);
-
-      await loadFeedCategories();
-
-      setShowNewCategoryFeedForm(false);
-    },
-    [loadFeedCategories, setShowNewCategoryFeedForm]
-  );
-
   const selectFeedCategory = useCallback(
-    async (
-      feedCategory: FeedCategory | null,
-      e: React.MouseEvent<HTMLButtonElement>
-    ) => {
-      if (e && (e.target as HTMLElement).classList.contains("deleteIcon")) {
-        const feedCategoryId = parseInt(
-          (e.target as HTMLElement).getAttribute("data-category-id") || "",
-          10
-        );
-
-        console.log("Deleting feed category ID:", feedCategoryId);
-
-        const confirmResult = confirm(
-          "About to delete a category. Please confirm."
-        );
-
-        if (!confirmResult) {
-          return;
-        }
-
-        await ds.removeFeedCategory(feedCategoryId);
-
-        await loadFeedCategories();
-
-        setShowNewCategoryFeedForm(false);
-      } else {
-        setSelectedFeedCategory(feedCategory as FeedCategory);
-      }
+    (feedCategory: FeedCategory | undefined) => {
+      setSelectedFeedCategory(feedCategory);
     },
-    [loadFeedCategories]
+    []
   );
-
-  const showCategoryFeedForm = useCallback(() => {
-    setShowNewCategoryFeedForm(true);
-  }, [setShowNewCategoryFeedForm]);
-
-  const hideCategoryFeedForm = useCallback(() => {
-    setShowNewCategoryFeedForm(false);
-  }, [setShowNewCategoryFeedForm]);
 
   // const inputRef = register({ required: true });
   // const inputSearchRef = register();
@@ -172,7 +120,7 @@ export default function Feeds({ topMenu }: FeedsProps) {
             <button
               type="button"
               className="btn btn-link text-decoration-none"
-              onClick={(e) => selectFeedCategory(null, e)}
+              onClick={() => selectFeedCategory(undefined)}
               tabIndex={0}
             >
               <small>All</small>
@@ -191,54 +139,15 @@ export default function Feeds({ topMenu }: FeedsProps) {
                 <button
                   type="button"
                   className="btn btn-link text-decoration-none"
-                  onClick={(e) => selectFeedCategory(feedCategory, e)}
+                  onClick={() => selectFeedCategory(feedCategory)}
                   tabIndex={0}
                 >
                   <span>{feedCategory.title}</span>
-                  {feedCategory.id !== 0 ? (
-                    <span className="menu-marker">
-                      <i
-                        className="bi bi-trash deleteIcon"
-                        data-category-id={feedCategory.id}
-                      />
-                    </span>
-                  ) : (
-                    ""
-                  )}
                 </button>
               </li>
             );
           })}
         </ul>
-
-        {showNewCategoryFeedForm && (
-          <form onSubmit={handleSubmit(onAddFeedCategory)}>
-            <div>
-              <input
-                type="text"
-                className="form-control input"
-                {...register("feedCategoryName")}
-                id="feedCategoryName"
-                onBlur={hideCategoryFeedForm}
-                onKeyUp={(e) => {
-                  e.code === "Escape" && hideCategoryFeedForm();
-                }}
-              />
-            </div>
-          </form>
-        )}
-
-        {!showNewCategoryFeedForm && (
-          <button
-            className="btn"
-            onClick={showCategoryFeedForm}
-            style={{
-              display: showNewCategoryFeedForm ? "none" : "",
-            }}
-          >
-            <i className="bi bi-plus"></i>
-          </button>
-        )}
       </nav>
 
       <main id="main-content">

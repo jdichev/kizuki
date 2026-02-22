@@ -16,6 +16,8 @@ import FeedOpmlOps from "./FeedOpmlOps";
 import FeedEdit from "./FeedEdit";
 import ItemCategoryEdit from "./ItemCategoryEdit";
 import ItemCategoryList from "./ItemCategoryList";
+import FeedCategoryList from "./FeedCategoryList";
+import FeedCategoryEdit from "./FeedCategoryEdit";
 import Settings from "./Settings";
 import ItemsSearch from "./ItemsSearch";
 import { useSidebarDivider } from "./hooks/useSidebarDivider";
@@ -275,6 +277,15 @@ function AppLayout() {
         />
 
         <Route path="/item-categories/new" element={<ItemCategoryEdit />} />
+
+        <Route path="/feed-categories/list" element={<FeedCategoryList />} />
+
+        <Route
+          path="/feed-categories/edit/:categoryId"
+          element={<FeedCategoryEdit />}
+        />
+
+        <Route path="/feed-categories/new" element={<FeedCategoryEdit />} />
 
         <Route path="/items/search" element={<ItemsSearch />} />
 

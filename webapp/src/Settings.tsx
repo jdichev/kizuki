@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import SettingsService from "./service/SettingsService";
+import SettingsSubNavigation from "./components/SettingsSubNavigation";
 
 const ss = SettingsService.getInstance();
 
 export default function Settings() {
-  const navigate = useNavigate();
   const [settings, setSettings] = useState<{ [key: string]: string }>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -87,23 +86,11 @@ export default function Settings() {
 
   return (
     <>
-      <nav id="main-sidebar" data-activenav="true">
-        <ul>
-          <li className="feed-selected">
-            <button
-              type="button"
-              className="btn btn-link text-decoration-none"
-              onClick={() => navigate("/item-categories/list")}
-            >
-              <i className="bi bi-tags" /> <span>Item Categories</span>
-            </button>
-          </li>
-        </ul>
-      </nav>
+      <SettingsSubNavigation activeSection="settings" />
 
       <main id="main-content">
-        <div id="feed-panel">
-          <div id="panel-single-column">
+        <div id="table-panel">
+          <div>
             <h3>Settings</h3>
 
             {loading && <p>Loading settings...</p>}
