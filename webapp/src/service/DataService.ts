@@ -91,6 +91,7 @@ export default class DataService {
       size: number;
       unreadOnly: boolean;
       bookmarkedOnly: boolean;
+      searchQuery?: string;
       selectedFeedCategory?: FeedCategory | undefined;
       selectedFeed?: Feed | undefined;
       selectedItemCategoryIds?: number[] | undefined;
@@ -98,6 +99,7 @@ export default class DataService {
       size: 50,
       unreadOnly: false,
       bookmarkedOnly: false,
+      searchQuery: "",
       selectedFeedCategory: undefined,
       selectedFeed: undefined,
       selectedItemCategoryIds: undefined,
@@ -122,6 +124,7 @@ export default class DataService {
       size: number;
       unreadOnly: boolean;
       bookmarkedOnly: boolean;
+      searchQuery?: string;
       selectedFeedCategory?: FeedCategory | undefined;
       selectedFeed?: Feed | undefined;
       selectedItemCategoryIds?: number[] | undefined;
@@ -129,6 +132,7 @@ export default class DataService {
       size: 50,
       unreadOnly: false,
       bookmarkedOnly: false,
+      searchQuery: "",
       selectedFeedCategory: undefined,
       selectedFeed: undefined,
       selectedItemCategoryIds: undefined,
@@ -146,6 +150,10 @@ export default class DataService {
 
     if (params.bookmarkedOnly) {
       query.set("bookmarked", "true");
+    }
+
+    if (params.searchQuery && params.searchQuery.trim().length > 0) {
+      query.set("q", params.searchQuery.trim());
     }
 
     if (params.selectedFeedCategory) {
@@ -178,6 +186,28 @@ export default class DataService {
     }
 
     return Promise.resolve([]);
+  }
+
+  public async searchItems(
+    queryText: string,
+    size: number = 100
+  ): Promise<Item[]> {
+    const query = new URLSearchParams();
+    query.set("q", queryText);
+    query.set("size", `${size}`);
+
+    const response = await fetch(
+      `${this.makeUrl("/items/search")}?${query.toString()}`
+    ).catch((reason) => {
+      console.error(reason.code, reason.message, reason.name);
+    });
+
+    if (!response) {
+      return Promise.resolve([]);
+    }
+
+    const items = await response.json();
+    return Promise.resolve(Array.isArray(items) ? items : []);
   }
 
   public async getItemDeferred(

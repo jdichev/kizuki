@@ -131,6 +131,20 @@ export default class DataService {
   private static instance: DataService;
 
   private database: Database;
+  private ftsReady: boolean = false;
+  private static readonly FTS_VERSION = "unicode61-2";
+
+  private static buildFtsQuery(searchQuery: string): string {
+    const tokens = searchQuery
+      .normalize("NFKC")
+      .trim()
+      .split(/\s+/)
+      .map((token) => token.trim())
+      .filter((token) => token.length > 0)
+      .map((token) => `"${token.replace(/"/g, '""')}"*`);
+
+    return tokens.join(" AND ");
+  }
 
   constructor() {
     const tempInstance = process.env.NODE_ENV === "test";
@@ -236,6 +250,79 @@ export default class DataService {
       ALTER TABLE items ADD COLUMN latest_content TEXT;
     `;
 
+    const ensureItemsFts = `
+      BEGIN TRANSACTION;
+
+      CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
+        title,
+        content,
+        summary,
+        latest_content,
+        content='items',
+        content_rowid='id',
+        tokenize='unicode61 remove_diacritics 2'
+      );
+
+      CREATE TRIGGER IF NOT EXISTS items_ai AFTER INSERT ON items BEGIN
+        INSERT INTO items_fts(rowid, title, content, summary, latest_content)
+        VALUES (new.id, new.title, new.content, new.summary, new.latest_content);
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS items_ad AFTER DELETE ON items BEGIN
+        INSERT INTO items_fts(items_fts, rowid, title, content, summary, latest_content)
+        VALUES('delete', old.id, old.title, old.content, old.summary, old.latest_content);
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS items_au AFTER UPDATE ON items BEGIN
+        INSERT INTO items_fts(items_fts, rowid, title, content, summary, latest_content)
+        VALUES('delete', old.id, old.title, old.content, old.summary, old.latest_content);
+        INSERT INTO items_fts(rowid, title, content, summary, latest_content)
+        VALUES (new.id, new.title, new.content, new.summary, new.latest_content);
+      END;
+
+      COMMIT;
+    `;
+
+    const rebuildItemsFts = `
+      BEGIN TRANSACTION;
+
+      DROP TRIGGER IF EXISTS items_ai;
+      DROP TRIGGER IF EXISTS items_ad;
+      DROP TRIGGER IF EXISTS items_au;
+      DROP TABLE IF EXISTS items_fts;
+
+      CREATE VIRTUAL TABLE items_fts USING fts5(
+        title,
+        content,
+        summary,
+        latest_content,
+        content='items',
+        content_rowid='id',
+        tokenize='unicode61 remove_diacritics 2'
+      );
+
+      CREATE TRIGGER items_ai AFTER INSERT ON items BEGIN
+        INSERT INTO items_fts(rowid, title, content, summary, latest_content)
+        VALUES (new.id, new.title, new.content, new.summary, new.latest_content);
+      END;
+
+      CREATE TRIGGER items_ad AFTER DELETE ON items BEGIN
+        INSERT INTO items_fts(items_fts, rowid, title, content, summary, latest_content)
+        VALUES('delete', old.id, old.title, old.content, old.summary, old.latest_content);
+      END;
+
+      CREATE TRIGGER items_au AFTER UPDATE ON items BEGIN
+        INSERT INTO items_fts(items_fts, rowid, title, content, summary, latest_content)
+        VALUES('delete', old.id, old.title, old.content, old.summary, old.latest_content);
+        INSERT INTO items_fts(rowid, title, content, summary, latest_content)
+        VALUES (new.id, new.title, new.content, new.summary, new.latest_content);
+      END;
+
+      INSERT INTO items_fts(items_fts) VALUES('rebuild');
+
+      COMMIT;
+    `;
+
     // Try to add summary column (will fail silently if it already exists)
     this.database.run(addSummaryColumn, (error) => {
       if (error && !error.message.includes("duplicate column")) {
@@ -254,6 +341,79 @@ export default class DataService {
       } else if (!error) {
         pino.info("Added latest_content column to items table");
       }
+    });
+
+    this.database.serialize(() => {
+      const createMetaTable = `
+        CREATE TABLE IF NOT EXISTS app_meta (
+          key TEXT PRIMARY KEY,
+          value TEXT
+        );
+      `;
+
+      this.database.run(createMetaTable, (error) => {
+        if (error) {
+          pino.warn(
+            { error: error.message },
+            "Failed to create app_meta table"
+          );
+        }
+      });
+
+      this.database.get(
+        `SELECT value FROM app_meta WHERE key = 'fts_version'`,
+        (error, row) => {
+          if (error) {
+            pino.warn(
+              { error: error.message },
+              "Failed to read FTS version; rebuilding"
+            );
+          }
+
+          const currentVersion = (row as { value?: string } | undefined)?.value;
+          const shouldRebuild =
+            !currentVersion ||
+            currentVersion !== DataService.FTS_VERSION ||
+            !!error;
+
+          const execSql = shouldRebuild ? rebuildItemsFts : ensureItemsFts;
+
+          this.database.exec(execSql, (execError) => {
+            if (execError) {
+              this.ftsReady = false;
+              pino.warn(
+                { error: execError.message },
+                "FTS setup failed; falling back to non-FTS text search"
+              );
+              return;
+            }
+
+            if (shouldRebuild) {
+              this.database.run(
+                `INSERT INTO app_meta (key, value)
+                 VALUES ('fts_version', ?)
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value;`,
+                [DataService.FTS_VERSION],
+                (metaError) => {
+                  if (metaError) {
+                    pino.warn(
+                      { error: metaError.message },
+                      "Failed to update FTS version"
+                    );
+                  }
+                }
+              );
+            }
+
+            this.ftsReady = true;
+            if (shouldRebuild) {
+              pino.info("FTS rebuilt for items search");
+            } else {
+              pino.info("FTS ensured for items search");
+            }
+          });
+        }
+      );
     });
   }
 
@@ -1290,6 +1450,7 @@ export default class DataService {
       size: number | undefined;
       unreadOnly?: boolean;
       bookmarkedOnly?: boolean;
+      searchQuery?: string;
       selectedFeedCategory?: FeedCategory | undefined;
       selectedFeed?: Feed | undefined;
       selectedItemCategory?: Category | undefined;
@@ -1299,6 +1460,7 @@ export default class DataService {
       size: 50,
       unreadOnly: false,
       bookmarkedOnly: false,
+      searchQuery: "",
       selectedFeedCategory: undefined,
       selectedFeed: undefined,
       selectedItemCategory: undefined,
@@ -1318,6 +1480,7 @@ export default class DataService {
         feeds.feedCategoryId
       FROM
         items
+      __SEARCH_JOIN_PLACEHOLDER__
       LEFT JOIN feeds ON
         feeds.id = items.feed_id
       __WHERE_PLACEHOLDER1__
@@ -1384,23 +1547,44 @@ export default class DataService {
     }
 
     let whereQuery2 = "";
-    let operator;
+    const conditions: string[] = [];
+    const hasSearchQuery = Boolean(params.searchQuery?.trim());
+    const useFtsSearch = hasSearchQuery && this.ftsReady;
 
-    if (params.unreadOnly || params.bookmarkedOnly) {
-      if (filteredById) {
-        operator = "AND";
+    if (useFtsSearch) {
+      query = query.replace(
+        "__SEARCH_JOIN_PLACEHOLDER__",
+        "INNER JOIN items_fts ON items_fts.rowid = items.id"
+      );
+    } else {
+      query = query.replace("__SEARCH_JOIN_PLACEHOLDER__", "");
+    }
+
+    if (params.unreadOnly) {
+      conditions.push("items.read = 0");
+    }
+
+    if (params.bookmarkedOnly) {
+      conditions.push("items.bookmarked = 1");
+    }
+
+    if (hasSearchQuery) {
+      if (useFtsSearch) {
+        conditions.push("items_fts MATCH ?");
       } else {
-        operator = "WHERE";
+        conditions.push(`
+          (
+            LOWER(items.title) LIKE LOWER(?) OR
+            LOWER(items.content) LIKE LOWER(?) OR
+            LOWER(items.summary) LIKE LOWER(?) OR
+            LOWER(items.latest_content) LIKE LOWER(?)
+          )
+        `);
       }
+    }
 
-      const conditions = [];
-      if (params.unreadOnly) {
-        conditions.push("items.read = 0");
-      }
-      if (params.bookmarkedOnly) {
-        conditions.push("items.bookmarked = 1");
-      }
-
+    if (conditions.length > 0) {
+      const operator = filteredById ? "AND" : "WHERE";
       whereQuery2 = `
       ${operator} ${conditions.join(" AND ")}
     `;
@@ -1422,14 +1606,131 @@ export default class DataService {
       "Executing getItems query"
     );
 
+    const queryParams: Array<string | number | undefined> = [];
+
+    if (hasSearchQuery) {
+      if (useFtsSearch) {
+        const ftsQuery = DataService.buildFtsQuery(params.searchQuery || "");
+        queryParams.push(ftsQuery || '""');
+      } else {
+        const searchPattern = `%${params.searchQuery!.trim()}%`;
+        queryParams.push(
+          searchPattern,
+          searchPattern,
+          searchPattern,
+          searchPattern
+        );
+      }
+    }
+
+    queryParams.push(params.size);
+
     return new Promise((resolve) => {
-      this.database.all(query, [params.size], (error, rows) => {
+      this.database.all(query, queryParams, (error, rows) => {
         if (error) {
           pino.error(error);
         }
 
         resolve((rows as Item[]) || []);
       });
+    });
+  }
+
+  public async searchItems(
+    params: {
+      query: string;
+      size?: number;
+    } = {
+      query: "",
+      size: 100,
+    }
+  ): Promise<Item[]> {
+    const trimmedQuery = params.query.trim();
+    const size = params.size ?? 100;
+
+    if (!trimmedQuery) {
+      return Promise.resolve([]);
+    }
+
+    if (this.ftsReady) {
+      const ftsQuery = DataService.buildFtsQuery(trimmedQuery);
+
+      const ftsSearchQuery = `
+        SELECT
+          items.id,
+          items.title,
+          items.url,
+          items.published,
+          items.read,
+          items.bookmarked,
+          items.feed_id AS feedId,
+          feeds.title AS feedTitle
+        FROM
+          items
+        INNER JOIN items_fts ON
+          items_fts.rowid = items.id
+        LEFT JOIN feeds ON
+          feeds.id = items.feed_id
+        WHERE
+          items_fts MATCH ?
+        ORDER BY items.published DESC
+        LIMIT ?
+      `;
+
+      return new Promise((resolve) => {
+        this.database.all(
+          ftsSearchQuery,
+          [ftsQuery || '""', size],
+          (error, rows) => {
+            if (error) {
+              pino.error(error);
+              resolve([]);
+              return;
+            }
+
+            resolve((rows as Item[]) || []);
+          }
+        );
+      });
+    }
+
+    const query = `
+      SELECT
+        items.id,
+        items.title,
+        items.url,
+        items.published,
+        items.read,
+        items.bookmarked,
+        items.feed_id AS feedId,
+        feeds.title AS feedTitle
+      FROM
+        items
+      LEFT JOIN feeds ON
+        feeds.id = items.feed_id
+      WHERE
+        LOWER(items.title) LIKE LOWER(?) OR
+        LOWER(items.content) LIKE LOWER(?) OR
+        LOWER(items.summary) LIKE LOWER(?) OR
+        LOWER(items.latest_content) LIKE LOWER(?)
+      ORDER BY items.published DESC
+      LIMIT ?
+    `;
+
+    const searchPattern = `%${trimmedQuery}%`;
+
+    return new Promise((resolve) => {
+      this.database.all(
+        query,
+        [searchPattern, searchPattern, searchPattern, searchPattern, size],
+        (error, rows) => {
+          if (error) {
+            pino.error(error);
+          }
+
+          resolve((rows as Item[]) || []);
+        }
+      );
     });
   }
 

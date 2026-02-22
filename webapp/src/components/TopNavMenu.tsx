@@ -6,6 +6,8 @@ interface TopNavMenuProps {
   onMarkAllRead: () => void;
   onToggleUnreadOnly: () => void;
   onToggleBookmarkedOnly: () => void;
+  searchVisible?: boolean;
+  onToggleSearch?: () => void;
 }
 
 export default function TopNavMenu({
@@ -14,9 +16,27 @@ export default function TopNavMenu({
   onMarkAllRead,
   onToggleUnreadOnly,
   onToggleBookmarkedOnly,
+  searchVisible = false,
+  onToggleSearch,
 }: TopNavMenuProps) {
   return (
     <div className="top-nav-icon-buttons">
+      {onToggleSearch && (
+        <button
+          type="button"
+          className="top-nav-icon-btn"
+          id="items-text-search-toggle"
+          title={searchVisible ? "Hide search" : "Show search"}
+          onClick={onToggleSearch}
+          aria-label="Toggle item text search"
+          aria-pressed={searchVisible}
+        >
+          <i
+            className={searchVisible ? "bi bi-search-heart" : "bi bi-search"}
+          />
+        </button>
+      )}
+
       <button
         type="button"
         className="top-nav-icon-btn"

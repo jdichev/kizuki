@@ -17,6 +17,7 @@ import FeedEdit from "./FeedEdit";
 import ItemCategoryEdit from "./ItemCategoryEdit";
 import ItemCategoryList from "./ItemCategoryList";
 import Settings from "./Settings";
+import ItemsSearch from "./ItemsSearch";
 import { useSidebarDivider } from "./hooks/useSidebarDivider";
 import {
   SIDEBAR_MENU_HIDE_REQUEST_EVENT,
@@ -274,6 +275,8 @@ function AppLayout() {
         />
 
         <Route path="/item-categories/new" element={<ItemCategoryEdit />} />
+
+        <Route path="/items/search" element={<ItemsSearch />} />
 
         <Route path="/settings" element={<Settings />} />
       </Routes>

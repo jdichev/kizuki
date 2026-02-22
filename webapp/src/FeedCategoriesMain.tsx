@@ -63,8 +63,11 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
   }>({});
 
   const [activeNav, setActiveNav] = useState<string>("categories");
+  const [searchVisible, setSearchVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const listRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const articleRef = useRef<HTMLDivElement>(null);
 
@@ -123,7 +126,13 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
 
       if (selectedFeed) {
         res = await ds
-          .getItemsDeferred({ size, unreadOnly, bookmarkedOnly, selectedFeed })
+          .getItemsDeferred({
+            size,
+            unreadOnly,
+            bookmarkedOnly,
+            selectedFeed,
+            searchQuery,
+          })
           .catch((e) => {
             console.error("Error fetching items for feed:", e);
             return undefined;
@@ -135,6 +144,7 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
             unreadOnly,
             bookmarkedOnly,
             selectedFeedCategory,
+            searchQuery,
           })
           .catch((e) => {
             console.error("Error fetching items:", e);
@@ -179,9 +189,26 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
     size,
     selectedFeedCategory,
     selectedFeed,
+    searchQuery,
     unreadOnly,
     updateFeedCategoryReadStats,
   ]);
+
+  const toggleSearch = useCallback(() => {
+    setSearchVisible((prev) => {
+      const next = !prev;
+      if (!next) {
+        setSearchQuery("");
+      }
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (searchVisible) {
+      searchInputRef.current?.focus();
+    }
+  }, [searchVisible]);
 
   useEffect(() => {
     showItems();
@@ -354,6 +381,24 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
 
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
+      const eventTarget = e.target as HTMLElement | null;
+      const isInputTarget =
+        eventTarget?.tagName === "INPUT" || eventTarget?.tagName === "TEXTAREA";
+
+      const isFKey = e.code === "KeyF" || e.key.toLowerCase() === "f";
+      const isSearchToggleShortcut =
+        isFKey && e.shiftKey && !e.altKey && (e.ctrlKey || e.metaKey);
+
+      if (isSearchToggleShortcut) {
+        e.preventDefault();
+        toggleSearch();
+        return;
+      }
+
+      if (isInputTarget) {
+        return;
+      }
+
       if (e.code === "Enter") {
         visitSite();
       }
@@ -972,9 +1017,43 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
                 onMarkAllRead={markItemsRead}
                 onToggleUnreadOnly={handleToggleUnreadOnly}
                 onToggleBookmarkedOnly={handleToggleBookmarkedOnly}
+                searchVisible={searchVisible}
+                onToggleSearch={toggleSearch}
               />,
               topMenu.current
             )}
+
+          {searchVisible && (
+            <form
+              onSubmit={(e) => e.preventDefault()}
+              className="item-search-form"
+            >
+              <input
+                ref={searchInputRef}
+                type="text"
+                id="itemTextSearch"
+                className="form-control input"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "ArrowDown") {
+                    if (items.length > 0) {
+                      e.preventDefault();
+                      void selectItem(undefined, items[0]);
+                    }
+                    return;
+                  }
+
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    setSearchQuery("");
+                    setSearchVisible(false);
+                  }
+                }}
+                placeholder="Search items in current selection"
+              />
+            </form>
+          )}
 
           <ItemsTable
             items={items}

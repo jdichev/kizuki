@@ -86,6 +86,8 @@ app.get("/items", async (req: Request, res: Response) => {
     ? JSON.parse(req.query.icids as string)
     : undefined;
 
+  const searchQuery = req.query.q ? String(req.query.q) : "";
+
   let selectedFeed;
   let selectedFeedCategory;
   let selectedItemCategory;
@@ -110,6 +112,7 @@ app.get("/items", async (req: Request, res: Response) => {
   const items = await dataModel.getItems({
     unreadOnly,
     bookmarkedOnly,
+    searchQuery,
     size,
     selectedFeed,
     selectedFeedCategory,
@@ -117,6 +120,21 @@ app.get("/items", async (req: Request, res: Response) => {
     selectedItemCategoryIds: selectedItemCategoryIdArray,
     order: "published",
   });
+  res.json(items);
+});
+
+app.get("/items/search", async (req: Request, res: Response) => {
+  const query = typeof req.query.q === "string" ? req.query.q : "";
+  const size =
+    typeof req.query.size === "string"
+      ? parseInt(req.query.size, 10)
+      : undefined;
+
+  const items = await dataModel.searchItems({
+    query,
+    size,
+  });
+
   res.json(items);
 });
 
