@@ -26,7 +26,7 @@
     "testEnvironment": "jsdom"
   },
   "author": "Jordan Dichev",
-  "license": "ISC",
+  "license": "SEE LICENSE IN ../LICENSE",
   "dependencies": {
     "bootstrap-icons": "^1.13.1",
     "forestconfig": "file:../config",

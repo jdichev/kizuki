@@ -6,7 +6,7 @@
   "scripts": {
     "build": "napi build --release --features napi-export"
   },
-  "license": "ISC",
+  "license": "SEE LICENSE IN ../../LICENSE",
   "dependencies": {
     "valid-url": "^1.0.9"
   },

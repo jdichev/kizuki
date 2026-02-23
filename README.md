@@ -32,3 +32,13 @@ A modern desktop feed reader built with Electron and TypeScript, featuring intel
 Should follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
 
 [![CI](https://github.com/jdichev/forest/actions/workflows/main.yml/badge.svg)](https://github.com/jdichev/forest/actions/workflows/main.yml)
+
+## License
+
+This project is licensed under the `Kizuki (formerly Forest) Non-Commercial License 1.0`.
+
+- Non-commercial use is allowed under the terms in [LICENSE](LICENSE)
+- Commercial use requires prior written consent and a separate agreement
+- See [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md) for the commercial process
+- Monorepo note: all nested packages in this repository reference and inherit
+  the root [LICENSE](LICENSE)

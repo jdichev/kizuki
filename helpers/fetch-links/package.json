@@ -9,7 +9,7 @@
     "test": "cargo test",
     "fetch": "node scripts/fetch-links.js"
   },
-  "license": "ISC",
+  "license": "SEE LICENSE IN ../../LICENSE",
   "devDependencies": {
     "@napi-rs/cli": "^3.5.0"
   }
