@@ -944,11 +944,41 @@ export default class DataService {
     });
   }
 
-  public async importOpml(options: {
-    filePath?: string;
-    fileContent?: string;
-  }) {
+  public async importOpml(
+    options: {
+      filePath?: string;
+      fileContent?: string;
+      opmlUrl?: string;
+      targetCategoryId?: number;
+    },
+    onProgress?: (progress: {
+      processedFeeds: number;
+      totalFeeds: number;
+    }) => void
+  ): Promise<{
+    processedFeeds: number;
+    totalFeeds: number;
+    importedFeeds: number;
+  }> {
     let opmlContent: string;
+    let targetCategoryId: number | undefined;
+
+    if (options.targetCategoryId !== undefined) {
+      const parsedTargetCategoryId = Number(options.targetCategoryId);
+      if (!Number.isInteger(parsedTargetCategoryId)) {
+        throw new Error("Invalid targetCategoryId");
+      }
+
+      const targetCategory = await this.getFeedCategoryById(
+        parsedTargetCategoryId
+      );
+
+      if (!targetCategory) {
+        throw new Error("Target category does not exist");
+      }
+
+      targetCategoryId = parsedTargetCategoryId;
+    }
 
     if (options.filePath) {
       // Electron path: read from file system
@@ -956,56 +986,104 @@ export default class DataService {
     } else if (options.fileContent) {
       // Browser: use content directly
       opmlContent = options.fileContent;
+    } else if (options.opmlUrl) {
+      const response = await fetch(options.opmlUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch OPML URL: ${response.status}`);
+      }
+
+      opmlContent = await response.text();
     } else {
-      throw new Error("Either filePath or fileContent must be provided");
+      throw new Error(
+        "One of filePath, fileContent, or opmlUrl must be provided"
+      );
     }
 
     const opmlData = opmlParser.load(opmlContent);
+    const totalFeeds = opmlData.feeds.length;
+    let processedFeeds = 0;
+    let importedFeeds = 0;
     const feedFinder = new FeedFinder();
+    const existingFeeds = await this.getFeeds();
+    const existingFeedUrls = new Set(
+      existingFeeds
+        .map((existingFeed) => existingFeed.feedUrl)
+        .filter((feedUrl): feedUrl is string => !!feedUrl)
+    );
+    const opmlSeenFeedUrls = new Set<string>();
+
+    if (onProgress) {
+      onProgress({ processedFeeds, totalFeeds });
+    }
 
     pino.debug({ categories: opmlData.categories }, "OPML categories");
 
-    // Insert all categories in parallel
-    await Promise.all(
-      opmlData.categories.map(
-        async (feedCategory: { text?: string; title?: string }) => {
-          if (!feedCategory.title && !feedCategory.text) {
-            return;
-          }
-
-          pino.debug(
-            { feedCategory },
-            "Inserting feed category from OPML import"
-          );
-
-          await this.insertFeedCategory({
-            title: feedCategory.title ?? "NO_TITLE",
-            text: feedCategory.text ?? "NO_TEXT",
-          });
-        }
-      )
-    );
-
-    // Create a mapping of category titles to IDs
-    const allCategories = await this.getFeedCategories();
     const categoryTitleToIdMap = new Map<string, number>();
-    allCategories.forEach((category) => {
-      categoryTitleToIdMap.set(category.title, category.id ?? 0);
-    });
+    if (targetCategoryId === undefined) {
+      // Insert all categories in parallel
+      await Promise.all(
+        opmlData.categories.map(
+          async (feedCategory: { text?: string; title?: string }) => {
+            if (!feedCategory.title && !feedCategory.text) {
+              return;
+            }
+
+            pino.debug(
+              { feedCategory },
+              "Inserting feed category from OPML import"
+            );
+
+            await this.insertFeedCategory({
+              title: feedCategory.title ?? "NO_TITLE",
+              text: feedCategory.text ?? "NO_TEXT",
+            });
+          }
+        )
+      );
+
+      // Create a mapping of category titles to IDs
+      const allCategories = await this.getFeedCategories();
+      allCategories.forEach((category) => {
+        categoryTitleToIdMap.set(category.title, category.id ?? 0);
+      });
+    }
 
     pino.debug({ feeds: opmlData.feeds }, "OPML Feeds");
     for (const feed of opmlData.feeds) {
+      const feedUrl = String(feed.feedUrl || "").trim();
+
+      if (
+        !feedUrl ||
+        existingFeedUrls.has(feedUrl) ||
+        opmlSeenFeedUrls.has(feedUrl)
+      ) {
+        processedFeeds += 1;
+        if (onProgress) {
+          onProgress({ processedFeeds, totalFeeds });
+        }
+        continue;
+      }
+
+      opmlSeenFeedUrls.add(feedUrl);
       pino.debug(feed);
       // @ts-ignore
-      const feedRes = await feedFinder.checkFeed(feed.feedUrl);
+      const feedRes = await feedFinder.checkFeed(feedUrl);
       if (feedRes.length) {
         const feedToInsert = feedRes[0];
-        // Use the category ID mapping to set the feedCategoryId directly
-        if (feed.categoryTitle) {
+        if (targetCategoryId !== undefined) {
+          feedToInsert.feedCategoryId = targetCategoryId;
+        } else if (feed.categoryTitle) {
+          // Use the category ID mapping to set the feedCategoryId directly
           feedToInsert.feedCategoryId =
             categoryTitleToIdMap.get(feed.categoryTitle) || 0;
         }
         await this.insertFeed(feedToInsert);
+        existingFeedUrls.add(feedUrl);
+        importedFeeds += 1;
+      }
+      processedFeeds += 1;
+      if (onProgress) {
+        onProgress({ processedFeeds, totalFeeds });
       }
       // else {
       //   // @ts-ignore
@@ -1017,6 +1095,100 @@ export default class DataService {
     }
 
     pino.info("Imported %d feeds", opmlData.feeds.length);
+
+    return {
+      processedFeeds,
+      totalFeeds,
+      importedFeeds,
+    };
+  }
+
+  public async inspectOpmlSource(options: {
+    filePath?: string;
+    opmlUrl?: string;
+  }): Promise<{
+    sourceExists: boolean;
+    isValid: boolean;
+    feedsCount: number;
+    categoriesCount: number;
+    newFeedsCount: number;
+    error?: string;
+  }> {
+    const normalizedFilePath = (options.filePath || "").trim();
+    const normalizedOpmlUrl = (options.opmlUrl || "").trim();
+
+    if (!normalizedFilePath && !normalizedOpmlUrl) {
+      return {
+        sourceExists: false,
+        isValid: false,
+        feedsCount: 0,
+        categoriesCount: 0,
+        newFeedsCount: 0,
+        error: "filePath or opmlUrl is required",
+      };
+    }
+
+    try {
+      let opmlContent = "";
+
+      if (normalizedFilePath) {
+        if (!fs.existsSync(normalizedFilePath)) {
+          return {
+            sourceExists: false,
+            isValid: false,
+            feedsCount: 0,
+            categoriesCount: 0,
+            newFeedsCount: 0,
+            error: "File does not exist",
+          };
+        }
+
+        opmlContent = fs.readFileSync(normalizedFilePath, "utf-8");
+      } else {
+        const response = await fetch(normalizedOpmlUrl);
+        if (!response.ok) {
+          return {
+            sourceExists: false,
+            isValid: false,
+            feedsCount: 0,
+            categoriesCount: 0,
+            newFeedsCount: 0,
+            error: `Failed to fetch OPML URL: ${response.status}`,
+          };
+        }
+
+        opmlContent = await response.text();
+      }
+
+      const opmlData = opmlParser.load(opmlContent);
+      const existingFeeds = await this.getFeeds();
+      const existingFeedUrls = new Set(
+        existingFeeds
+          .map((feed) => feed.feedUrl)
+          .filter((feedUrl): feedUrl is string => !!feedUrl)
+      );
+
+      const newFeedsCount = opmlData.feeds.filter((feed) => {
+        return !!feed.feedUrl && !existingFeedUrls.has(feed.feedUrl);
+      }).length;
+
+      return {
+        sourceExists: true,
+        isValid: true,
+        feedsCount: opmlData.feeds.length,
+        categoriesCount: opmlData.categories.length,
+        newFeedsCount,
+      };
+    } catch (error: any) {
+      return {
+        sourceExists: true,
+        isValid: false,
+        feedsCount: 0,
+        categoriesCount: 0,
+        newFeedsCount: 0,
+        error: error.message || "Invalid OPML file",
+      };
+    }
   }
 
   private async getFeedIds(feedCategory: FeedCategory): Promise<number[]> {

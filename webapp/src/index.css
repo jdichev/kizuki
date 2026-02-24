@@ -451,6 +451,10 @@ a:hover {
   max-width: 800px;
 }
 
+.form-section {
+  padding: 2rem;
+}
+
 #feed-panel,
 #list-panel,
 #content-panel {

@@ -461,6 +461,8 @@ export default class DataService {
     filePath?: string;
     fileContent?: string;
     fileName?: string;
+    opmlUrl?: string;
+    targetCategoryId?: number;
   }) {
     const body = JSON.stringify(options);
 
@@ -470,6 +472,56 @@ export default class DataService {
         "Content-Type": "application/json",
       },
       body,
+    });
+
+    const result = await response.json();
+
+    return Promise.resolve(result);
+  }
+
+  public async startOpmlImport(options: {
+    filePath?: string;
+    fileContent?: string;
+    fileName?: string;
+    opmlUrl?: string;
+    targetCategoryId?: number;
+  }) {
+    const response = await fetch(this.makeUrl("/opml-import-start"), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(options),
+    });
+
+    const result = await response.json();
+
+    return Promise.resolve(result);
+  }
+
+  public async getOpmlImportProgress(jobId: string) {
+    const query = new URLSearchParams();
+    query.set("jobId", jobId);
+
+    const response = await fetch(
+      `${this.makeUrl("/opml-import-progress")}?${query.toString()}`
+    );
+
+    const result = await response.json();
+
+    return Promise.resolve(result);
+  }
+
+  public async previewOpmlImport(options: {
+    filePath?: string;
+    opmlUrl?: string;
+  }) {
+    const response = await fetch(this.makeUrl("/opml-import-preview"), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(options),
     });
 
     const result = await response.json();

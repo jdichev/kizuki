@@ -35,6 +35,20 @@ const app: Application = express();
 
 const jsonParser = bodyParser.json();
 
+type OpmlImportJob = {
+  status: "running" | "completed" | "failed";
+  processedFeeds: number;
+  totalFeeds: number;
+  importedFeeds: number;
+  error?: string;
+};
+
+const opmlImportJobs = new Map<string, OpmlImportJob>();
+
+const makeOpmlImportJobId = () => {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
 app.use(cors());
 
 // Request logging middleware
@@ -533,12 +547,118 @@ app.post("/checkfeedurls", jsonParser, async (req: Request, res: Response) => {
 });
 
 app.post("/opml-import", jsonParser, async (req: Request, res: Response) => {
-  pino.debug(req.body, "REQUEST BODY");
+  try {
+    pino.debug(req.body, "REQUEST BODY");
 
-  const result = await dataModel.importOpml(req.body);
+    const result = await dataModel.importOpml(req.body);
 
-  res.json(result);
+    res.json(result);
+  } catch (error: any) {
+    pino.error(
+      { error: error.message || String(error) },
+      "Error importing OPML"
+    );
+    res.status(500).json({ error: error.message || "Failed to import OPML" });
+  }
 });
+
+app.post(
+  "/opml-import-start",
+  jsonParser,
+  async (req: Request, res: Response) => {
+    try {
+      const jobId = makeOpmlImportJobId();
+      opmlImportJobs.set(jobId, {
+        status: "running",
+        processedFeeds: 0,
+        totalFeeds: 0,
+        importedFeeds: 0,
+      });
+
+      void (async () => {
+        try {
+          const result = await dataModel.importOpml(req.body, (progress) => {
+            const job = opmlImportJobs.get(jobId);
+            if (!job) {
+              return;
+            }
+
+            opmlImportJobs.set(jobId, {
+              ...job,
+              status: "running",
+              processedFeeds: progress.processedFeeds,
+              totalFeeds: progress.totalFeeds,
+              importedFeeds: progress.processedFeeds,
+            });
+          });
+
+          opmlImportJobs.set(jobId, {
+            status: "completed",
+            processedFeeds: result.processedFeeds,
+            totalFeeds: result.totalFeeds,
+            importedFeeds: result.importedFeeds,
+          });
+        } catch (error: any) {
+          const job = opmlImportJobs.get(jobId);
+          opmlImportJobs.set(jobId, {
+            status: "failed",
+            processedFeeds: job?.processedFeeds || 0,
+            totalFeeds: job?.totalFeeds || 0,
+            importedFeeds: job?.importedFeeds || 0,
+            error: error.message || String(error),
+          });
+        }
+      })();
+
+      res.json({ jobId });
+    } catch (error: any) {
+      pino.error(
+        { error: error.message || String(error) },
+        "Error starting OPML import"
+      );
+      res
+        .status(500)
+        .json({ error: error.message || "Failed to start OPML import" });
+    }
+  }
+);
+
+app.get("/opml-import-progress", async (req: Request, res: Response) => {
+  const jobId = String(req.query.jobId || "");
+
+  if (!jobId) {
+    return res.status(400).json({ error: "jobId is required" });
+  }
+
+  const job = opmlImportJobs.get(jobId);
+
+  if (!job) {
+    return res.status(404).json({ error: "OPML import job not found" });
+  }
+
+  res.json(job);
+});
+
+app.post(
+  "/opml-import-preview",
+  jsonParser,
+  async (req: Request, res: Response) => {
+    try {
+      const filePath = String(req.body?.filePath || "");
+      const opmlUrl = String(req.body?.opmlUrl || "");
+      const result = await dataModel.inspectOpmlSource({ filePath, opmlUrl });
+      res.json(result);
+    } catch (error: any) {
+      pino.error(
+        { error: error.message || String(error) },
+        "Error previewing OPML import"
+      );
+      res
+        .status(500)
+        .json({ error: error.message || "Failed to preview OPML" });
+    }
+  }
+);
 
 app.get("/opml-export", async (req: Request, res: Response) => {
   try {
