@@ -134,7 +134,32 @@ export default class DataService {
   private ftsReady: boolean = false;
   private static readonly FTS_VERSION = "unicode61-2";
 
-  private static buildFtsQuery(searchQuery: string): string {
+  private static parseSearchQuery(searchQuery: string): {
+    scope: "all" | "title" | "desc";
+    term: string;
+  } {
+    const normalizedQuery = searchQuery.normalize("NFKC").trim();
+    const prefixedQueryMatch = normalizedQuery.match(
+      /^(title|desc)\s*:\s*(.*)$/i
+    );
+
+    if (!prefixedQueryMatch) {
+      return {
+        scope: "all",
+        term: normalizedQuery,
+      };
+    }
+
+    return {
+      scope: prefixedQueryMatch[1].toLowerCase() === "title" ? "title" : "desc",
+      term: prefixedQueryMatch[2].trim(),
+    };
+  }
+
+  private static buildFtsQuery(
+    searchQuery: string,
+    scope: "all" | "title" | "desc" = "all"
+  ): string {
     const tokens = searchQuery
       .normalize("NFKC")
       .trim()
@@ -143,7 +168,21 @@ export default class DataService {
       .filter((token) => token.length > 0)
       .map((token) => `"${token.replace(/"/g, '""')}"*`);
 
-    return tokens.join(" AND ");
+    if (tokens.length === 0) {
+      return "";
+    }
+
+    const tokenQuery = tokens.join(" AND ");
+
+    if (scope === "title") {
+      return `{title} : ${tokenQuery}`;
+    }
+
+    if (scope === "desc") {
+      return `{content summary latest_content} : ${tokenQuery}`;
+    }
+
+    return tokenQuery;
   }
 
   constructor() {
@@ -1720,7 +1759,10 @@ export default class DataService {
 
     let whereQuery2 = "";
     const conditions: string[] = [];
-    const hasSearchQuery = Boolean(params.searchQuery?.trim());
+    const parsedSearchQuery = DataService.parseSearchQuery(
+      params.searchQuery || ""
+    );
+    const hasSearchQuery = Boolean(parsedSearchQuery.term);
     const useFtsSearch = hasSearchQuery && this.ftsReady;
 
     if (useFtsSearch) {
@@ -1744,14 +1786,26 @@ export default class DataService {
       if (useFtsSearch) {
         conditions.push("items_fts MATCH ?");
       } else {
-        conditions.push(`
-          (
-            LOWER(items.title) LIKE LOWER(?) OR
-            LOWER(items.content) LIKE LOWER(?) OR
-            LOWER(items.summary) LIKE LOWER(?) OR
-            LOWER(items.latest_content) LIKE LOWER(?)
-          )
-        `);
+        if (parsedSearchQuery.scope === "title") {
+          conditions.push("LOWER(items.title) LIKE LOWER(?)");
+        } else if (parsedSearchQuery.scope === "desc") {
+          conditions.push(`
+            (
+              LOWER(items.content) LIKE LOWER(?) OR
+              LOWER(items.summary) LIKE LOWER(?) OR
+              LOWER(items.latest_content) LIKE LOWER(?)
+            )
+          `);
+        } else {
+          conditions.push(`
+            (
+              LOWER(items.title) LIKE LOWER(?) OR
+              LOWER(items.content) LIKE LOWER(?) OR
+              LOWER(items.summary) LIKE LOWER(?) OR
+              LOWER(items.latest_content) LIKE LOWER(?)
+            )
+          `);
+        }
       }
     }
 
@@ -1782,16 +1836,26 @@ export default class DataService {
 
     if (hasSearchQuery) {
       if (useFtsSearch) {
-        const ftsQuery = DataService.buildFtsQuery(params.searchQuery || "");
+        const ftsQuery = DataService.buildFtsQuery(
+          parsedSearchQuery.term,
+          parsedSearchQuery.scope
+        );
         queryParams.push(ftsQuery || '""');
       } else {
-        const searchPattern = `%${params.searchQuery!.trim()}%`;
-        queryParams.push(
-          searchPattern,
-          searchPattern,
-          searchPattern,
-          searchPattern
-        );
+        const searchPattern = `%${parsedSearchQuery.term}%`;
+
+        if (parsedSearchQuery.scope === "title") {
+          queryParams.push(searchPattern);
+        } else if (parsedSearchQuery.scope === "desc") {
+          queryParams.push(searchPattern, searchPattern, searchPattern);
+        } else {
+          queryParams.push(
+            searchPattern,
+            searchPattern,
+            searchPattern,
+            searchPattern
+          );
+        }
       }
     }
 
@@ -1817,7 +1881,8 @@ export default class DataService {
       size: 100,
     }
   ): Promise<Item[]> {
-    const trimmedQuery = params.query.trim();
+    const parsedSearchQuery = DataService.parseSearchQuery(params.query);
+    const trimmedQuery = parsedSearchQuery.term;
     const size = params.size ?? 100;
 
     if (!trimmedQuery) {
@@ -1825,7 +1890,10 @@ export default class DataService {
     }
 
     if (this.ftsReady) {
-      const ftsQuery = DataService.buildFtsQuery(trimmedQuery);
+      const ftsQuery = DataService.buildFtsQuery(
+        trimmedQuery,
+        parsedSearchQuery.scope
+      );
 
       const ftsSearchQuery = `
         SELECT
@@ -1866,6 +1934,35 @@ export default class DataService {
       });
     }
 
+    let whereClause = `
+      LOWER(items.title) LIKE LOWER(?) OR
+      LOWER(items.content) LIKE LOWER(?) OR
+      LOWER(items.summary) LIKE LOWER(?) OR
+      LOWER(items.latest_content) LIKE LOWER(?)
+    `;
+
+    const queryParams: Array<string | number> = [];
+    const searchPattern = `%${trimmedQuery}%`;
+
+    if (parsedSearchQuery.scope === "title") {
+      whereClause = "LOWER(items.title) LIKE LOWER(?)";
+      queryParams.push(searchPattern);
+    } else if (parsedSearchQuery.scope === "desc") {
+      whereClause = `
+        LOWER(items.content) LIKE LOWER(?) OR
+        LOWER(items.summary) LIKE LOWER(?) OR
+        LOWER(items.latest_content) LIKE LOWER(?)
+      `;
+      queryParams.push(searchPattern, searchPattern, searchPattern);
+    } else {
+      queryParams.push(
+        searchPattern,
+        searchPattern,
+        searchPattern,
+        searchPattern
+      );
+    }
+
     const query = `
       SELECT
         items.id,
@@ -1881,28 +1978,20 @@ export default class DataService {
       LEFT JOIN feeds ON
         feeds.id = items.feed_id
       WHERE
-        LOWER(items.title) LIKE LOWER(?) OR
-        LOWER(items.content) LIKE LOWER(?) OR
-        LOWER(items.summary) LIKE LOWER(?) OR
-        LOWER(items.latest_content) LIKE LOWER(?)
+        ${whereClause}
       ORDER BY items.published DESC
       LIMIT ?
     `;
-
-    const searchPattern = `%${trimmedQuery}%`;
+    queryParams.push(size);
 
     return new Promise((resolve) => {
-      this.database.all(
-        query,
-        [searchPattern, searchPattern, searchPattern, searchPattern, size],
-        (error, rows) => {
-          if (error) {
-            pino.error(error);
-          }
-
-          resolve((rows as Item[]) || []);
+      this.database.all(query, queryParams, (error, rows) => {
+        if (error) {
+          pino.error(error);
         }
-      );
+
+        resolve((rows as Item[]) || []);
+      });
     });
   }
 
