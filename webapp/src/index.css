@@ -616,7 +616,6 @@ table.feeds-table {
 
 #content {
   color: var(--content-body-color);
-  padding-right: 5%;
 }
 
 .text-summary {
@@ -646,28 +645,12 @@ table.feeds-table {
   display: inline-block;
 }
 
-/* Video player sizing calculation:
- * Width: Calculate the right column's share of viewport (87vw total grid),
- *        then subtract padding (82px) and side menu width.
- *        Formula: (87vw / 100) * 62 - 82px - 50px
- * Height: Apply 16:9 aspect ratio to the calculated width.
- *         Formula: width / 16 * 9
- */
 #player {
-  width: calc(
-    (((87vw) / var(--total-main-size)) * var(--right-column-unitless-size)) -
-      82px - var(--side-menu-width) - 30px
-  );
-  height: calc(
-    (
-        (
-            ((87vw) / var(--total-main-size)) *
-              var(--right-column-unitless-size)
-          ) -
-          82px - var(--side-menu-width)
-      ) /
-      16 * 9
-  );
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
 }
 
 #content-options {

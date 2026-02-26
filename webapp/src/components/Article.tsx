@@ -364,8 +364,6 @@ export default function Article({
                   title={article.title}
                   data-testid="yt-embed-frame"
                   id="player"
-                  width="640"
-                  height="390"
                   src={`https://www.youtube.com/embed/${videoId}?enablejsapi=1`}
                 />
                 <br />
