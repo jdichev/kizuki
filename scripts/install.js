@@ -12,15 +12,17 @@ const run = async (command, cwd) => {
 };
 
 const install = async () => {
-  run("npm install", "./config");
+  run("npm ci", "./config");
 
-  run("npm install", "./helpers/fetch-feed");
+  run("npm ci", "./helpers/fetch-feed");
 
-  run("npm install", "./webapp");
+  run("npm ci", "./helpers/fetch-links");
 
-  run("npm install", "./server");
+  run("npm ci", "./webapp");
 
-  run("npm install", "./desktop");
+  run("npm ci", "./server");
+
+  run("npm ci", "./desktop");
 };
 
 install();

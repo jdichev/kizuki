@@ -1,4 +1,4 @@
-name: Build Native Module
+name: Main Build
 on:
   push:
     branches: [main]
@@ -8,31 +8,80 @@ on:
 
 jobs:
   build-native:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            node-version: 22
+          - os: macos-15-intel
+            platform: mac-intel
+            node-version: 20
+          - os: macos-15
+            platform: mac-arm
+            node-version: 20
+          - os: windows-2022
+            platform: windows
+            node-version: 20
+    runs-on: ${{ matrix.os }}
+    name: Build (${{ matrix.platform }})
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ matrix.node-version }}
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            config/package-lock.json
+            helpers/fetch-feed/package-lock.json
+            helpers/fetch-links/package-lock.json
+            webapp/package-lock.json
+            server/package-lock.json
+            desktop/package-lock.json
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-unknown-linux-gnu
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
-      - name: Build native module
+      - name: Build native module (fetch-feed)
         run: |
-          cd helpers/fetch-feed
-          npx napi build --release --features napi-export
+          npm --prefix helpers/fetch-feed run build
+
+      - name: Build native module (fetch-links)
+        run: |
+          npm --prefix helpers/fetch-links run build
 
       - name: Run tests
         run: npm test
 
       - name: Run build
         run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-${{ matrix.platform }}
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            desktop/release/**/*.AppImage
+            desktop/release/**/*.dmg
+            desktop/release/**/*.exe
+            desktop/release/**/*.msi
+            desktop/release/**/*.zip
+            desktop/release/**/*.deb
+            desktop/release/**/*.rpm
+            desktop/release/**/*.snap
+            desktop/release/**/*.blockmap
+            desktop/release/**/latest*.yml

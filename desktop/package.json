@@ -1,6 +1,8 @@
 {
   "name": "forestdesktop",
   "version": "1.0.0",
+  "description": "Desktop application for Forest",
+  "author": "Jordan Dichev",
   "scripts": {
     "start": "NODE_ENV=development electron index.js | pino-pretty",
     "start-prod": "electron index.js | pino-pretty",
@@ -27,6 +29,18 @@
     "appId": "com.electron.KizukiApp",
     "directories": {
       "output": "release"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ]
     },
     "linux": {
       "target": [
