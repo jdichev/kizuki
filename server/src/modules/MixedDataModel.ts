@@ -2,7 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import DOMPurify from "dompurify";
-import { Database } from "sqlite3";
+import { Database } from "./SqliteCompat";
 import { JSDOM } from "jsdom";
 import pinoLib from "pino";
 import opmlParser from "./OpmlParser";
@@ -68,7 +68,7 @@ COMMIT;
 
 const seedData = `
 INSERT OR IGNORE INTO feed_categories (id, title, text)
-VALUES (0, "Uncategorized", "Uncategorized");
+VALUES (0, 'Uncategorized', 'Uncategorized');
 
 INSERT OR IGNORE INTO item_categories (id, title, text) VALUES
 -- General News & Lifestyle (0-99)
@@ -734,13 +734,12 @@ export default class DataService {
     `;
 
     return new Promise((resolve) => {
-      this.database.all(query, (error, rows) => {
+      this.database.all(query, (error, rows: { feedUrl: string }[] = []) => {
         if (error) {
           pino.error(error);
         }
 
         const res = rows.map((record) => {
-          // @ts-ignore
           return record.feedUrl;
         });
 
