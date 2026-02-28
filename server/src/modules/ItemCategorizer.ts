@@ -15,7 +15,7 @@ export default class ItemCategorizer {
   /**
    * Formats items into a prompt-friendly string.
    */
-  public static buildItemsPromptList(items: any[]): string {
+  public static buildItemsPromptList(items: Item[]): string {
     if (!items || items.length === 0) {
       return "";
     }
@@ -41,11 +41,11 @@ export default class ItemCategorizer {
    * Shared categorization pipeline once items are selected.
    */
   private async runCategorization(
-    items: any[],
-    itemCategories: any[],
+    items: Item[],
+    itemCategories: Category[],
     aiService: GoogleAiService,
     logContext: string
-  ): Promise<any[]> {
+  ): Promise<Array<{ name: string; items: Item[] }>> {
     const itemCategoriesForPrompt = itemCategories
       .map((cat) => cat.title)
       .join(", ");
@@ -83,7 +83,7 @@ export default class ItemCategorizer {
    * Categorizes uncategorized items
    * @returns The generated groups with their associated items
    */
-  public async categorize(): Promise<any[]> {
+  public async categorize(): Promise<Array<{ name: string; items: Item[] }>> {
     // Check if AI service is configured
     const aiService = GoogleAiService.getInstance();
     if (!aiService.isConfigured()) {
@@ -110,7 +110,7 @@ export default class ItemCategorizer {
       }
 
       // Just find items in Uncategorized category
-      let items = await dataModel.getItems({
+      const items = await dataModel.getItems({
         unreadOnly: false,
         size: 500,
         selectedItemCategory: uncategorizedCategory,
@@ -133,9 +133,10 @@ export default class ItemCategorizer {
         aiService,
         "standard"
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
       pino.error(
-        { error: error.message || String(error) },
+        { error: message },
         "Error during standard item categorization"
       );
       throw error;

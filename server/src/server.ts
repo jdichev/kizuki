@@ -174,14 +174,15 @@ app.put("/items", jsonParser, async (req: Request, res: Response) => {
 
     const result = await dataModel.assignItemToCategory(itemId, itemCategoryId);
     res.json({ success: result });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
     pino.error(
-      { error: error.message || String(error) },
+      { error: message },
       "Error updating item category"
     );
     res.status(500).json({
       error: "Failed to update item category",
-      message: error.message || String(error),
+      message: message,
     });
   }
 });
@@ -281,14 +282,14 @@ app.get("/item-categories/readstats", async (req: Request, res: Response) => {
       "Item category read stats retrieved"
     );
     res.json(itemCategoryReadStats);
-  } catch (error: any) {
+  } catch (error: unknown) {
     pino.error(
-      { error: error.message || String(error) },
+      { error: (error as any).message || String(error) },
       "Error fetching item category read stats"
     );
     res.status(500).json({
       error: "Failed to fetch item category read stats",
-      message: error.message || String(error),
+      message: (error as any).message || String(error),
     });
   }
 });
@@ -299,14 +300,14 @@ app.get("/item-categories", async (req: Request, res: Response) => {
     const itemCategories = await dataModel.getItemCategories();
     pino.trace({ count: itemCategories.length }, "Item categories retrieved");
     res.json(itemCategories);
-  } catch (error: any) {
+  } catch (error: unknown) {
     pino.error(
-      { error: error.message || String(error) },
+      { error: (error as any).message || String(error) },
       "Error fetching item categories"
     );
     res.status(500).json({
       error: "Failed to fetch item categories",
-      message: error.message || String(error),
+      message: (error as any).message || String(error),
     });
   }
 });
@@ -320,14 +321,14 @@ app.post(
       const itemCategory = req.body;
       const result = await dataModel.insertItemCategory(itemCategory);
       res.json({ success: result });
-    } catch (error: any) {
+    } catch (error: unknown) {
       pino.error(
-        { error: error.message || String(error) },
+        { error: (error as any).message || String(error) },
         "Error creating item category"
       );
       res.status(500).json({
         error: "Failed to create item category",
-        message: error.message || String(error),
+        message: (error as any).message || String(error),
       });
     }
   }
@@ -339,14 +340,15 @@ app.put("/item-categories", jsonParser, async (req: Request, res: Response) => {
     const itemCategory = req.body;
     const result = await dataModel.updateItemCategory(itemCategory);
     res.json({ success: result });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
     pino.error(
-      { error: error.message || String(error) },
+      { error: message },
       "Error updating item category"
     );
     res.status(500).json({
       error: "Failed to update item category",
-      message: error.message || String(error),
+      message: message,
     });
   }
 });
@@ -363,14 +365,14 @@ app.delete("/item-categories", async (req: Request, res: Response) => {
     }
     const result = await dataModel.deleteItemCategory(itemCategoryId);
     res.json({ success: result });
-  } catch (error: any) {
+  } catch (error: unknown) {
     pino.error(
-      { error: error.message || String(error) },
+      { error: (error as any).message || String(error) },
       "Error deleting item category"
     );
     res.status(500).json({
       error: "Failed to delete item category",
-      message: error.message || String(error),
+      message: (error as any).message || String(error),
     });
   }
 });
@@ -381,14 +383,14 @@ app.get("/item-categories/:id", async (req: Request, res: Response) => {
     const id = parseInt(req.params.id);
     const itemCategory = await dataModel.getItemCategoryById(id);
     res.json(itemCategory);
-  } catch (error: any) {
+  } catch (error: unknown) {
     pino.error(
-      { error: error.message || String(error) },
+      { error: (error as any).message || String(error) },
       "Error fetching item category"
     );
     res.status(500).json({
       error: "Failed to fetch item category",
-      message: error.message || String(error),
+      message: (error as any).message || String(error),
     });
   }
 });
@@ -529,9 +531,9 @@ app.post("/feeds", jsonParser, async (req: Request, res: Response) => {
     const result = await updater.addFeed(req.body);
     pino.trace({ result }, "Feed added successfully");
     res.json(result);
-  } catch (error: any) {
-    pino.error({ error: error.message || String(error) }, "Error adding feed");
-    res.status(500).json({ error: error.message || String(error) });
+  } catch (error: unknown) {
+    pino.error({ error: (error as any).message || String(error) }, "Error adding feed");
+    res.status(500).json({ error: (error as any).message || String(error) });
   }
 });
 
@@ -556,12 +558,12 @@ app.post("/opml-import", jsonParser, async (req: Request, res: Response) => {
     const result = await dataModel.importOpml(req.body);
 
     res.json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
     pino.error(
-      { error: error.message || String(error) },
+      { error: (error as any).message || String(error) },
       "Error importing OPML"
     );
-    res.status(500).json({ error: error.message || "Failed to import OPML" });
+    res.status(500).json({ error: (error as any).message || "Failed to import OPML" });
   }
 });
 
@@ -601,27 +603,27 @@ app.post(
             totalFeeds: result.totalFeeds,
             importedFeeds: result.importedFeeds,
           });
-        } catch (error: any) {
+        } catch (error: unknown) {
           const job = opmlImportJobs.get(jobId);
           opmlImportJobs.set(jobId, {
             status: "failed",
             processedFeeds: job?.processedFeeds || 0,
             totalFeeds: job?.totalFeeds || 0,
             importedFeeds: job?.importedFeeds || 0,
-            error: error.message || String(error),
+            error: (error as any).message || String(error),
           });
         }
       })();
 
       res.json({ jobId });
-    } catch (error: any) {
+    } catch (error: unknown) {
       pino.error(
-        { error: error.message || String(error) },
+        { error: (error as any).message || String(error) },
         "Error starting OPML import"
       );
       res
         .status(500)
-        .json({ error: error.message || "Failed to start OPML import" });
+        .json({ error: (error as any).message || "Failed to start OPML import" });
     }
   }
 );
@@ -651,14 +653,14 @@ app.post(
       const opmlUrl = String(req.body?.opmlUrl || "");
       const result = await dataModel.inspectOpmlSource({ filePath, opmlUrl });
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       pino.error(
-        { error: error.message || String(error) },
+        { error: (error as any).message || String(error) },
         "Error previewing OPML import"
       );
       res
         .status(500)
-        .json({ error: error.message || "Failed to preview OPML" });
+        .json({ error: (error as any).message || "Failed to preview OPML" });
     }
   }
 );
@@ -672,9 +674,9 @@ app.get("/opml-export", async (req: Request, res: Response) => {
       'attachment; filename="forest-feeds.opml"'
     );
     res.send(opmlContent);
-  } catch (error: any) {
+  } catch (error: unknown) {
     pino.error(
-      { error: error.message || String(error) },
+      { error: (error as any).message || String(error) },
       "Error exporting OPML"
     );
     res.status(500).json({ error: "Failed to export OPML" });
@@ -778,14 +780,14 @@ app.post("/api/summarize", jsonParser, async (req: Request, res: Response) => {
       html: format === "html" ? responseContent : undefined,
       fromCache,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     pino.error(
-      { error: error.message || String(error) },
+      { error: (error as any).message || String(error) },
       "Error summarizing content"
     );
     res.status(500).json({
       error: "Failed to summarize content",
-      message: error.message || String(error),
+      message: (error as any).message || String(error),
     });
   }
 });
@@ -833,14 +835,14 @@ app.post(
         html: format === "html" ? content : undefined,
         fromCache,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       pino.error(
-        { error: error.message || String(error) },
+        { error: (error as any).message || String(error) },
         "Error retrieving article content"
       );
       res.status(500).json({
         error: "Failed to retrieve article content",
-        message: error.message || String(error),
+        message: (error as any).message || String(error),
       });
     }
   }
@@ -852,11 +854,11 @@ app.get("/api/google-ai/metrics", (req: Request, res: Response) => {
     const metrics = aiService.getUsageMetrics();
     pino.debug({ metrics }, "Google AI usage metrics retrieved");
     res.json(metrics);
-  } catch (error: any) {
+  } catch (error: unknown) {
     pino.error({ error }, "Failed to get Google AI usage metrics");
     res.status(500).json({
       error: "Failed to retrieve Google AI usage metrics",
-      message: error.message || String(error),
+      message: (error as any).message || String(error),
     });
   }
 });
@@ -869,11 +871,11 @@ app.get("/api/google-ai/quota-status", (req: Request, res: Response) => {
       "Google AI quota status retrieved"
     );
     res.json(quotaStatus);
-  } catch (error: any) {
+  } catch (error: unknown) {
     pino.error({ error }, "Failed to get Google AI quota status");
     res.status(500).json({
       error: "Failed to retrieve Google AI quota status",
-      message: error.message || String(error),
+      message: (error as any).message || String(error),
     });
   }
 });
@@ -904,11 +906,11 @@ app.post(
       }
 
       res.json(serviceMetrics);
-    } catch (error: any) {
+    } catch (error: unknown) {
       pino.error({ error }, "Failed to fetch Google AI service metrics");
       res.status(500).json({
         error: "Failed to fetch Google AI service metrics",
-        message: error.message || String(error),
+        message: (error as any).message || String(error),
       });
     }
   }

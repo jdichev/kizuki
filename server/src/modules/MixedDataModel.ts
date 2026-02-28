@@ -326,8 +326,8 @@ export default class DataService {
     try {
       this.database.exec(addSummaryColumn);
       pino.info("Added summary column to items table");
-    } catch (error: any) {
-      if (!error.message.includes("duplicate column")) {
+    } catch (error: unknown) {
+      if (error instanceof Error && !error.message.includes("duplicate column")) {
         pino.debug("Summary column might already exist or migration skipped");
       }
     }
@@ -336,8 +336,8 @@ export default class DataService {
     try {
       this.database.exec(addLatestContentColumn);
       pino.info("Added latest_content column to items table");
-    } catch (error: any) {
-      if (!error.message.includes("duplicate column")) {
+    } catch (error: unknown) {
+      if (error instanceof Error && !error.message.includes("duplicate column")) {
         pino.debug(
           "Latest_content column might already exist or migration skipped"
         );
@@ -381,10 +381,11 @@ export default class DataService {
       } else {
         pino.info("FTS ensured for items search");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.ftsReady = false;
+      const message = error instanceof Error ? error.message : String(error);
       pino.warn(
-        { error: error.message },
+        { error: message },
         "FTS setup failed; falling back to non-FTS text search"
       );
     }
@@ -1044,14 +1045,15 @@ export default class DataService {
         categoriesCount: opmlData.categories.length,
         newFeedsCount,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
       return {
         sourceExists: true,
         isValid: false,
         feedsCount: 0,
         categoriesCount: 0,
         newFeedsCount: 0,
-        error: error.message || "Invalid OPML file",
+        error: message || "Invalid OPML file",
       };
     }
   }
@@ -1338,7 +1340,9 @@ export default class DataService {
     `;
 
     try {
-      const row = this.database.prepare(query).get(itemId) as Item | undefined;
+      const row = this.database.prepare(query).get(itemId) as
+        | (Item & { json_content?: string })
+        | undefined;
 
       if (row) {
         // @ts-ignore
@@ -1359,9 +1363,9 @@ export default class DataService {
           '<a target="_blank" rel="noreferrer noopener" '
         );
 
-        if ((row as any).json_content) {
-          row.jsonContent = JSON.parse((row as any).json_content);
-          delete (row as any).json_content;
+        if (row.json_content) {
+          row.jsonContent = JSON.parse(row.json_content);
+          delete row.json_content;
         }
       }
 
@@ -1972,7 +1976,7 @@ export default class DataService {
     `;
 
     try {
-      const row = this.database.prepare(query).get(url) as any;
+      const row = this.database.prepare(query).get(url) as { summary: string } | undefined;
       return row?.summary || null;
     } catch (error) {
       pino.error({ error, url }, "Error retrieving item summary");
@@ -1993,7 +1997,7 @@ export default class DataService {
     `;
 
     try {
-      const row = this.database.prepare(query).get(url) as any;
+      const row = this.database.prepare(query).get(url) as { latest_content: string } | undefined;
       return row?.latest_content || null;
     } catch (error) {
       pino.error({ error, url }, "Error retrieving item latest content");

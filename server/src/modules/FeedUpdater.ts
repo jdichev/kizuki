@@ -263,9 +263,10 @@ export default class FeedUpdater {
     try {
       pino.debug({ feed }, "Inserting feed into database");
       await dataModel.insertFeed(feed);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
       pino.error(
-        { error, feedUrl: feedData.feedUrl },
+        { error: message, feedUrl: feedData.feedUrl },
         "Failed to insert feed into database"
       );
       throw error;
