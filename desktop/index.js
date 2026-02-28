@@ -45,7 +45,13 @@ function createWindow() {
     win.loadURL(`http://localhost:${projectConfig.devServerPort}`);
   } else {
     win.loadFile(
-      path.join("node_modules", "forestwebapp", "dist", "index.html")
+      path.join(
+        app.getAppPath(),
+        "node_modules",
+        "forestwebapp",
+        "dist",
+        "index.html"
+      )
     );
   }
 

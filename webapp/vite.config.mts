@@ -5,6 +5,7 @@ import projectConfig from "forestconfig";
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  base: "./",
   server: {
     port: projectConfig.devServerPort,
     host: true,
