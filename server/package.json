@@ -17,9 +17,6 @@
     "moduleFileExtensions": [
       "ts",
       "js"
-    ],
-    "transformIgnorePatterns": [
-      "node_modules/(?!(marked)/)"
     ]
   },
   "devDependencies": {
