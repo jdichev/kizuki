@@ -2,7 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import DOMPurify from "dompurify";
-import { Database } from "./SqliteCompat";
+import Database from "better-sqlite3";
 import { JSDOM } from "jsdom";
 import pinoLib from "pino";
 import opmlParser from "./OpmlParser";
@@ -19,7 +19,6 @@ const { window } = new JSDOM("<!DOCTYPE html>");
 const domPurify = DOMPurify(window);
 
 const createTables = `
-BEGIN TRANSACTION;
 CREATE TABLE IF NOT EXISTS "feed_categories" (
 	"id"	INTEGER NOT NULL UNIQUE,
 	"title"	TEXT NOT NULL,
@@ -62,8 +61,6 @@ CREATE TABLE IF NOT EXISTS "items" (
 	"latest_content"	TEXT,
 	PRIMARY KEY("id" AUTOINCREMENT)
 );
-
-COMMIT;
 `;
 
 const seedData = `
@@ -130,7 +127,7 @@ INSERT OR IGNORE INTO item_categories (id, title, text) VALUES
 export default class DataService {
   private static instance: DataService;
 
-  private database: Database;
+  private database!: Database.Database;
   private ftsReady: boolean = false;
   private static readonly FTS_VERSION = "unicode61-2";
 
@@ -201,10 +198,8 @@ export default class DataService {
       fs.mkdirSync(storageDir, { recursive: true });
     }
 
-    this.database = new Database(dbPath, (err) => {
-      if (err) {
-        pino.error({ err }, "Database opening error");
-      }
+    try {
+      this.database = new Database(dbPath);
 
       const pragmaSettings = `
         pragma journal_mode = WAL;
@@ -213,61 +208,34 @@ export default class DataService {
         pragma mmap_size = 30000000000;
       `;
 
-      this.database.exec(pragmaSettings, (innerErr) => {
-        if (innerErr) {
-          pino.error(innerErr, "Error pragma settings");
-        }
-
-        pino.debug("pragma seetings executed");
-      });
+      this.database.exec(pragmaSettings);
+      pino.debug("pragma settings executed");
 
       // Create tables (safe due to IF NOT EXISTS)
-      this.database.exec(createTables, (createErr) => {
-        if (createErr) {
-          pino.error(createErr, "Error creating tables");
-        }
+      this.database.exec(createTables);
+      pino.debug("tables created");
 
-        // Seed default data (safe due to INSERT OR IGNORE)
-        this.database.exec(seedData, (seedErr) => {
-          if (seedErr) {
-            pino.error(seedErr, "Error seeding data");
-          }
+      // Seed default data (safe due to INSERT OR IGNORE)
+      this.database.exec(seedData);
+      pino.debug("data seeded");
 
-          // Run migrations for new columns
-          this.runMigrations();
+      // Run migrations for new columns
+      this.runMigrations();
 
-          pino.debug(
-            `Database initialized in mode ${tempInstance ? "temp" : "not-temp"}`
-          );
-        });
-      });
-
-      // const twoWeeksAgo = new Date();
-      // twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
-      // const twoWeeksAgoTime = twoWeeksAgo.getTime();
-
-      // const query = `DELETE FROM items WHERE published < ${twoWeeksAgoTime}`;
-
-      // this.database.run(query, (error) => {
-      //   if (error) {
-      //     pino.error(error);
-      //   }
-      // });
-
-      // pino.info("Removed all items older than 2 weeks");
-    });
+      pino.debug(
+        `Database initialized in mode ${tempInstance ? "temp" : "not-temp"}`
+      );
+    } catch (err) {
+      pino.error({ err }, "Database opening or initialization error");
+    }
   }
 
-  public disconnect(): Promise<void> {
-    return new Promise((resolve) => {
-      this.database.close((error) => {
-        if (error) {
-          pino.error(error, "Error closing database");
-        }
-
-        resolve();
-      });
-    });
+  public async disconnect(): Promise<void> {
+    try {
+      this.database.close();
+    } catch (error) {
+      pino.error(error, "Error closing database");
+    }
   }
 
   public static getInstance(): DataService {
@@ -290,8 +258,6 @@ export default class DataService {
     `;
 
     const ensureItemsFts = `
-      BEGIN TRANSACTION;
-
       CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
         title,
         content,
@@ -318,13 +284,9 @@ export default class DataService {
         INSERT INTO items_fts(rowid, title, content, summary, latest_content)
         VALUES (new.id, new.title, new.content, new.summary, new.latest_content);
       END;
-
-      COMMIT;
     `;
 
     const rebuildItemsFts = `
-      BEGIN TRANSACTION;
-
       DROP TRIGGER IF EXISTS items_ai;
       DROP TRIGGER IF EXISTS items_ad;
       DROP TRIGGER IF EXISTS items_au;
@@ -358,31 +320,31 @@ export default class DataService {
       END;
 
       INSERT INTO items_fts(items_fts) VALUES('rebuild');
-
-      COMMIT;
     `;
 
     // Try to add summary column (will fail silently if it already exists)
-    this.database.run(addSummaryColumn, (error) => {
-      if (error && !error.message.includes("duplicate column")) {
+    try {
+      this.database.exec(addSummaryColumn);
+      pino.info("Added summary column to items table");
+    } catch (error: any) {
+      if (!error.message.includes("duplicate column")) {
         pino.debug("Summary column might already exist or migration skipped");
-      } else if (!error) {
-        pino.info("Added summary column to items table");
       }
-    });
+    }
 
     // Try to add latest_content column (will fail silently if it already exists)
-    this.database.run(addLatestContentColumn, (error) => {
-      if (error && !error.message.includes("duplicate column")) {
+    try {
+      this.database.exec(addLatestContentColumn);
+      pino.info("Added latest_content column to items table");
+    } catch (error: any) {
+      if (!error.message.includes("duplicate column")) {
         pino.debug(
           "Latest_content column might already exist or migration skipped"
         );
-      } else if (!error) {
-        pino.info("Added latest_content column to items table");
       }
-    });
+    }
 
-    this.database.serialize(() => {
+    try {
       const createMetaTable = `
         CREATE TABLE IF NOT EXISTS app_meta (
           key TEXT PRIMARY KEY,
@@ -390,70 +352,42 @@ export default class DataService {
         );
       `;
 
-      this.database.run(createMetaTable, (error) => {
-        if (error) {
-          pino.warn(
-            { error: error.message },
-            "Failed to create app_meta table"
-          );
-        }
-      });
+      this.database.exec(createMetaTable);
 
-      this.database.get(
-        `SELECT value FROM app_meta WHERE key = 'fts_version'`,
-        (error, row) => {
-          if (error) {
-            pino.warn(
-              { error: error.message },
-              "Failed to read FTS version; rebuilding"
-            );
-          }
+      const row = this.database
+        .prepare(`SELECT value FROM app_meta WHERE key = 'fts_version'`)
+        .get() as { value?: string } | undefined;
 
-          const currentVersion = (row as { value?: string } | undefined)?.value;
-          const shouldRebuild =
-            !currentVersion ||
-            currentVersion !== DataService.FTS_VERSION ||
-            !!error;
+      const currentVersion = row?.value;
+      const shouldRebuild = !currentVersion || currentVersion !== DataService.FTS_VERSION;
 
-          const execSql = shouldRebuild ? rebuildItemsFts : ensureItemsFts;
+      const execSql = shouldRebuild ? rebuildItemsFts : ensureItemsFts;
 
-          this.database.exec(execSql, (execError) => {
-            if (execError) {
-              this.ftsReady = false;
-              pino.warn(
-                { error: execError.message },
-                "FTS setup failed; falling back to non-FTS text search"
-              );
-              return;
-            }
+      this.database.exec(execSql);
 
-            if (shouldRebuild) {
-              this.database.run(
-                `INSERT INTO app_meta (key, value)
-                 VALUES ('fts_version', ?)
-                 ON CONFLICT(key) DO UPDATE SET value = excluded.value;`,
-                [DataService.FTS_VERSION],
-                (metaError) => {
-                  if (metaError) {
-                    pino.warn(
-                      { error: metaError.message },
-                      "Failed to update FTS version"
-                    );
-                  }
-                }
-              );
-            }
+      if (shouldRebuild) {
+        this.database
+          .prepare(
+            `INSERT INTO app_meta (key, value)
+             VALUES ('fts_version', ?)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value;`
+          )
+          .run(DataService.FTS_VERSION);
+      }
 
-            this.ftsReady = true;
-            if (shouldRebuild) {
-              pino.info("FTS rebuilt for items search");
-            } else {
-              pino.info("FTS ensured for items search");
-            }
-          });
-        }
+      this.ftsReady = true;
+      if (shouldRebuild) {
+        pino.info("FTS rebuilt for items search");
+      } else {
+        pino.info("FTS ensured for items search");
+      }
+    } catch (error: any) {
+      this.ftsReady = false;
+      pino.warn(
+        { error: error.message },
+        "FTS setup failed; falling back to non-FTS text search"
       );
-    });
+    }
   }
 
   public async getFeedByUrl(feedUrl: string): Promise<Feed> {
@@ -466,15 +400,13 @@ export default class DataService {
         feedUrl = ?
     `;
 
-    return new Promise((resolve) => {
-      this.database.get(query, feedUrl, (error, row) => {
-        if (error) {
-          pino.error(error);
-        }
-
-        resolve(row as Feed);
-      });
-    });
+    try {
+      const row = this.database.prepare(query).get(feedUrl);
+      return row as Feed;
+    } catch (error) {
+      pino.error(error);
+      throw error;
+    }
   }
 
   public async getFeedById(feedId: number): Promise<Feed> {
@@ -487,15 +419,13 @@ export default class DataService {
         id = ?
     `;
 
-    return new Promise((resolve) => {
-      this.database.get(query, feedId, (error, row) => {
-        if (error) {
-          pino.error(error);
-        }
-
-        resolve(row as Feed);
-      });
-    });
+    try {
+      const row = this.database.prepare(query).get(feedId);
+      return row as Feed;
+    } catch (error) {
+      pino.error(error);
+      throw error;
+    }
   }
 
   public async getFeeds(
@@ -528,74 +458,49 @@ export default class DataService {
         feeds.id
     `;
 
-    let whereQuery = `
-      WHERE
-      feeds.feedCategoryId = __CATEGORY_IDS_PLACEHOLDER__
-    `;
-
     if (params.selectedFeedCategory) {
-      whereQuery = whereQuery.replace(
-        "__CATEGORY_IDS_PLACEHOLDER__",
-        String(params.selectedFeedCategory.id)
-      );
+      const whereQuery = `
+        WHERE
+        feeds.feedCategoryId = ${params.selectedFeedCategory.id}
+      `;
       query = query.replace("__WHERE_PLACEHOLDER__", whereQuery);
     } else {
       query = query.replace("__WHERE_PLACEHOLDER__", "");
     }
 
-    return new Promise((resolve) => {
-      this.database.all(query, (err, rows) => {
-        if (err) {
-          pino.error(err);
-        }
-
-        resolve((rows as Feed[]) || []);
-      });
-    });
+    try {
+      const rows = this.database.prepare(query).all();
+      return (rows as Feed[]) || [];
+    } catch (err) {
+      pino.error(err);
+      return [];
+    }
   }
 
   public async removeFeeds(): Promise<void> {
-    const query = `
-      BEGIN TRANSACTION;
-        DELETE FROM items;
-        DELETE FROM feeds;
-      COMMIT;
-    `;
-
-    return new Promise<void>((resolve) => {
-      this.database.exec(query, (error) => {
-        if (error) {
-          pino.error(error);
-        }
-
-        pino.debug("removed feeds and related items");
-
-        resolve();
-      });
-    });
+    try {
+      this.database.transaction(() => {
+        this.database.prepare("DELETE FROM items").run();
+        this.database.prepare("DELETE FROM feeds").run();
+      })();
+      pino.debug("removed feeds and related items");
+    } catch (error) {
+      pino.error(error);
+      throw error;
+    }
   }
 
   public async removeFeed(feedId: number): Promise<void> {
-    const query = `
-      BEGIN TRANSACTION;
-        DELETE FROM items
-        WHERE feed_id = ${feedId};
-        DELETE FROM feeds
-        WHERE id = ${feedId};
-      COMMIT;
-    `;
-
-    return new Promise<void>((resolve) => {
-      this.database.exec(query, (error) => {
-        if (error) {
-          pino.error(error);
-        }
-
-        pino.debug(`removed feed ${feedId} and related items`);
-
-        resolve();
-      });
-    });
+    try {
+      this.database.transaction(() => {
+        this.database.prepare("DELETE FROM items WHERE feed_id = ?").run(feedId);
+        this.database.prepare("DELETE FROM feeds WHERE id = ?").run(feedId);
+      })();
+      pino.debug(`removed feed ${feedId} and related items`);
+    } catch (error) {
+      pino.error(error);
+      throw error;
+    }
   }
 
   private async feedExists(feed: Feed) {
@@ -604,47 +509,13 @@ export default class DataService {
       WHERE feedUrl = ?
     `;
 
-    return new Promise((resolve) => {
-      this.database.get(query, feed.feedUrl, (error, row) => {
-        if (error) {
-          pino.error(error);
-        }
-
-        resolve(row);
-      });
-    });
+    try {
+      return this.database.prepare(query).get(feed.feedUrl);
+    } catch (error) {
+      pino.error(error);
+      return undefined;
+    }
   }
-
-  // public async updateFeedTimings(
-  //   feed: Feed,
-  //   timingFields: {
-  //     updateFrequency: number;
-  //   }
-  // ) {
-  //   const query = `
-  //     UPDATE feeds
-  //     SET
-  //       updateFrequency = ?
-  //     WHERE
-  //       id = ?
-  //   `;
-
-  //   return new Promise<boolean>((resolve) => {
-  //     this.database.run(
-  //       query,
-  //       [timingFields.updateFrequency, feed.id],
-  //       (error) => {
-  //         if (error) {
-  //           pino.error(error);
-  //           resolve(false);
-  //         }
-
-  //         pino.debug("feed timing updated %o %o", feed, timingFields);
-  //         resolve(true);
-  //       }
-  //     );
-  //   });
-  // }
 
   public async updateFeed(feed: Feed): Promise<boolean> {
     const query = `
@@ -657,21 +528,16 @@ export default class DataService {
         id = ?
     `;
 
-    return new Promise<boolean>((resolve) => {
-      this.database.run(
-        query,
-        [feed.title, feed.feedCategoryId, feed.feedUrl, feed.id],
-        (error) => {
-          if (error) {
-            pino.error(error);
-            resolve(false);
-          }
-
-          pino.debug("feed updated %o", feed);
-          resolve(true);
-        }
-      );
-    });
+    try {
+      this.database
+        .prepare(query)
+        .run(feed.title, feed.feedCategoryId, feed.feedUrl, feed.id);
+      pino.debug("feed updated %o", feed);
+      return true;
+    } catch (error) {
+      pino.error(error);
+      return false;
+    }
   }
 
   public async insertFeed(feed: Feed) {
@@ -682,12 +548,12 @@ export default class DataService {
       VALUES( ?, ?, ?, ?, ? );
     `;
 
-    const feedExists = await this.feedExists(feed);
+    const feedExist = await this.feedExists(feed);
 
-    if (feedExists) {
+    if (feedExist) {
       pino.debug("Feed already exists");
 
-      return Promise.resolve();
+      return;
     }
 
     let categoryId: number;
@@ -708,44 +574,33 @@ export default class DataService {
 
     pino.debug("Category id: %s", categoryId);
 
-    return new Promise<void>((resolve) => {
-      this.database.run(
-        query,
-        [feed.title, feed.url, feed.feedUrl, feed.feedType, categoryId],
-        (error) => {
-          if (error) {
-            pino.error(error);
-          }
-
-          pino.debug(feed, "feed added");
-
-          resolve();
-        }
-      );
-    });
+    try {
+      this.database
+        .prepare(query)
+        .run(feed.title, feed.url, feed.feedUrl, feed.feedType, categoryId);
+      pino.debug(feed, "feed added");
+    } catch (error) {
+      pino.error(error);
+    }
   }
 
   public async checkFeedUrls(urls: string[]): Promise<string[]> {
+    if (urls.length === 0) return [];
+    const placeholders = urls.map(() => "?").join(", ");
     const query = `
       SELECT feedUrl
       FROM feeds
       WHERE
-        feedUrl IN ('${urls.join("', '")}')
+        feedUrl IN (${placeholders})
     `;
 
-    return new Promise((resolve) => {
-      this.database.all(query, (error, rows: { feedUrl: string }[] = []) => {
-        if (error) {
-          pino.error(error);
-        }
-
-        const res = rows.map((record) => {
-          return record.feedUrl;
-        });
-
-        resolve(res);
-      });
-    });
+    try {
+      const rows = this.database.prepare(query).all(urls) as { feedUrl: string }[];
+      return rows.map((record) => record.feedUrl);
+    } catch (error) {
+      pino.error(error);
+      return [];
+    }
   }
 
   public async getFeedReadStats(): Promise<FeedReadStat[]> {
@@ -766,43 +621,36 @@ export default class DataService {
         feeds.id
     `;
 
-    return new Promise((resolve) => {
-      this.database.all(query, (error, rows) => {
-        if (error) {
-          pino.error(error);
-        }
-
-        resolve((rows as FeedReadStat[]) || []);
-      });
-    });
+    try {
+      const rows = this.database.prepare(query).all();
+      return (rows as FeedReadStat[]) || [];
+    } catch (error) {
+      pino.error(error);
+      return [];
+    }
   }
 
   public async removeFeedCategory(
     feedCategory: FeedCategory
   ): Promise<boolean> {
-    const query = `
-      BEGIN TRANSACTION;
-        UPDATE feeds
-        SET feedCategoryId = 0
-        WHERE feedCategoryId = ${feedCategory.id};
+    try {
+      this.database.transaction(() => {
+        this.database
+          .prepare("UPDATE feeds SET feedCategoryId = 0 WHERE feedCategoryId = ?")
+          .run(feedCategory.id);
+        this.database
+          .prepare("DELETE FROM feed_categories WHERE id = ?")
+          .run(feedCategory.id);
+      })();
 
-        DELETE FROM feed_categories
-        WHERE id = ${feedCategory.id};
-      COMMIT;
-    `;
-
-    return new Promise((resolve) => {
-      this.database.exec(query, (error) => {
-        if (error) {
-          pino.error(error);
-        }
-
-        pino.debug(`removed category ${feedCategory.title} and assigned items
+      pino.debug(`removed category ${feedCategory.title} and assigned items
         to default category`);
 
-        resolve(true);
-      });
-    });
+      return true;
+    } catch (error) {
+      pino.error(error);
+      return false;
+    }
   }
 
   public async getFeedCategoryReadStats(): Promise<FeedCategoryReadStat[]> {
@@ -827,15 +675,13 @@ export default class DataService {
         feed_categories.id
     `;
 
-    return new Promise((resolve) => {
-      this.database.all(query, (error, rows) => {
-        if (error) {
-          pino.error(error);
-        }
-
-        resolve((rows as FeedCategoryReadStat[]) || []);
-      });
-    });
+    try {
+      const rows = this.database.prepare(query).all();
+      return (rows as FeedCategoryReadStat[]) || [];
+    } catch (error) {
+      pino.error(error);
+      return [];
+    }
   }
 
   public async getItemCategoryReadStats(): Promise<ItemCategoryReadStat[]> {
@@ -856,15 +702,13 @@ export default class DataService {
         item_categories.id
     `;
 
-    return new Promise((resolve) => {
-      this.database.all(query, (error, rows) => {
-        if (error) {
-          pino.error(error);
-        }
-
-        resolve((rows as ItemCategoryReadStat[]) || []);
-      });
-    });
+    try {
+      const rows = this.database.prepare(query).all();
+      return (rows as ItemCategoryReadStat[]) || [];
+    } catch (error) {
+      pino.error(error);
+      return [];
+    }
   }
 
   public async getFeedCategoryById(
@@ -876,15 +720,13 @@ export default class DataService {
       WHERE id = ?
     `;
 
-    return new Promise((resolve) => {
-      this.database.get(query, feedCategoryId, (error, row) => {
-        if (error) {
-          pino.error(error);
-        }
-
-        resolve((row as FeedCategory) || undefined);
-      });
-    });
+    try {
+      const row = this.database.prepare(query).get(feedCategoryId);
+      return (row as FeedCategory) || undefined;
+    } catch (error) {
+      pino.error(error);
+      return undefined;
+    }
   }
 
   public async getFeedCategories(): Promise<FeedCategory[]> {
@@ -893,15 +735,13 @@ export default class DataService {
       FROM feed_categories
     `;
 
-    return new Promise((resolve) => {
-      this.database.all(query, (error, rows) => {
-        if (error) {
-          pino.error(error);
-        }
-
-        resolve((rows as FeedCategory[]) || []);
-      });
-    });
+    try {
+      const rows = this.database.prepare(query).all();
+      return (rows as FeedCategory[]) || [];
+    } catch (error) {
+      pino.error(error);
+      return [];
+    }
   }
 
   private async feedCategoryExists(feedCategory: FeedCategory) {
@@ -910,15 +750,12 @@ export default class DataService {
       WHERE title = ?
     `;
 
-    return new Promise((resolve) => {
-      this.database.get(query, feedCategory.title, (error, row) => {
-        if (error) {
-          pino.error(error);
-        }
-
-        resolve(row);
-      });
-    });
+    try {
+      return this.database.prepare(query).get(feedCategory.title);
+    } catch (error) {
+      pino.error(error);
+      return undefined;
+    }
   }
 
   public async insertFeedCategory(
@@ -931,25 +768,19 @@ export default class DataService {
 
     pino.debug(feedCategory);
 
-    const feedCategoryExists = await this.feedCategoryExists(feedCategory);
+    const exist = await this.feedCategoryExists(feedCategory);
 
-    if (feedCategoryExists) {
-      return Promise.resolve(false);
+    if (exist) {
+      return false;
     }
 
-    return new Promise((resolve) => {
-      this.database.run(
-        query,
-        [feedCategory.title, feedCategory.text],
-        (error) => {
-          if (error) {
-            pino.error(error);
-          }
-
-          resolve(true);
-        }
-      );
-    });
+    try {
+      this.database.prepare(query).run(feedCategory.title, feedCategory.text);
+      return true;
+    } catch (error) {
+      pino.error(error);
+      return false;
+    }
   }
 
   public async updateFeedCategory(
@@ -961,25 +792,21 @@ export default class DataService {
       WHERE id = ?;
     `;
 
-    const feedCategoryExists = await this.feedCategoryExists(feedCategory);
+    const exist = await this.feedCategoryExists(feedCategory);
 
-    if (feedCategoryExists) {
-      return Promise.resolve(false);
+    if (exist) {
+      return false;
     }
 
-    return new Promise((resolve) => {
-      this.database.run(
-        query,
-        [feedCategory.title, feedCategory.text, feedCategory.id],
-        (error) => {
-          if (error) {
-            pino.error(error);
-          }
-
-          resolve(true);
-        }
-      );
-    });
+    try {
+      this.database
+        .prepare(query)
+        .run(feedCategory.title, feedCategory.text, feedCategory.id);
+      return true;
+    } catch (error) {
+      pino.error(error);
+      return false;
+    }
   }
 
   public async importOpml(
@@ -1235,24 +1062,13 @@ export default class DataService {
       WHERE feedCategoryId = ?
     `;
 
-    return new Promise((resolve) => {
-      this.database.all(query, feedCategory.id, (error, rows: Feed[]) => {
-        if (error) {
-          pino.error(error);
-        }
-
-        let feedIds: number[] = [];
-
-        if (rows.length) {
-          // @ts-ignore
-          feedIds = rows.map((feed) => {
-            return feed.id;
-          });
-        }
-
-        resolve(feedIds);
-      });
-    });
+    try {
+      const rows = this.database.prepare(query).all(feedCategory.id) as Feed[];
+      return rows.map((feed) => feed.id as number);
+    } catch (error) {
+      pino.error(error);
+      return [];
+    }
   }
 
   // Item Categories Methods
@@ -1262,15 +1078,13 @@ export default class DataService {
       FROM item_categories
     `;
 
-    return new Promise((resolve) => {
-      this.database.all(query, (error, rows) => {
-        if (error) {
-          pino.error(error);
-        }
-
-        resolve((rows as Category[]) || []);
-      });
-    });
+    try {
+      const rows = this.database.prepare(query).all();
+      return (rows as Category[]) || [];
+    } catch (error) {
+      pino.error(error);
+      return [];
+    }
   }
 
   private async itemCategoryExists(itemCategory: Category) {
@@ -1279,15 +1093,12 @@ export default class DataService {
       WHERE title = ?
     `;
 
-    return new Promise((resolve) => {
-      this.database.get(query, itemCategory.title, (error, row) => {
-        if (error) {
-          pino.error(error);
-        }
-
-        resolve(row);
-      });
-    });
+    try {
+      return this.database.prepare(query).get(itemCategory.title);
+    } catch (error) {
+      pino.error(error);
+      return undefined;
+    }
   }
 
   public async insertItemCategory(itemCategory: Category): Promise<boolean> {
@@ -1298,25 +1109,19 @@ export default class DataService {
 
     pino.debug(itemCategory);
 
-    const itemCategoryExists = await this.itemCategoryExists(itemCategory);
+    const exist = await this.itemCategoryExists(itemCategory);
 
-    if (itemCategoryExists) {
-      return Promise.resolve(false);
+    if (exist) {
+      return false;
     }
 
-    return new Promise((resolve) => {
-      this.database.run(
-        query,
-        [itemCategory.title, itemCategory.text],
-        (error) => {
-          if (error) {
-            pino.error(error);
-          }
-
-          resolve(true);
-        }
-      );
-    });
+    try {
+      this.database.prepare(query).run(itemCategory.title, itemCategory.text);
+      return true;
+    } catch (error) {
+      pino.error(error);
+      return false;
+    }
   }
 
   public async updateItemCategory(itemCategory: Category): Promise<boolean> {
@@ -1328,20 +1133,15 @@ export default class DataService {
 
     pino.debug(itemCategory);
 
-    return new Promise((resolve) => {
-      this.database.run(
-        query,
-        [itemCategory.title, itemCategory.text, itemCategory.id],
-        (error) => {
-          if (error) {
-            pino.error(error);
-            resolve(false);
-          } else {
-            resolve(true);
-          }
-        }
-      );
-    });
+    try {
+      this.database
+        .prepare(query)
+        .run(itemCategory.title, itemCategory.text, itemCategory.id);
+      return true;
+    } catch (error) {
+      pino.error(error);
+      return false;
+    }
   }
 
   public async deleteItemCategory(itemCategoryId: number): Promise<boolean> {
@@ -1350,16 +1150,13 @@ export default class DataService {
       WHERE id = ?
     `;
 
-    return new Promise((resolve) => {
-      this.database.run(query, [itemCategoryId], (error) => {
-        if (error) {
-          pino.error(error);
-          resolve(false);
-        } else {
-          resolve(true);
-        }
-      });
-    });
+    try {
+      this.database.prepare(query).run(itemCategoryId);
+      return true;
+    } catch (error) {
+      pino.error(error);
+      return false;
+    }
   }
 
   public async getItemCategoryById(
@@ -1371,16 +1168,13 @@ export default class DataService {
       WHERE id = ?
     `;
 
-    return new Promise((resolve) => {
-      this.database.get(query, [itemCategoryId], (error, row) => {
-        if (error) {
-          pino.error(error);
-          resolve(null);
-        } else {
-          resolve((row as Category) || null);
-        }
-      });
-    });
+    try {
+      const row = this.database.prepare(query).get(itemCategoryId);
+      return (row as Category) || null;
+    } catch (error) {
+      pino.error(error);
+      return null;
+    }
   }
 
   public async exportOpml(): Promise<string> {
@@ -1492,37 +1286,31 @@ export default class DataService {
       }
     }
 
-    return new Promise((resolve) => {
-      this.database.run(query, (error: Error) => {
-        if (error) {
-          pino.error(error);
-        }
-
-        resolve(1);
-      });
-    });
+    try {
+      this.database.prepare(query).run();
+      return 1;
+    } catch (error) {
+      pino.error(error);
+      return 0;
+    }
   }
 
   public async markMultipleItemsRead(items: Item[]) {
-    let query = `
+    if (items.length === 0) return 0;
+    const itemIds = items.map((item) => item.id).join(", ");
+    const query = `
       UPDATE items
       SET read = 1
-      WHERE id IN (__IDS_PLACEHOLDER__)
+      WHERE id IN (${itemIds})
     `;
 
-    const itemIds = items.map((item) => item.id);
-
-    query = query.replace("__IDS_PLACEHOLDER__", itemIds.join(", "));
-
-    return new Promise((resolve) => {
-      this.database.run(query, (error: Error, id: number) => {
-        if (error) {
-          pino.error(error);
-        }
-
-        resolve(id);
-      });
-    });
+    try {
+      const result = this.database.prepare(query).run();
+      return result.changes;
+    } catch (error) {
+      pino.error(error);
+      return 0;
+    }
   }
 
   public async getItemById(itemId: number): Promise<Item | undefined> {
@@ -1549,44 +1337,39 @@ export default class DataService {
       WHERE items.id = ?
     `;
 
-    return new Promise((resolve) => {
-      this.database.get(
-        query,
-        itemId,
-        (error: Error, row: Item | undefined) => {
-          if (error) {
-            pino.error(error);
-          }
+    try {
+      const row = this.database.prepare(query).get(itemId) as Item | undefined;
 
-          if (row) {
-            // @ts-ignore
-            row.content = domPurify.sanitize(row.content, {
-              FORBID_TAGS: ["style"],
-              FORBID_ATTR: [
-                "style",
-                "width",
-                "height",
-                "class",
-                "id",
-                "bgcolor",
-              ],
-            });
+      if (row) {
+        // @ts-ignore
+        row.content = domPurify.sanitize(row.content, {
+          FORBID_TAGS: ["style"],
+          FORBID_ATTR: [
+            "style",
+            "width",
+            "height",
+            "class",
+            "id",
+            "bgcolor",
+          ],
+        });
 
-            row.content = row.content.replace(
-              /<a /gim,
-              '<a target="_blank" rel="noreferrer noopener" '
-            );
+        row.content = row.content!.replace(
+          /<a /gim,
+          '<a target="_blank" rel="noreferrer noopener" '
+        );
 
-            if (row.json_content) {
-              row.jsonContent = JSON.parse(row.json_content);
-              delete row.json_content;
-            }
-          }
-
-          resolve(row);
+        if ((row as any).json_content) {
+          row.jsonContent = JSON.parse((row as any).json_content);
+          delete (row as any).json_content;
         }
-      );
-    });
+      }
+
+      return row;
+    } catch (error) {
+      pino.error(error);
+      return undefined;
+    }
   }
 
   public async markItemRead(item: Item) {
@@ -1596,15 +1379,13 @@ export default class DataService {
       WHERE id = ?
     `;
 
-    return new Promise((resolve) => {
-      this.database.run(query, item.id, (error: Error) => {
-        if (error) {
-          pino.error(error);
-        }
-
-        resolve(item.id);
-      });
-    });
+    try {
+      this.database.prepare(query).run(item.id);
+      return item.id;
+    } catch (error) {
+      pino.error(error);
+      return undefined;
+    }
   }
 
   public async toggleItemBookmark(item: Item) {
@@ -1615,22 +1396,16 @@ export default class DataService {
       WHERE id = ?
     `;
 
-    return new Promise((resolve) => {
-      this.database.run(
-        query,
-        [currentBookmarkStatus, item.id],
-        (error: Error) => {
-          if (error) {
-            pino.error(error);
-          }
-
-          resolve({
-            id: item.id,
-            bookmarked: currentBookmarkStatus,
-          });
-        }
-      );
-    });
+    try {
+      this.database.prepare(query).run(currentBookmarkStatus, item.id);
+      return {
+        id: item.id,
+        bookmarked: currentBookmarkStatus,
+      };
+    } catch (error) {
+      pino.error(error);
+      return undefined;
+    }
   }
 
   public async assignItemToCategory(
@@ -1643,16 +1418,13 @@ export default class DataService {
       WHERE id = ?
     `;
 
-    return new Promise((resolve) => {
-      this.database.run(query, [itemCategoryId, itemId], (error: Error) => {
-        if (error) {
-          pino.error(error);
-          resolve(false);
-        } else {
-          resolve(true);
-        }
-      });
-    });
+    try {
+      this.database.prepare(query).run(itemCategoryId, itemId);
+      return true;
+    } catch (error) {
+      pino.error(error);
+      return false;
+    }
   }
 
   public async getItems(
@@ -1700,7 +1472,6 @@ export default class DataService {
     `;
 
     pino.debug({ params }, "Parameters for getItems");
-    console.log("Parameters for getItems", params);
 
     let whereQuery1 = `
       WHERE
@@ -1739,18 +1510,18 @@ export default class DataService {
     } else if (params.selectedFeedCategory) {
       const feedIds = await this.getFeedIds(params.selectedFeedCategory);
 
-      whereQuery1 = whereQuery1.replace(
-        "__CATEGORY_IDS_PLACEHOLDER__",
-        feedIds.join(", ")
-      );
+      if (feedIds.length > 0) {
+        whereQuery1 = whereQuery1.replace(
+          "__CATEGORY_IDS_PLACEHOLDER__",
+          feedIds.join(", ")
+        );
 
-      query = query.replace("__WHERE_PLACEHOLDER1__", whereQuery1);
+        query = query.replace("__WHERE_PLACEHOLDER1__", whereQuery1);
 
-      filteredById = true;
-
-      // todo fix cleanup
-      if (feedIds.length === 0) {
-        query = query.replace("__WHERE_PLACEHOLDER1__", "");
+        filteredById = true;
+      } else {
+        query = query.replace("__WHERE_PLACEHOLDER1__", "WHERE 1=0");
+        filteredById = true;
       }
     } else {
       query = query.replace("__WHERE_PLACEHOLDER1__", "");
@@ -1819,17 +1590,6 @@ export default class DataService {
     }
 
     pino.trace({ query }, "Final items query");
-    pino.debug(
-      {
-        query,
-        params: {
-          unreadOnly: params.unreadOnly,
-          bookmarkedOnly: params.bookmarkedOnly,
-          size: params.size,
-        },
-      },
-      "Executing getItems query"
-    );
 
     const queryParams: Array<string | number | undefined> = [];
 
@@ -1860,15 +1620,13 @@ export default class DataService {
 
     queryParams.push(params.size);
 
-    return new Promise((resolve) => {
-      this.database.all(query, queryParams, (error, rows) => {
-        if (error) {
-          pino.error(error);
-        }
-
-        resolve((rows as Item[]) || []);
-      });
-    });
+    try {
+      const rows = this.database.prepare(query).all(queryParams);
+      return (rows as Item[]) || [];
+    } catch (error) {
+      pino.error(error);
+      return [];
+    }
   }
 
   public async searchItems(
@@ -1885,7 +1643,7 @@ export default class DataService {
     const size = params.size ?? 100;
 
     if (!trimmedQuery) {
-      return Promise.resolve([]);
+      return [];
     }
 
     if (this.ftsReady) {
@@ -1916,21 +1674,15 @@ export default class DataService {
         LIMIT ?
       `;
 
-      return new Promise((resolve) => {
-        this.database.all(
-          ftsSearchQuery,
-          [ftsQuery || '""', size],
-          (error, rows) => {
-            if (error) {
-              pino.error(error);
-              resolve([]);
-              return;
-            }
-
-            resolve((rows as Item[]) || []);
-          }
-        );
-      });
+      try {
+        const rows = this.database
+          .prepare(ftsSearchQuery)
+          .all(ftsQuery || '""', size);
+        return (rows as Item[]) || [];
+      } catch (error) {
+        pino.error(error);
+        return [];
+      }
     }
 
     let whereClause = `
@@ -1983,31 +1735,26 @@ export default class DataService {
     `;
     queryParams.push(size);
 
-    return new Promise((resolve) => {
-      this.database.all(query, queryParams, (error, rows) => {
-        if (error) {
-          pino.error(error);
-        }
-
-        resolve((rows as Item[]) || []);
-      });
-    });
+    try {
+      const rows = this.database.prepare(query).all(queryParams);
+      return (rows as Item[]) || [];
+    } catch (error) {
+      pino.error(error);
+      return [];
+    }
   }
 
   public async removeItems(): Promise<boolean> {
     const query = "DELETE FROM items";
 
-    return new Promise((resolve) => {
-      this.database.run(query, (error) => {
-        if (error) {
-          pino.error(error);
-        }
-
-        resolve(true);
-      });
-
+    try {
+      this.database.prepare(query).run();
       pino.info("Removed all items");
-    });
+      return true;
+    } catch (error) {
+      pino.error(error);
+      return false;
+    }
   }
 
   private async itemExists(item: Item) {
@@ -2016,15 +1763,12 @@ export default class DataService {
       WHERE url = ?
     `;
 
-    return new Promise((resolve) => {
-      this.database.get(query, item.link, (error, row) => {
-        if (error) {
-          pino.error(error);
-        }
-
-        resolve(row);
-      });
-    });
+    try {
+      return this.database.prepare(query).get(item.link);
+    } catch (error) {
+      pino.error(error);
+      return undefined;
+    }
   }
 
   public static getItemPublishedTime(item: Item) {
@@ -2072,7 +1816,7 @@ export default class DataService {
         { itemUrl: item.link, feedId },
         "Item already exists, skipping insertion"
       );
-      return Promise.resolve();
+      return;
     }
 
     const query = `
@@ -2080,73 +1824,65 @@ export default class DataService {
       VALUES ( ?, ?, ?, ?, ?, ?, ?, ? )
     `;
 
-    return new Promise<void>((resolve) => {
-      let content = "";
+    let content = "";
 
-      if (item.content !== undefined) {
-        content = item.content;
-      }
+    if (item.content !== undefined) {
+      content = item.content;
+    }
 
-      if (item["content:encoded"] !== undefined) {
-        content = item["content:encoded"];
-      }
+    if (item["content:encoded"] !== undefined) {
+      content = item["content:encoded"];
+    }
 
-      // picture elements
-      content = content.replace(/ data\-srcset\=/gim, " srcset=");
-      content = content.replace(/ data\-sizes\=/gim, " sizes=");
-      // relative links not allowed
-      content = content.replace(/href="(\/|(?!http))[^"]+"/gim, "");
-      // relative src not allowed
-      content = content.replace(/src="(\/|(?!http))[^"]+"/gim, "");
-      // all links should openin new window
-      content = content.replace(
-        /<a /gim,
-        '<a target="_blank" rel="noreferrer noopener" '
+    // picture elements
+    content = content.replace(/ data\-srcset\=/gim, " srcset=");
+    content = content.replace(/ data\-sizes\=/gim, " sizes=");
+    // relative links not allowed
+    content = content.replace(/href="(\/|(?!http))[^"]+"/gim, "");
+    // relative src not allowed
+    content = content.replace(/src="(\/|(?!http))[^"]+"/gim, "");
+    // all links should openin new window
+    content = content.replace(
+      /<a /gim,
+      '<a target="_blank" rel="noreferrer noopener" '
+    );
+
+    if (item.description) {
+      content += item.description;
+    }
+
+    let jsonContent = "";
+    if (item.id && typeof item.id === "string" && item.id.includes("yt:video:")) {
+      const vidId = item.id.replace("yt:video:", "");
+      jsonContent = JSON.stringify({
+        "yt-id": vidId,
+      });
+    }
+
+    const publishedTime = DataService.getItemPublishedTime(item);
+
+    const createdTime = Date.now();
+
+    try {
+      this.database.prepare(query).run(
+        item.link,
+        DataService.cleanString(
+          domPurify.sanitize(item.title, { ALLOWED_TAGS: [] })
+        ),
+        domPurify.sanitize(content, {
+          FORBID_TAGS: ["style", "script", "svg"],
+          FORBID_ATTR: ["style", "width", "height", "class", "id"],
+        }),
+        feedId,
+        publishedTime,
+        item.comments,
+        createdTime,
+        jsonContent
       );
-
-      if (item.description) {
-        content += item.description;
-      }
-
-      let jsonContent = "";
-      if (item.id && item.id.includes("yt:video:")) {
-        const vidId = item.id.replace("yt:video:", "");
-        jsonContent = JSON.stringify({
-          "yt-id": vidId,
-        });
-      }
-
-      const publishedTime = DataService.getItemPublishedTime(item);
-
-      const createdTime = Date.now();
-
-      this.database.run(
-        query,
-        [
-          item.link,
-          DataService.cleanString(
-            domPurify.sanitize(item.title, { ALLOWED_TAGS: [] })
-          ),
-          domPurify.sanitize(content, {
-            FORBID_TAGS: ["style", "script", "svg"],
-            FORBID_ATTR: ["style", "width", "height", "class", "id"],
-          }),
-          feedId,
-          publishedTime,
-          item.comments,
-          createdTime,
-          jsonContent,
-        ],
-        (error) => {
-          if (error) {
-            pino.error(error);
-            pino.trace("ITEM URL: %s,\nFEED: %s", item.link, feedId);
-          }
-
-          resolve();
-        }
-      );
-    });
+    } catch (error) {
+      pino.error(error);
+      pino.trace("ITEM URL: %s,\nFEED: %s", item.link, feedId);
+    }
   }
 
   public async markFeedError(feed: Feed): Promise<boolean> {
@@ -2156,15 +1892,13 @@ export default class DataService {
       WHERE id = ?
     `;
 
-    return new Promise((resolve) => {
-      this.database.run(query, feed.id, (error) => {
-        if (error) {
-          pino.error(error);
-        }
-
-        resolve(true);
-      });
-    });
+    try {
+      this.database.prepare(query).run(feed.id);
+      return true;
+    } catch (error) {
+      pino.error(error);
+      return false;
+    }
   }
 
   public async getFeedsLastFirstItems(): Promise<Item[]> {
@@ -2179,15 +1913,13 @@ export default class DataService {
       ORDER BY items.published DESC
     `;
 
-    return new Promise((resolve) => {
-      this.database.all(query, (error, rows) => {
-        if (error) {
-          pino.error(error);
-        }
-
-        resolve((rows as Item[]) || []);
-      });
-    });
+    try {
+      const rows = this.database.prepare(query).all();
+      return (rows as Item[]) || [];
+    } catch (error) {
+      pino.error(error);
+      return [];
+    }
   }
 
   public async updateItemsWithCategories(
@@ -2200,36 +1932,31 @@ export default class DataService {
       categoryNameToIdMap.set(category.title, category.id ?? 0);
     });
 
-    // Process each group
-    for (const group of groups) {
-      const categoryId = categoryNameToIdMap.get(group.name) ?? 0;
+    try {
+      const updateStmt = this.database.prepare(`
+        UPDATE items
+        SET itemCategoryId = ?
+        WHERE id = ?
+      `);
 
-      // Update all items in this group with the category ID
-      for (const item of group.items) {
-        if (item.id === undefined || item.id === null) {
-          pino.debug({ item }, "Skipping item without ID in category update");
-          continue;
-        }
+      this.database.transaction(() => {
+        for (const group of groups) {
+          const categoryId = categoryNameToIdMap.get(group.name) ?? 0;
 
-        const query = `
-          UPDATE items
-          SET itemCategoryId = ?
-          WHERE id = ?
-        `;
-
-        await new Promise<void>((resolve) => {
-          this.database.run(query, [categoryId, item.id], (error) => {
-            if (error) {
-              pino.error(error, `Error updating item ${item.id} category`);
+          for (const item of group.items) {
+            if (item.id === undefined || item.id === null) {
+              pino.debug({ item }, "Skipping item without ID in category update");
+              continue;
             }
+            updateStmt.run(categoryId, item.id);
+          }
+        }
+      })();
 
-            resolve();
-          });
-        });
-      }
+      pino.debug("Items updated with categories from AI grouping");
+    } catch (error) {
+      pino.error(error, "Error updating items categories");
     }
-
-    pino.debug("Items updated with categories from AI grouping");
   }
 
   /**
@@ -2244,16 +1971,13 @@ export default class DataService {
       WHERE url = ? AND summary IS NOT NULL
     `;
 
-    return new Promise((resolve) => {
-      this.database.get(query, [url], (error, row: any) => {
-        if (error) {
-          pino.error({ error, url }, "Error retrieving item summary");
-          resolve(null);
-        } else {
-          resolve(row?.summary || null);
-        }
-      });
-    });
+    try {
+      const row = this.database.prepare(query).get(url) as any;
+      return row?.summary || null;
+    } catch (error) {
+      pino.error({ error, url }, "Error retrieving item summary");
+      return null;
+    }
   }
 
   /**
@@ -2268,16 +1992,13 @@ export default class DataService {
       WHERE url = ? AND latest_content IS NOT NULL
     `;
 
-    return new Promise((resolve) => {
-      this.database.get(query, [url], (error, row: any) => {
-        if (error) {
-          pino.error({ error, url }, "Error retrieving item latest content");
-          resolve(null);
-        } else {
-          resolve(row?.latest_content || null);
-        }
-      });
-    });
+    try {
+      const row = this.database.prepare(query).get(url) as any;
+      return row?.latest_content || null;
+    } catch (error) {
+      pino.error({ error, url }, "Error retrieving item latest content");
+      return null;
+    }
   }
 
   /**
@@ -2292,16 +2013,12 @@ export default class DataService {
       WHERE url = ?
     `;
 
-    return new Promise((resolve) => {
-      this.database.run(query, [summary, url], (error) => {
-        if (error) {
-          pino.error({ error, url }, "Error updating item summary");
-        } else {
-          pino.debug({ url }, "Item summary updated successfully");
-        }
-        resolve();
-      });
-    });
+    try {
+      this.database.prepare(query).run(summary, url);
+      pino.debug({ url }, "Item summary updated successfully");
+    } catch (error) {
+      pino.error({ error, url }, "Error updating item summary");
+    }
   }
 
   /**
@@ -2319,15 +2036,11 @@ export default class DataService {
       WHERE url = ?
     `;
 
-    return new Promise((resolve) => {
-      this.database.run(query, [content, url], (error) => {
-        if (error) {
-          pino.error({ error, url }, "Error updating item latest content");
-        } else {
-          pino.debug({ url }, "Item latest content updated successfully");
-        }
-        resolve();
-      });
-    });
+    try {
+      this.database.prepare(query).run(content, url);
+      pino.debug({ url }, "Item latest content updated successfully");
+    } catch (error) {
+      pino.error({ error, url }, "Error updating item latest content");
+    }
   }
 }
