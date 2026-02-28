@@ -65,28 +65,28 @@ jobs:
       - name: Run tests
         run: npm test
 
-      - name: Run build (mac-intel with retry)
-        if: matrix.platform == 'mac-intel'
+      - name: Run build (zip-only)
         shell: bash
         run: |
           set -euo pipefail
-          attempts=3
-          for attempt in $(seq 1 "$attempts"); do
-            echo "Build attempt ${attempt}/${attempts}"
-            if npm --prefix webapp run build && npm --prefix server run build && npm --prefix desktop run build -- --mac zip; then
-              exit 0
-            fi
-            if [ "$attempt" -lt "$attempts" ]; then
-              echo "Build failed, waiting before retry..."
-              sleep 5
-            fi
-          done
-          echo "Build failed after ${attempts} attempts"
-          exit 1
+          npm --prefix webapp run build
+          npm --prefix server run build
 
-      - name: Run build
-        if: matrix.platform != 'mac-intel'
-        run: npm run build
+          case "${{ matrix.platform }}" in
+            linux)
+              npm --prefix desktop run build -- --linux zip
+              ;;
+            mac-intel|mac-arm)
+              npm --prefix desktop run build -- --mac zip
+              ;;
+            windows)
+              npm --prefix desktop run build -- --win zip
+              ;;
+            *)
+              echo "Unsupported platform: ${{ matrix.platform }}"
+              exit 1
+              ;;
+          esac
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -95,13 +95,6 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
           path: |
-            desktop/release/**/*.AppImage
-            desktop/release/**/*.dmg
-            desktop/release/**/*.exe
-            desktop/release/**/*.msi
             desktop/release/**/*.zip
-            desktop/release/**/*.deb
-            desktop/release/**/*.rpm
-            desktop/release/**/*.snap
-            desktop/release/**/*.blockmap
+            desktop/release/**/*.zip.blockmap
             desktop/release/**/latest*.yml
