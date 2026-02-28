@@ -2,13 +2,12 @@ import { Server } from "net";
 import express, { Application, Request, Response } from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
+import MarkdownIt from "markdown-it";
 import pinoLib from "pino";
-import { marked } from "marked";
 import MixedDataModel from "./modules/MixedDataModel";
 import FeedUpdater from "./modules/FeedUpdater";
 import FeedFinder from "./modules/FeedFinder";
 import SettingsManager from "./modules/SettingsManager";
-import ItemCategorizer from "./modules/ItemCategorizer";
 import GoogleAiService from "./modules/GoogleAiService";
 import GoogleServiceUsageManager from "./modules/GoogleServiceUsageManager";
 import projectConfig from "forestconfig";
@@ -23,13 +22,17 @@ const dataModel = MixedDataModel.getInstance();
 
 const updater = new FeedUpdater();
 
-const itemCategorizer = new ItemCategorizer();
-
 const settingsManager = SettingsManager.getInstance();
 
 const aiService = GoogleAiService.getInstance();
 
 const serviceUsageManager = GoogleServiceUsageManager.getInstance();
+
+const markdownRenderer = new MarkdownIt();
+
+const renderMarkdownToHtml = (content: string) => {
+  return markdownRenderer.render(content);
+};
 
 const app: Application = express();
 
@@ -766,8 +769,8 @@ app.post("/api/summarize", jsonParser, async (req: Request, res: Response) => {
     }
 
     let responseContent = summary;
-    if (format === "html") {
-      responseContent = marked(summary) as string;
+    if (format === "html" && summary) {
+      responseContent = renderMarkdownToHtml(summary);
     }
 
     res.json({
@@ -821,8 +824,8 @@ app.post(
       }
 
       let content = markdown;
-      if (format === "html") {
-        content = marked(markdown) as string;
+      if (format === "html" && markdown) {
+        content = renderMarkdownToHtml(markdown);
       }
 
       res.json({
