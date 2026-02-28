@@ -73,7 +73,7 @@ jobs:
           attempts=3
           for attempt in $(seq 1 "$attempts"); do
             echo "Build attempt ${attempt}/${attempts}"
-            if npm run build; then
+            if npm --prefix webapp run build && npm --prefix server run build && npm --prefix desktop run build -- --mac zip; then
               exit 0
             fi
             if [ "$attempt" -lt "$attempts" ]; then
