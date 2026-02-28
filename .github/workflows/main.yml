@@ -65,7 +65,27 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Run build (mac-intel with retry)
+        if: matrix.platform == 'mac-intel'
+        shell: bash
+        run: |
+          set -euo pipefail
+          attempts=3
+          for attempt in $(seq 1 "$attempts"); do
+            echo "Build attempt ${attempt}/${attempts}"
+            if npm run build; then
+              exit 0
+            fi
+            if [ "$attempt" -lt "$attempts" ]; then
+              echo "Build failed, waiting before retry..."
+              sleep 5
+            fi
+          done
+          echo "Build failed after ${attempts} attempts"
+          exit 1
+
       - name: Run build
+        if: matrix.platform != 'mac-intel'
         run: npm run build
 
       - name: Upload build artifacts
