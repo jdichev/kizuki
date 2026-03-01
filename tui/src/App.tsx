@@ -4,10 +4,11 @@ import SelectInput from "ink-select-input";
 import DataService from "./api/DataService.js";
 import { Feed, FeedCategory, Item, ItemCategory } from "./types/index.js";
 import { decode } from "entities";
+import stringWidth from "string-width";
 
 const ds = DataService.getInstance();
 
-type View = "start" | "sidebar" | "items" | "reader" | "confirm-mark-read";
+type View = "start" | "sidebar" | "items" | "reader" | "confirm-mark-read" | "confirm-exit";
 type GroupingMode = "feed-categories" | "item-categories";
 
 export default function App() {
@@ -37,10 +38,29 @@ export default function App() {
     value: c.id?.toString() || ""
   }));
 
-  const articleItems = items.map((i: Item) => ({
-    label: `${i.read ? " " : "*"} ${i.title}`,
-    value: i.id?.toString() || ""
-  }));
+  const articleItems = items.map((i: Item) => {
+    const readMarker = i.read ? " " : "*";
+    const dateStr = new Date(
+      i.published > 10000000000 ? (i.published as number) : (i.published as number) * 1000
+    ).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+
+    const feedWidth = Math.floor(terminalWidth * 0.2);
+    const dateWidth = 10;
+    const titleWidth = terminalWidth - feedWidth - dateWidth - 12;
+
+    const title = visualTruncate(readMarker + " " + i.title, titleWidth);
+    const feed = visualTruncate(i.feedTitle || "", feedWidth);
+    const date = visualTruncate(dateStr, dateWidth);
+
+    return {
+      label: `${title} │ ${feed} │ ${date}`,
+      value: i.id?.toString() || "",
+    };
+  });
 
   // Update terminal dimensions on resize
   useEffect(() => {
@@ -148,7 +168,16 @@ export default function App() {
 
   // Keyboard navigation
   useInput((input: string, key: any) => {
-    if (key.escape) exit();
+    if (key.escape) {
+        setView("confirm-exit");
+        return;
+    }
+
+    if (view === "confirm-exit") {
+        if (input === "y" || key.return) exit();
+        if (input === "n" || input === "a" || key.leftArrow) setView("start");
+        return;
+    }
 
     if (input === "a" || key.leftArrow) {
       if (view === "reader") {
@@ -200,48 +229,64 @@ export default function App() {
     }
   });
 
-  const contentHeight = terminalHeight - 7;
+  const contentHeight = terminalHeight - 4;
 
   const renderBreadcrumbs = () => {
-    const parts = [<Text key="root" bold color="green">Kizuki</Text>];
+    const parts = [];
+    parts.push(
+      <Text key="root" bold color="white">
+        KIZUKI
+      </Text>
+    );
 
     if (view !== "start") {
-      const modeLabel = groupingMode === "feed-categories" ? "Feeds" : "AI Categories";
+      const modeLabel =
+        groupingMode === "feed-categories" ? "FEEDS" : "AI CATEGORIES";
       parts.push(<Text key="sep1"> › </Text>);
-      parts.push(<Text key="mode" color="cyan">{modeLabel}</Text>);
+      parts.push(
+        <Text key="mode" bold color="white">
+          {modeLabel}
+        </Text>
+      );
     }
 
-    if (selectedCategory && (view === "items" || view === "reader" || view === "confirm-mark-read")) {
+    if (
+      selectedCategory &&
+      (view === "items" || view === "reader" || view === "confirm-mark-read")
+    ) {
       parts.push(<Text key="sep2"> › </Text>);
-      parts.push(<Text key="cat" color="cyan">{(selectedCategory as any).title}</Text>);
+      parts.push(
+        <Text key="cat" bold color="white">
+          {(selectedCategory as any).title.toUpperCase()}
+        </Text>
+      );
     }
 
     if (selectedItem && view === "reader") {
       parts.push(<Text key="sep3"> › </Text>);
       parts.push(
-        <Text key="item" color="yellow" bold>
-          {selectedItem.title.substring(0, 30)}
+        <Text key="item" bold color="white">
+          {selectedItem.title.substring(0, 30).toUpperCase()}
           {selectedItem.title.length > 30 ? "..." : ""}
         </Text>
       );
     }
 
-    return (
-      <Box paddingX={1}>
-        {parts}
-      </Box>
-    );
+    return parts;
   };
 
   const renderReader = () => {
     if (!selectedItem) return null;
-    const lines = cleanContent(selectedItem.content || "").split("\n");
+    
+    const wrapWidth = Math.min(80, terminalWidth - 6);
+    const content = cleanContent(selectedItem.content || "");
+    const lines = wordWrap(content, wrapWidth);
     const visibleLines = lines.slice(scrollOffset, scrollOffset + contentHeight);
 
     return (
       <Box flexDirection="column" width="100%">
         <Text color="yellow" bold>{selectedItem.title}</Text>
-        <Box borderStyle="single" borderColor="gray" paddingX={1} marginTop={1} height={contentHeight} width="100%">
+        <Box borderStyle="single" borderColor="gray" paddingX={1} marginTop={1} height={contentHeight} width={wrapWidth + 4}>
             <Text>{visibleLines.join("\n")}</Text>
         </Box>
         <Text dimColor>
@@ -253,11 +298,16 @@ export default function App() {
 
   return (
     <Box flexDirection="column" height={terminalHeight} paddingX={1}>
-      <Box borderStyle="round" borderColor="green" paddingX={1} height={3} alignItems="center">
-        {renderBreadcrumbs()}
+      <Box height={1} width="100%">
+        <Text backgroundColor="green" color="white">
+          {" "}
+          {renderBreadcrumbs()}
+          {" ".repeat(terminalWidth)}
+        </Text>
       </Box>
 
-      <Box flexGrow={1} marginTop={0} minHeight={contentHeight - 2}>
+      <Box flexGrow={1} marginTop={1} minHeight={contentHeight - 2}>
+
         {loading ? (
           <Text>Loading...</Text>
         ) : (
@@ -330,15 +380,48 @@ export default function App() {
                     </Box>
                 </Box>
             )}
+
+            {view === "confirm-exit" && (
+                <Box flexDirection="column" borderStyle="double" borderColor="yellow" padding={1} alignItems="center">
+                    <Text bold color="yellow">Exit Kizuki?</Text>
+                    <Box marginTop={1}>
+                        <Text bold>[Y]es</Text>
+                        <Text> / [N]o</Text>
+                    </Box>
+                </Box>
+            )}
           </>
         )}
       </Box>
       
-      <Box borderStyle="single" borderColor="gray" height={3} paddingX={1} alignItems="center">
-        <Text dimColor>keys: WASD/Arrows: Navigate | Q: Mark Read | Esc: Exit</Text>
+      <Box height={1} width="100%">
+        <Text backgroundColor="blue" color="white">
+          <Text bold> keys: </Text>
+          {`WASD/Arrows: Navigate | Q: Mark Read | Esc: Exit `.padEnd(terminalWidth - 7)}
+        </Text>
       </Box>
     </Box>
   );
+}
+
+function visualTruncate(str: string, width: number): string {
+  const currentWidth = stringWidth(str);
+  if (currentWidth <= width) {
+    return str + " ".repeat(width - currentWidth);
+  }
+
+  let result = "";
+  let w = 0;
+  for (const char of str) {
+    const charWidth = stringWidth(char);
+    if (w + charWidth > width - 1) {
+      // Leave space for ellipsis or just cut
+      break;
+    }
+    result += char;
+    w += charWidth;
+  }
+  return result + " ".repeat(width - w);
 }
 
 function cleanContent(html: string | undefined): string {
@@ -348,4 +431,30 @@ function cleanContent(html: string | undefined): string {
     .map((line: string) => line.trim())
     .filter((line: string) => line.length > 0)
     .join("\n\n");
+}
+
+function wordWrap(text: string, width: number): string[] {
+  const lines: string[] = [];
+  const paragraphs = text.split("\n");
+
+  for (const paragraph of paragraphs) {
+    if (paragraph.trim().length === 0) {
+      lines.push("");
+      continue;
+    }
+
+    let currentLine = "";
+    const words = paragraph.split(" ");
+
+    for (const word of words) {
+      if ((currentLine + word).length > width) {
+        if (currentLine.length > 0) lines.push(currentLine.trim());
+        currentLine = word + " ";
+      } else {
+        currentLine += word + " ";
+      }
+    }
+    if (currentLine.length > 0) lines.push(currentLine.trim());
+  }
+  return lines;
 }
