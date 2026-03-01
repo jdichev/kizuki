@@ -14,6 +14,7 @@ export default function App() {
   const { exit } = useApp();
   const { stdout } = useStdout();
   const [terminalHeight, setTerminalHeight] = useState(stdout.rows || 24);
+  const [terminalWidth, setTerminalWidth] = useState(stdout.columns || 80);
   const [view, setView] = useState<View>("start");
   const [groupingMode, setGroupingMode] = useState<GroupingMode>("feed-categories");
   const [categories, setCategories] = useState<(FeedCategory | ItemCategory)[]>([]);
@@ -41,9 +42,12 @@ export default function App() {
     value: i.id?.toString() || ""
   }));
 
-  // Update terminal height on resize
+  // Update terminal dimensions on resize
   useEffect(() => {
-    const onResize = () => setTerminalHeight(stdout.rows);
+    const onResize = () => {
+      setTerminalHeight(stdout.rows);
+      setTerminalWidth(stdout.columns);
+    };
     stdout.on("resize", onResize);
     return () => {
       stdout.off("resize", onResize);
@@ -191,10 +195,10 @@ export default function App() {
     }
   });
 
-  const contentHeight = terminalHeight - 8;
+  const contentHeight = terminalHeight - 7;
 
   const renderBreadcrumbs = () => {
-    const parts = [<Text key="root">Forest</Text>];
+    const parts = [<Text key="root" bold color="green">Kizuki</Text>];
 
     if (view !== "start") {
       const modeLabel = groupingMode === "feed-categories" ? "Feeds" : "AI Categories";
@@ -218,7 +222,7 @@ export default function App() {
     }
 
     return (
-      <Box paddingX={1} marginBottom={1}>
+      <Box paddingX={1}>
         {parts}
       </Box>
     );
@@ -236,7 +240,7 @@ export default function App() {
             <Text>{visibleLines.join("\n")}</Text>
         </Box>
         <Text dimColor>
-            Line {scrollOffset + 1} to {Math.min(scrollOffset + contentHeight, lines.length)} of {lines.length} (Arrows to scroll)
+            Line {scrollOffset + 1} to {Math.min(scrollOffset + contentHeight, lines.length)} of {lines.length} (WASD to scroll)
         </Text>
       </Box>
     );
@@ -244,14 +248,9 @@ export default function App() {
 
   return (
     <Box flexDirection="column" height={terminalHeight} paddingX={1}>
-      <Box borderStyle="round" borderColor="green" paddingX={1} height={3}>
-        <Text bold color="green">Forest TUI</Text>
-        <Box marginLeft={2}>
-            <Text dimColor> | {view.toUpperCase()} | 'esc' to exit</Text>
-        </Box>
+      <Box borderStyle="round" borderColor="green" paddingX={1} height={3} alignItems="center">
+        {renderBreadcrumbs()}
       </Box>
-
-      {renderBreadcrumbs()}
 
       <Box flexGrow={1} marginTop={0} minHeight={contentHeight - 2}>
         {loading ? (
@@ -330,8 +329,8 @@ export default function App() {
         )}
       </Box>
       
-      <Box borderStyle="single" borderColor="gray" height={3} paddingX={1}>
-        <Text dimColor>A/Left: Back | D/Right: Select | Q: Mark Read | Esc: Exit</Text>
+      <Box borderStyle="single" borderColor="gray" height={3} paddingX={1} alignItems="center">
+        <Text dimColor>keys: WASD/Arrows: Navigate | Q: Mark Read | Esc: Exit</Text>
       </Box>
     </Box>
   );
