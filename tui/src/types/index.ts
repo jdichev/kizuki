@@ -51,6 +51,7 @@ export interface Item {
   title: string;
   read: 0 | 1 | number;
   bookmarked?: 0 | 1 | number;
+  latestContentWordCount?: number;
   published: number;
   created?: number;
   feedTitle?: string;

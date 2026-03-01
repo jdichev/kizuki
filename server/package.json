@@ -6,7 +6,8 @@
     "upd": "ncu -u --target patch",
     "start": "nodemon src/scripts/dev-starter.ts | pino-pretty",
     "build": "tsc -p .",
-    "test": "jest"
+    "test": "jest",
+    "backfill:latest-content": "ts-node src/scripts/backfill-latest-content.ts"
   },
   "license": "SEE LICENSE IN ../LICENSE",
   "jest": {

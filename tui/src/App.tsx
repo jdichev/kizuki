@@ -8,7 +8,13 @@ import stringWidth from "string-width";
 
 const ds = DataService.getInstance();
 
-type View = "start" | "sidebar" | "items" | "reader" | "confirm-mark-read" | "confirm-exit";
+type View =
+  | "start"
+  | "sidebar"
+  | "items"
+  | "reader"
+  | "confirm-mark-read"
+  | "confirm-exit";
 type GroupingMode = "feed-categories" | "item-categories";
 
 export default function App() {
@@ -17,47 +23,55 @@ export default function App() {
   const [terminalHeight, setTerminalHeight] = useState(stdout.rows || 24);
   const [terminalWidth, setTerminalWidth] = useState(stdout.columns || 80);
   const [view, setView] = useState<View>("start");
-  const [groupingMode, setGroupingMode] = useState<GroupingMode>("feed-categories");
-  const [categories, setCategories] = useState<(FeedCategory | ItemCategory)[]>([]);
+  const [groupingMode, setGroupingMode] =
+    useState<GroupingMode>("feed-categories");
+  const [categories, setCategories] = useState<(FeedCategory | ItemCategory)[]>(
+    []
+  );
   const [items, setItems] = useState<Item[]>([]);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<FeedCategory | ItemCategory | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<
+    FeedCategory | ItemCategory | null
+  >(null);
   const [modeIndex, setModeIndex] = useState(0);
-  const [sidebarIndex, setSidebarIndex] = useState(0);
-  const [itemIndex, setItemIndex] = useState(0);
+  const [sidebarIndices, setSidebarIndices] = useState<Record<string, number>>(
+    {}
+  );
+  const [itemIndices, setItemIndices] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
   const [scrollOffset, setScrollOffset] = useState(0);
 
   const modeItems = [
     { label: "Feed Categories", value: "feed-categories" },
-    { label: "Item Categories (AI)", value: "item-categories" }
+    { label: "Item Categories (AI)", value: "item-categories" },
   ];
 
   const sidebarItems = categories.map((c: any) => ({
     label: c.title,
-    value: c.id?.toString() || ""
+    value: c.id?.toString() || "",
   }));
 
   const articleItems = items.map((i: Item) => {
-    const readMarker = i.read ? " " : "*";
     const dateStr = new Date(
-      i.published > 10000000000 ? (i.published as number) : (i.published as number) * 1000
+      i.published > 10000000000
+        ? (i.published as number)
+        : (i.published as number) * 1000
     ).toLocaleDateString("en-GB", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
     });
 
-    const feedWidth = Math.floor(terminalWidth * 0.2);
-    const dateWidth = 10;
-    const titleWidth = terminalWidth - feedWidth - dateWidth - 12;
-
-    const title = visualTruncate(readMarker + " " + i.title, titleWidth);
-    const feed = visualTruncate(i.feedTitle || "", feedWidth);
-    const date = visualTruncate(dateStr, dateWidth);
+    const labelData = JSON.stringify({
+      title: decode(i.title),
+      feed: i.feedTitle || "",
+      date: dateStr,
+      read: i.read === 1,
+      words: i.latestContentWordCount || 0,
+    });
 
     return {
-      label: `${title} │ ${feed} │ ${date}`,
+      label: labelData,
       value: i.id?.toString() || "",
     };
   });
@@ -99,23 +113,23 @@ export default function App() {
     setSelectedCategory(category);
     setLoading(true);
     try {
-        const params: any = {
-            size: 100,
-            unreadOnly: false,
-            bookmarkedOnly: false,
-        };
-        
-        if (groupingMode === "feed-categories") {
-            params.selectedFeedCategory = category;
-        } else {
-            params.selectedItemCategoryIds = category ? [category.id] : undefined;
-        }
+      const params: any = {
+        size: 100,
+        unreadOnly: false,
+        bookmarkedOnly: false,
+      };
 
-        const categoryItems = await ds.getItems(params);
-        setItems(categoryItems);
+      if (groupingMode === "feed-categories") {
+        params.selectedFeedCategory = category;
+      } else {
+        params.selectedItemCategoryIds = category ? [category.id] : undefined;
+      }
+
+      const categoryItems = await ds.getItems(params);
+      setItems(categoryItems);
     } finally {
-        setLoading(false);
-        setView("items");
+      setLoading(false);
+      setView("items");
     }
   };
 
@@ -128,9 +142,7 @@ export default function App() {
         setSelectedItem(fullItem);
         setView("reader");
         setScrollOffset(0);
-        // Mark as read in background
         ds.markItemRead(fullItem);
-        // Update local state so it's reflected when going back
         setItems((prevItems) =>
           prevItems.map((i) => (i.id === itemId ? { ...i, read: 1 } : i))
         );
@@ -141,206 +153,249 @@ export default function App() {
   };
 
   const handleMarkAllRead = async () => {
-      if (!selectedCategory) return;
-      setLoading(true);
-      try {
-          const params: any = {};
-          if (groupingMode === "feed-categories") {
-              params.feedCategory = selectedCategory;
-          } else {
-              params.itemCategories = [selectedCategory];
-          }
-          await ds.markItemsRead(params);
-          // Refresh list
-          const refreshedItems = await ds.getItems({
-              size: 100,
-              unreadOnly: false,
-              bookmarkedOnly: false,
-              selectedFeedCategory: groupingMode === "feed-categories" ? selectedCategory as FeedCategory : undefined,
-              selectedItemCategoryIds: groupingMode === "item-categories" ? [selectedCategory.id!] : undefined
-          });
-          setItems(refreshedItems);
-      } finally {
-          setLoading(false);
-          setView("items");
+    if (!selectedCategory) return;
+    setLoading(true);
+    try {
+      const params: any = {};
+      if (groupingMode === "feed-categories") {
+        params.feedCategory = selectedCategory;
+      } else {
+        params.itemCategories = [selectedCategory];
       }
+      await ds.markItemsRead(params);
+      const refreshedItems = await ds.getItems({
+        size: 100,
+        unreadOnly: false,
+        bookmarkedOnly: false,
+        selectedFeedCategory:
+          groupingMode === "feed-categories"
+            ? (selectedCategory as FeedCategory)
+            : undefined,
+        selectedItemCategoryIds:
+          groupingMode === "item-categories"
+            ? [selectedCategory.id!]
+            : undefined,
+      });
+      setItems(refreshedItems);
+    } finally {
+      setLoading(false);
+      setView("items");
+    }
   };
 
   // Keyboard navigation
   useInput((input: string, key: any) => {
     if (key.escape) {
-        setView("confirm-exit");
-        return;
+      setView("confirm-exit");
+      return;
     }
 
     if (view === "confirm-exit") {
-        if (input === "y" || key.return) exit();
-        if (input === "n" || input === "a" || key.leftArrow) setView("start");
-        return;
+      if (input === "y" || key.return) exit();
+      if (input === "n" || input === "a" || key.leftArrow) setView("start");
+      return;
     }
 
+    // WASD Support: Map W to Up, S to Down, A to Back, D to Select
     if (input === "a" || key.leftArrow) {
       if (view === "reader") {
-          setView("items");
-          setScrollOffset(0);
-      }
-      else if (view === "items") setView("sidebar");
+        setView("items");
+        setScrollOffset(0);
+      } else if (view === "items") setView("sidebar");
       else if (view === "sidebar") setView("start");
       else if (view === "confirm-mark-read") setView("items");
     }
 
     if (input === "d" || key.rightArrow) {
-        if (view === "start") handleSelectMode(modeItems[modeIndex]);
-        else if (view === "sidebar") handleSelectCategory(sidebarItems[sidebarIndex]);
-        else if (view === "items") handleSelectItem(articleItems[itemIndex]);
+      if (view === "start") handleSelectMode(modeItems[modeIndex]);
+      else if (view === "sidebar" && sidebarItems.length > 0)
+        handleSelectCategory(sidebarItems[sidebarIndices[groupingMode] || 0]);
+      else if (view === "items" && articleItems.length > 0) {
+        const catKey = selectedCategory?.id?.toString() || "all";
+        handleSelectItem(articleItems[itemIndices[catKey] || 0]);
+      }
     }
 
-    if (input === "w" || key.upArrow) {
-      if (view === "reader") {
+    // Manual Scroll for Reader (WASD)
+    if (view === "reader") {
+      if (input === "w" || key.upArrow)
         setScrollOffset(Math.max(0, scrollOffset - 1));
-      } else if (view === "start") {
-        setModeIndex((prev) => Math.max(0, prev - 1));
-      } else if (view === "sidebar") {
-        setSidebarIndex((prev) => Math.max(0, prev - 1));
-      } else if (view === "items") {
-        setItemIndex((prev) => Math.max(0, prev - 1));
-      }
-    }
-
-    if (input === "s" || key.downArrow) {
-      if (view === "reader") {
-        setScrollOffset((prev) => prev + 1);
-      } else if (view === "start") {
-        setModeIndex((prev) => Math.min(modeItems.length - 1, prev + 1));
-      } else if (view === "sidebar") {
-        setSidebarIndex((prev) => Math.min(sidebarItems.length - 1, prev + 1));
-      } else if (view === "items") {
-        setItemIndex((prev) => Math.min(articleItems.length - 1, prev + 1));
-      }
+      if (input === "s" || key.downArrow) setScrollOffset(scrollOffset + 1);
     }
 
     if (view === "items" && input === "q") {
-        setView("confirm-mark-read");
+      setView("confirm-mark-read");
     }
 
     if (view === "confirm-mark-read") {
-        if (input === "y") handleMarkAllRead();
-        if (input === "n") setView("items");
+      if (input === "y") handleMarkAllRead();
+      if (input === "n") setView("items");
     }
   });
 
   const contentHeight = terminalHeight - 4;
+  const dialogWidth = Math.max(40, Math.floor(terminalWidth * 0.5));
+  const dialogHeight = Math.max(8, Math.floor(contentHeight * 0.5));
 
   const renderBreadcrumbs = () => {
-    const parts = [];
-    parts.push(
-      <Text key="root" bold color="white">
-        KIZUKI
-      </Text>
-    );
+    const parts: string[] = ["KIZUKI"];
 
     if (view !== "start") {
       const modeLabel =
         groupingMode === "feed-categories" ? "FEEDS" : "AI CATEGORIES";
-      parts.push(<Text key="sep1"> › </Text>);
-      parts.push(
-        <Text key="mode" bold color="white">
-          {modeLabel}
-        </Text>
-      );
+      parts.push(modeLabel);
     }
 
     if (
       selectedCategory &&
       (view === "items" || view === "reader" || view === "confirm-mark-read")
     ) {
-      parts.push(<Text key="sep2"> › </Text>);
-      parts.push(
-        <Text key="cat" bold color="white">
-          {(selectedCategory as any).title.toUpperCase()}
-        </Text>
-      );
+      parts.push((selectedCategory as any).title.toUpperCase());
     }
 
     if (selectedItem && view === "reader") {
-      parts.push(<Text key="sep3"> › </Text>);
       parts.push(
-        <Text key="item" bold color="white">
-          {selectedItem.title.substring(0, 30).toUpperCase()}
-          {selectedItem.title.length > 30 ? "..." : ""}
-        </Text>
+        `${selectedItem.title.substring(0, 30).toUpperCase()}${selectedItem.title.length > 30 ? "..." : ""}`
       );
     }
 
-    return parts;
+    return parts.join(" › ");
   };
 
   const renderReader = () => {
     if (!selectedItem) return null;
-    
+
     const wrapWidth = Math.min(80, terminalWidth - 6);
     const content = cleanContent(selectedItem.content || "");
     const lines = wordWrap(content, wrapWidth);
-    const visibleLines = lines.slice(scrollOffset, scrollOffset + contentHeight);
+    const visibleLines = lines.slice(
+      scrollOffset,
+      scrollOffset + contentHeight
+    );
 
     return (
       <Box flexDirection="column" width="100%">
-        <Text color="yellow" bold>{selectedItem.title}</Text>
-        <Box borderStyle="single" borderColor="gray" paddingX={1} marginTop={1} height={contentHeight} width={wrapWidth + 4}>
-            <Text>{visibleLines.join("\n")}</Text>
+        <Text color="yellow" bold>
+          {selectedItem.title}
+        </Text>
+        <Box
+          borderStyle="single"
+          borderColor="gray"
+          paddingX={1}
+          marginTop={1}
+          height={contentHeight}
+          width={wrapWidth + 4}
+        >
+          <Text>{visibleLines.join("\n")}</Text>
         </Box>
         <Text dimColor>
-            Line {scrollOffset + 1} to {Math.min(scrollOffset + contentHeight, lines.length)} of {lines.length} (WASD to scroll)
+          Line {scrollOffset + 1} to{" "}
+          {Math.min(scrollOffset + contentHeight, lines.length)} of{" "}
+          {lines.length} (WASD to scroll)
         </Text>
       </Box>
     );
+  };
+
+  const renderSectionHeader = (title: string) => (
+    <Box flexDirection="column">
+      <Text color="cyan" bold>
+        {title}
+      </Text>
+      <Text color="cyan">{"─".repeat(Math.max(1, terminalWidth - 2))}</Text>
+    </Box>
+  );
+
+  const TableItem = ({
+    label,
+    isSelected,
+  }: {
+    label: string;
+    isSelected?: boolean;
+  }) => {
+    try {
+      const data = JSON.parse(label);
+      const readMarker = data.read ? " " : "*";
+
+      const feedWidth = Math.floor(terminalWidth * 0.2);
+      const dateWidth = 12;
+      const wordsWidth = 8;
+      const titleWidth =
+        terminalWidth - feedWidth - dateWidth - wordsWidth - 11;
+
+      const bgColor = isSelected ? "white" : undefined;
+      const fgColor = isSelected ? "black" : undefined;
+
+      const rowText = `${readMarker} ${visualTruncate(data.title, titleWidth - 2)} │ ${visualTruncate(data.feed, feedWidth - 2)} │ ${visualTruncate(`${data.words}w`, wordsWidth - 1)} │ ${data.date}`;
+
+      return (
+        <Box flexDirection="row" width={terminalWidth - 4}>
+          <Text backgroundColor={bgColor} color={fgColor}>
+            {rowText.padEnd(terminalWidth - 4)}
+          </Text>
+        </Box>
+      );
+    } catch {
+      return <Text>{label}</Text>;
+    }
   };
 
   return (
     <Box flexDirection="column" height={terminalHeight} paddingX={1}>
       <Box height={1} width="100%">
         <Text backgroundColor="green" color="white">
-          {" "}
-          {renderBreadcrumbs()}
-          {" ".repeat(terminalWidth)}
+          {visualTruncate(
+            ` ${renderBreadcrumbs()}`,
+            Math.max(1, terminalWidth - 2)
+          )}
         </Text>
       </Box>
 
       <Box flexGrow={1} marginTop={1} minHeight={contentHeight - 2}>
-
         {loading ? (
           <Text>Loading...</Text>
         ) : (
           <>
             {view === "start" && (
               <Box flexDirection="column">
-                <Text color="cyan" bold underline>Choose Browsing Mode</Text>
-                <SelectInput 
-                    isFocused={false}
-                    key={`mode-${modeIndex}`}
-                    items={modeItems} 
-                    onSelect={handleSelectMode} 
-                    initialIndex={modeIndex}
-                    onHighlight={(item) => {
-                        const idx = modeItems.findIndex(i => i.value === item.value);
-                        if (idx !== -1) setModeIndex(idx);
-                    }}
+                {renderSectionHeader("Choose Browsing Mode")}
+                <SelectInput
+                  isFocused={true}
+                  items={modeItems}
+                  onSelect={handleSelectMode}
+                  initialIndex={modeIndex}
+                  onHighlight={(item) => {
+                    const idx = modeItems.findIndex(
+                      (i) => i.value === item.value
+                    );
+                    if (idx !== -1) setModeIndex(idx);
+                  }}
                 />
               </Box>
             )}
 
             {view === "sidebar" && (
               <Box flexDirection="column">
-                <Text color="cyan" bold underline>{groupingMode === "feed-categories" ? "Feed Categories" : "Item Categories"}</Text>
-                <SelectInput 
-                  isFocused={false}
-                  key={`sidebar-${sidebarIndex}`}
-                  items={sidebarItems} 
-                  onSelect={handleSelectCategory} 
-                  initialIndex={sidebarIndex}
+                {renderSectionHeader(
+                  groupingMode === "feed-categories"
+                    ? "Feed Categories"
+                    : "Item Categories"
+                )}
+                <SelectInput
+                  isFocused={true}
+                  items={sidebarItems}
+                  onSelect={handleSelectCategory}
+                  initialIndex={sidebarIndices[groupingMode] || 0}
                   onHighlight={(item) => {
-                    const idx = sidebarItems.findIndex(i => i.value === item.value);
-                    if (idx !== -1) setSidebarIndex(idx);
+                    const idx = sidebarItems.findIndex(
+                      (i) => i.value === item.value
+                    );
+                    if (idx !== -1) {
+                      setSidebarIndices((prev) => ({
+                        ...prev,
+                        [groupingMode]: idx,
+                      }));
+                    }
                   }}
                 />
               </Box>
@@ -348,22 +403,31 @@ export default function App() {
 
             {view === "items" && (
               <Box flexDirection="column">
-                <Text color="cyan" bold underline>
-                  Articles: {selectedCategory?.title || "All"}
-                </Text>
+                {renderSectionHeader(
+                  `Articles: ${selectedCategory?.title || "All"}`
+                )}
                 {items.length === 0 ? (
                   <Text>No items found.</Text>
                 ) : (
-                  <SelectInput 
-                    isFocused={false}
-                    key={`items-${itemIndex}`}
-                    items={articleItems} 
-                    onSelect={handleSelectItem} 
+                  <SelectInput
+                    isFocused={true}
+                    items={articleItems}
+                    onSelect={handleSelectItem}
                     limit={contentHeight - 2}
-                    initialIndex={itemIndex}
+                    initialIndex={
+                      itemIndices[selectedCategory?.id?.toString() || "all"] ||
+                      0
+                    }
+                    itemComponent={TableItem}
                     onHighlight={(item) => {
-                      const idx = articleItems.findIndex(i => i.value === item.value);
-                      if (idx !== -1) setItemIndex(idx);
+                      const idx = articleItems.findIndex(
+                        (i) => i.value === item.value
+                      );
+                      if (idx !== -1) {
+                        const catKey =
+                          selectedCategory?.id?.toString() || "all";
+                        setItemIndices((prev) => ({ ...prev, [catKey]: idx }));
+                      }
                     }}
                   />
                 )}
@@ -373,31 +437,69 @@ export default function App() {
             {view === "reader" && renderReader()}
 
             {view === "confirm-mark-read" && (
-                <Box flexDirection="column" borderStyle="double" borderColor="red" padding={1} alignItems="center">
-                    <Text bold color="red">Mark all articles in "{selectedCategory?.title}" as read?</Text>
-                    <Box marginTop={1}>
-                        <Text>[Y]es / [N]o</Text>
-                    </Box>
+              <Box
+                flexGrow={1}
+                width="100%"
+                justifyContent="center"
+                alignItems="center"
+              >
+                <Box
+                  flexDirection="column"
+                  borderStyle="double"
+                  borderColor="red"
+                  padding={1}
+                  alignItems="center"
+                  justifyContent="center"
+                  width={dialogWidth}
+                  minHeight={dialogHeight}
+                >
+                  <Text bold color="red">
+                    Mark all articles in "{selectedCategory?.title}" as read?
+                  </Text>
+                  <Box marginTop={1}>
+                    <Text>[Y]es / [N]o</Text>
+                  </Box>
                 </Box>
+              </Box>
             )}
 
             {view === "confirm-exit" && (
-                <Box flexDirection="column" borderStyle="double" borderColor="yellow" padding={1} alignItems="center">
-                    <Text bold color="yellow">Exit Kizuki?</Text>
-                    <Box marginTop={1}>
-                        <Text bold>[Y]es</Text>
-                        <Text> / [N]o</Text>
-                    </Box>
+              <Box
+                flexGrow={1}
+                width="100%"
+                justifyContent="center"
+                alignItems="center"
+              >
+                <Box
+                  flexDirection="column"
+                  borderStyle="double"
+                  borderColor="yellow"
+                  padding={1}
+                  alignItems="center"
+                  justifyContent="center"
+                  width={dialogWidth}
+                  minHeight={dialogHeight}
+                >
+                  <Text bold color="yellow">
+                    Exit Kizuki?
+                  </Text>
+                  <Box marginTop={1}>
+                    <Text bold>[Y]es</Text>
+                    <Text> / [N]o</Text>
+                  </Box>
                 </Box>
+              </Box>
             )}
           </>
         )}
       </Box>
-      
+
       <Box height={1} width="100%">
         <Text backgroundColor="blue" color="white">
           <Text bold> keys: </Text>
-          {`WASD/Arrows: Navigate | Q: Mark Read | Esc: Exit `.padEnd(terminalWidth - 7)}
+          {`WASD/Arrows: Navigate | Q: Mark Read | Esc: Exit `.padEnd(
+            terminalWidth - 7
+          )}
         </Text>
       </Box>
     </Box>
@@ -410,18 +512,22 @@ function visualTruncate(str: string, width: number): string {
     return str + " ".repeat(width - currentWidth);
   }
 
+  const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+  const segments = segmenter.segment(str.replace(/\s+/g, " ").trim());
+
   let result = "";
   let w = 0;
-  for (const char of str) {
-    const charWidth = stringWidth(char);
-    if (w + charWidth > width - 1) {
-      // Leave space for ellipsis or just cut
+
+  for (const { segment } of segments) {
+    const charWidth = stringWidth(segment);
+    if (w + charWidth > width) {
       break;
     }
-    result += char;
+    result += segment;
     w += charWidth;
   }
-  return result + " ".repeat(width - w);
+
+  return result + " ".repeat(Math.max(0, width - w));
 }
 
 function cleanContent(html: string | undefined): string {

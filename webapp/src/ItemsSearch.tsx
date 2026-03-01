@@ -69,6 +69,7 @@ export default function ItemsSearch() {
             <tr>
               <th>Title</th>
               <th>Feed</th>
+              <th>Words</th>
               <th>Date</th>
               <th>Link</th>
             </tr>
@@ -78,6 +79,7 @@ export default function ItemsSearch() {
               <tr key={item.id}>
                 <td>{item.title}</td>
                 <td>{item.feedTitle || "-"}</td>
+                <td>{item.latestContentWordCount || 0}</td>
                 <td>
                   {item.published
                     ? new Date(item.published).toLocaleString()

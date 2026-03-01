@@ -19,6 +19,33 @@ export default class DataService {
     return `${this.baseUrl}${path}`;
   }
 
+  private normalizeItem(item: Item | Record<string, unknown>): Item {
+    const source = item as Item & {
+      latest_content_word_count?: number | string | null;
+    };
+
+    const normalizedWordCount =
+      source.latestContentWordCount ?? source.latest_content_word_count;
+
+    return {
+      ...source,
+      latestContentWordCount:
+        normalizedWordCount === null || normalizedWordCount === undefined
+          ? 0
+          : Number(normalizedWordCount) || 0,
+    };
+  }
+
+  private normalizeItems(items: unknown): Item[] {
+    if (!Array.isArray(items)) {
+      return [];
+    }
+
+    return items.map((item) =>
+      this.normalizeItem(item as Record<string, unknown>)
+    );
+  }
+
   public static getInstance(): DataService {
     if (this.instance === undefined) {
       this.instance = new DataService();
@@ -182,7 +209,7 @@ export default class DataService {
 
     if (response) {
       const items = await response.json();
-      return Promise.resolve(items);
+      return Promise.resolve(this.normalizeItems(items));
     }
 
     return Promise.resolve([]);
@@ -207,7 +234,7 @@ export default class DataService {
     }
 
     const items = await response.json();
-    return Promise.resolve(Array.isArray(items) ? items : []);
+    return Promise.resolve(this.normalizeItems(items));
   }
 
   public async getItemDeferred(
@@ -236,7 +263,11 @@ export default class DataService {
     const response = await fetch(this.makeUrl(`/items/${itemId}`));
     const item = await response.json();
 
-    return Promise.resolve(item);
+    if (!item) {
+      return Promise.resolve(undefined);
+    }
+
+    return Promise.resolve(this.normalizeItem(item));
   }
 
   public async markItemsRead(params: {

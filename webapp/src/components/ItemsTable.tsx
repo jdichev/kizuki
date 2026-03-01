@@ -33,6 +33,8 @@ export default function ItemsTable({
                   <small className="item-list-details">
                     {item.feedTitle ? item.feedTitle : "NO_TITLE"},&nbsp;
                     <FormattedDate pubDate={item.published} />
+                    ,&nbsp;
+                    {item.latestContentWordCount || 0} words
                   </small>
                 </a>
               </td>

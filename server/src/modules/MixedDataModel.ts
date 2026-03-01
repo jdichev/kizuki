@@ -5,6 +5,8 @@ import DOMPurify from "dompurify";
 import Database from "better-sqlite3";
 import { JSDOM } from "jsdom";
 import pinoLib from "pino";
+import TurndownService from "turndown";
+import { gfm } from "turndown-plugin-gfm";
 import opmlParser from "./OpmlParser";
 import FeedFinder from "./FeedFinder";
 
@@ -17,6 +19,19 @@ const { window } = new JSDOM("<!DOCTYPE html>");
 
 // @ts-ignore
 const domPurify = DOMPurify(window);
+
+const turndownService = new TurndownService({
+  headingStyle: "atx",
+  codeBlockStyle: "fenced",
+  bulletListMarker: "-",
+});
+
+turndownService.use(gfm);
+
+turndownService.addRule("removeScripts", {
+  filter: ["script", "style", "noscript"],
+  replacement: () => "",
+});
 
 const createTables = `
 CREATE TABLE IF NOT EXISTS "feed_categories" (
@@ -59,6 +74,7 @@ CREATE TABLE IF NOT EXISTS "items" (
 	"itemCategoryId"	INTEGER DEFAULT 0,
 	"summary"	TEXT,
 	"latest_content"	TEXT,
+  "latest_content_word_count"	INTEGER DEFAULT 0,
 	PRIMARY KEY("id" AUTOINCREMENT)
 );
 `;
@@ -257,6 +273,11 @@ export default class DataService {
       ALTER TABLE items ADD COLUMN latest_content TEXT;
     `;
 
+    // Migration: Add latest_content_word_count column if it doesn't exist
+    const addLatestContentWordCountColumn = `
+      ALTER TABLE items ADD COLUMN latest_content_word_count INTEGER DEFAULT 0;
+    `;
+
     const ensureItemsFts = `
       CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
         title,
@@ -327,7 +348,10 @@ export default class DataService {
       this.database.exec(addSummaryColumn);
       pino.info("Added summary column to items table");
     } catch (error: unknown) {
-      if (error instanceof Error && !error.message.includes("duplicate column")) {
+      if (
+        error instanceof Error &&
+        !error.message.includes("duplicate column")
+      ) {
         pino.debug("Summary column might already exist or migration skipped");
       }
     }
@@ -337,9 +361,27 @@ export default class DataService {
       this.database.exec(addLatestContentColumn);
       pino.info("Added latest_content column to items table");
     } catch (error: unknown) {
-      if (error instanceof Error && !error.message.includes("duplicate column")) {
+      if (
+        error instanceof Error &&
+        !error.message.includes("duplicate column")
+      ) {
         pino.debug(
           "Latest_content column might already exist or migration skipped"
+        );
+      }
+    }
+
+    // Try to add latest_content_word_count column (will fail silently if it already exists)
+    try {
+      this.database.exec(addLatestContentWordCountColumn);
+      pino.info("Added latest_content_word_count column to items table");
+    } catch (error: unknown) {
+      if (
+        error instanceof Error &&
+        !error.message.includes("duplicate column")
+      ) {
+        pino.debug(
+          "Latest_content_word_count column might already exist or migration skipped"
         );
       }
     }
@@ -359,7 +401,8 @@ export default class DataService {
         .get() as { value?: string } | undefined;
 
       const currentVersion = row?.value;
-      const shouldRebuild = !currentVersion || currentVersion !== DataService.FTS_VERSION;
+      const shouldRebuild =
+        !currentVersion || currentVersion !== DataService.FTS_VERSION;
 
       const execSql = shouldRebuild ? rebuildItemsFts : ensureItemsFts;
 
@@ -494,7 +537,9 @@ export default class DataService {
   public async removeFeed(feedId: number): Promise<void> {
     try {
       this.database.transaction(() => {
-        this.database.prepare("DELETE FROM items WHERE feed_id = ?").run(feedId);
+        this.database
+          .prepare("DELETE FROM items WHERE feed_id = ?")
+          .run(feedId);
         this.database.prepare("DELETE FROM feeds WHERE id = ?").run(feedId);
       })();
       pino.debug(`removed feed ${feedId} and related items`);
@@ -596,7 +641,9 @@ export default class DataService {
     `;
 
     try {
-      const rows = this.database.prepare(query).all(urls) as { feedUrl: string }[];
+      const rows = this.database.prepare(query).all(urls) as {
+        feedUrl: string;
+      }[];
       return rows.map((record) => record.feedUrl);
     } catch (error) {
       pino.error(error);
@@ -637,7 +684,9 @@ export default class DataService {
     try {
       this.database.transaction(() => {
         this.database
-          .prepare("UPDATE feeds SET feedCategoryId = 0 WHERE feedCategoryId = ?")
+          .prepare(
+            "UPDATE feeds SET feedCategoryId = 0 WHERE feedCategoryId = ?"
+          )
           .run(feedCategory.id);
         this.database
           .prepare("DELETE FROM feed_categories WHERE id = ?")
@@ -1325,6 +1374,7 @@ export default class DataService {
         items.published,
         items.read,
         items.bookmarked,
+        items.latest_content_word_count AS latestContentWordCount,
         items.url,
         items.feed_id AS feedId,
         feeds.title AS feedTitle,
@@ -1348,14 +1398,7 @@ export default class DataService {
         // @ts-ignore
         row.content = domPurify.sanitize(row.content, {
           FORBID_TAGS: ["style"],
-          FORBID_ATTR: [
-            "style",
-            "width",
-            "height",
-            "class",
-            "id",
-            "bgcolor",
-          ],
+          FORBID_ATTR: ["style", "width", "height", "class", "id", "bgcolor"],
         });
 
         row.content = row.content!.replace(
@@ -1461,6 +1504,7 @@ export default class DataService {
         items.published,
         items.read,
         items.bookmarked,
+        items.latest_content_word_count AS latestContentWordCount,
         items.feed_id AS feedId,
         feeds.title AS feedTitle,
         feeds.feedCategoryId
@@ -1664,6 +1708,7 @@ export default class DataService {
           items.published,
           items.read,
           items.bookmarked,
+          items.latest_content_word_count AS latestContentWordCount,
           items.feed_id AS feedId,
           feeds.title AS feedTitle
         FROM
@@ -1726,6 +1771,7 @@ export default class DataService {
         items.published,
         items.read,
         items.bookmarked,
+        items.latest_content_word_count AS latestContentWordCount,
         items.feed_id AS feedId,
         feeds.title AS feedTitle
       FROM
@@ -1811,6 +1857,29 @@ export default class DataService {
     return str;
   }
 
+  public static htmlToMarkdown(content: string): string {
+    const normalizedContent = (content || "").trim();
+
+    if (!normalizedContent) {
+      return "";
+    }
+
+    return turndownService
+      .turndown(normalizedContent)
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
+
+  public static countWords(content: string): number {
+    const normalizedContent = (content || "").trim();
+
+    if (!normalizedContent) {
+      return 0;
+    }
+
+    return normalizedContent.split(/\s+/).filter(Boolean).length;
+  }
+
   public async insertItem(item: Item, feedId: number | undefined) {
     // Check if item already exists by URL
     const exists = await this.itemExists(item);
@@ -1824,8 +1893,8 @@ export default class DataService {
     }
 
     const query = `
-      INSERT INTO items (url, title, content, feed_id, published, comments, created, json_content)
-      VALUES ( ?, ?, ?, ?, ?, ?, ?, ? )
+      INSERT INTO items (url, title, content, feed_id, published, comments, created, json_content, latest_content, latest_content_word_count)
+      VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )
     `;
 
     let content = "";
@@ -1856,7 +1925,11 @@ export default class DataService {
     }
 
     let jsonContent = "";
-    if (item.id && typeof item.id === "string" && item.id.includes("yt:video:")) {
+    if (
+      item.id &&
+      typeof item.id === "string" &&
+      item.id.includes("yt:video:")
+    ) {
       const vidId = item.id.replace("yt:video:", "");
       jsonContent = JSON.stringify({
         "yt-id": vidId,
@@ -1867,22 +1940,31 @@ export default class DataService {
 
     const createdTime = Date.now();
 
+    const sanitizedContent = domPurify.sanitize(content, {
+      FORBID_TAGS: ["style", "script", "svg"],
+      FORBID_ATTR: ["style", "width", "height", "class", "id"],
+    });
+
+    const latestContent = DataService.htmlToMarkdown(sanitizedContent);
+    const latestContentWordCount = DataService.countWords(latestContent);
+
     try {
-      this.database.prepare(query).run(
-        item.link,
-        DataService.cleanString(
-          domPurify.sanitize(item.title, { ALLOWED_TAGS: [] })
-        ),
-        domPurify.sanitize(content, {
-          FORBID_TAGS: ["style", "script", "svg"],
-          FORBID_ATTR: ["style", "width", "height", "class", "id"],
-        }),
-        feedId,
-        publishedTime,
-        item.comments,
-        createdTime,
-        jsonContent
-      );
+      this.database
+        .prepare(query)
+        .run(
+          item.link,
+          DataService.cleanString(
+            domPurify.sanitize(item.title, { ALLOWED_TAGS: [] })
+          ),
+          sanitizedContent,
+          feedId,
+          publishedTime,
+          item.comments,
+          createdTime,
+          jsonContent,
+          latestContent,
+          latestContentWordCount
+        );
     } catch (error) {
       pino.error(error);
       pino.trace("ITEM URL: %s,\nFEED: %s", item.link, feedId);
@@ -1949,7 +2031,10 @@ export default class DataService {
 
           for (const item of group.items) {
             if (item.id === undefined || item.id === null) {
-              pino.debug({ item }, "Skipping item without ID in category update");
+              pino.debug(
+                { item },
+                "Skipping item without ID in category update"
+              );
               continue;
             }
             updateStmt.run(categoryId, item.id);
@@ -1976,7 +2061,9 @@ export default class DataService {
     `;
 
     try {
-      const row = this.database.prepare(query).get(url) as { summary: string } | undefined;
+      const row = this.database.prepare(query).get(url) as
+        | { summary: string }
+        | undefined;
       return row?.summary || null;
     } catch (error) {
       pino.error({ error, url }, "Error retrieving item summary");
@@ -1997,7 +2084,9 @@ export default class DataService {
     `;
 
     try {
-      const row = this.database.prepare(query).get(url) as { latest_content: string } | undefined;
+      const row = this.database.prepare(query).get(url) as
+        | { latest_content: string }
+        | undefined;
       return row?.latest_content || null;
     } catch (error) {
       pino.error({ error, url }, "Error retrieving item latest content");
@@ -2034,17 +2123,90 @@ export default class DataService {
     url: string,
     content: string
   ): Promise<void> {
+    const latestContentWordCount = DataService.countWords(content);
+
     const query = `
       UPDATE items
-      SET latest_content = ?
+      SET latest_content = ?, latest_content_word_count = ?
       WHERE url = ?
     `;
 
     try {
-      this.database.prepare(query).run(content, url);
+      this.database.prepare(query).run(content, latestContentWordCount, url);
       pino.debug({ url }, "Item latest content updated successfully");
     } catch (error) {
       pino.error({ error, url }, "Error updating item latest content");
     }
+  }
+
+  public async backfillLatestContentAndWordCount(): Promise<{
+    scanned: number;
+    latestContentUpdated: number;
+    wordCountUpdated: number;
+  }> {
+    const rows = this.database
+      .prepare(
+        `
+          SELECT
+            id,
+            content,
+            latest_content,
+            latest_content_word_count
+          FROM items
+        `
+      )
+      .all() as Array<{
+      id: number;
+      content: string | null;
+      latest_content: string | null;
+      latest_content_word_count: number | null;
+    }>;
+
+    const updateStmt = this.database.prepare(`
+      UPDATE items
+      SET latest_content = ?, latest_content_word_count = ?
+      WHERE id = ?
+    `);
+
+    let latestContentUpdated = 0;
+    let wordCountUpdated = 0;
+
+    this.database.transaction(() => {
+      for (const row of rows) {
+        const hasLatestContent = Boolean((row.latest_content || "").trim());
+        const latestContent = hasLatestContent
+          ? row.latest_content || ""
+          : DataService.htmlToMarkdown(row.content || "");
+
+        const calculatedWordCount = DataService.countWords(latestContent);
+        const currentWordCount = row.latest_content_word_count || 0;
+        const shouldUpdateLatestContent = !hasLatestContent;
+        const shouldUpdateWordCount = currentWordCount !== calculatedWordCount;
+
+        if (!shouldUpdateLatestContent && !shouldUpdateWordCount) {
+          continue;
+        }
+
+        const latestContentForUpdate = shouldUpdateLatestContent
+          ? latestContent
+          : row.latest_content || "";
+
+        updateStmt.run(latestContentForUpdate, calculatedWordCount, row.id);
+
+        if (shouldUpdateLatestContent) {
+          latestContentUpdated += 1;
+        }
+
+        if (shouldUpdateWordCount) {
+          wordCountUpdated += 1;
+        }
+      }
+    })();
+
+    return {
+      scanned: rows.length,
+      latestContentUpdated,
+      wordCountUpdated,
+    };
   }
 }

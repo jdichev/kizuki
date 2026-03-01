@@ -55,6 +55,8 @@ interface Item {
   id?: number | string | array;
   title: string;
   content?: string;
+  latestContent?: string;
+  latestContentWordCount?: number;
   "content:encoded"?: string;
   description?: string;
   link?: string;
