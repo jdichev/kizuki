@@ -8,6 +8,7 @@
     "start": "node scripts/start.js",
     "test": "node scripts/test.js",
     "build": "node scripts/build.js",
+    "tui": "npm --prefix tui start",
     "format": "prettier . --write",
     "format:check": "prettier . --check"
   },

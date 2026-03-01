@@ -1,0 +1,27 @@
+{
+  "name": "forest-tui",
+  "version": "1.0.0",
+  "description": "Terminal User Interface for Forest",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "tsc && node dist/index.js",
+    "dev": "tsc --watch",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "ink": "^6.0.0",
+    "react": "^19.0.0",
+    "ink-select-input": "^6.0.0",
+    "ink-text-input": "^6.0.0",
+    "markdown-it": "^14.1.0",
+    "entities": "^6.0.0",
+    "pino": "^9.6.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/markdown-it": "^14.1.2",
+    "@types/node": "^22.13.5",
+    "typescript": "^5.7.3"
+  }
+}
