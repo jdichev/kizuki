@@ -108,7 +108,12 @@ export default function App() {
         setSelectedItem(fullItem);
         setView("reader");
         setScrollOffset(0);
+        // Mark as read in background
         ds.markItemRead(fullItem);
+        // Update local state so it's reflected when going back
+        setItems((prevItems) =>
+          prevItems.map((i) => (i.id === itemId ? { ...i, read: 1 } : i))
+        );
       }
     } finally {
       setLoading(false);
