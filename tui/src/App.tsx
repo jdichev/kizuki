@@ -309,12 +309,9 @@ export default function App() {
           </Text>
         </Box>
         <Box
-          borderStyle="single"
-          borderColor="gray"
-          paddingX={1}
           marginTop={1}
           height={contentHeight - 2}
-          width={wrapWidth + 4}
+          width={wrapWidth}
         >
           <Text>{visibleLines.join("\n")}</Text>
         </Box>
