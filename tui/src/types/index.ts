@@ -65,4 +65,5 @@ export interface Item {
     "yt-id"?: string;
   };
   content?: string;
+  latest_content?: string;
 }
