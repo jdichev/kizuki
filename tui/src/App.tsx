@@ -94,13 +94,25 @@ export default function App() {
     setGroupingMode(mode);
     setLoading(true);
     try {
+      let cats: (FeedCategory | ItemCategory)[] = [];
       if (mode === "feed-categories") {
-        const cats = await ds.getFeedCategories();
-        setCategories(cats);
+        cats = await ds.getFeedCategories();
       } else {
-        const cats = await ds.getItemCategories();
-        setCategories(cats);
+        cats = await ds.getItemCategories();
       }
+
+      // 1. Virtual 'All' category at the start
+      const allVirtual = { id: -1, title: "All" };
+
+      // 2. Filter out 'Uncategorized' to move it to the end
+      const others = cats.filter(
+        (c) => c.title.toLowerCase() !== "uncategorized"
+      );
+      const uncategorized = cats.filter(
+        (c) => c.title.toLowerCase() === "uncategorized"
+      );
+
+      setCategories([allVirtual, ...others, ...uncategorized]);
       setView("sidebar");
     } finally {
       setLoading(false);
@@ -119,10 +131,13 @@ export default function App() {
         bookmarkedOnly: false,
       };
 
-      if (groupingMode === "feed-categories") {
-        params.selectedFeedCategory = category;
-      } else {
-        params.selectedItemCategoryIds = category ? [category.id] : undefined;
+      // Handle virtual 'All' category (id: -1)
+      if (categoryId !== -1) {
+        if (groupingMode === "feed-categories") {
+          params.selectedFeedCategory = category;
+        } else {
+          params.selectedItemCategoryIds = category ? [category.id] : undefined;
+        }
       }
 
       const categoryItems = await ds.getItems(params);
@@ -132,7 +147,6 @@ export default function App() {
       setView("items");
     }
   };
-
   const handleSelectItem = async (item: { value: string }) => {
     const itemId = parseInt(item.value);
     setLoading(true);
@@ -265,32 +279,48 @@ export default function App() {
   const renderReader = () => {
     if (!selectedItem) return null;
 
+    const timestamp =
+      selectedItem.published && selectedItem.published > 10000000000
+        ? (selectedItem.published as number)
+        : (selectedItem.published as number) * 1000;
+
+    const dateStr = new Date(timestamp).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+
     const wrapWidth = Math.min(80, terminalWidth - 6);
     const content = cleanContent(selectedItem.content || "");
     const lines = wordWrap(content, wrapWidth);
     const visibleLines = lines.slice(
       scrollOffset,
-      scrollOffset + contentHeight
+      scrollOffset + contentHeight - 2
     );
 
     return (
       <Box flexDirection="column" width="100%">
         <Text color="yellow" bold>
-          {selectedItem.title}
+          {decode(selectedItem.title)}
         </Text>
+        <Box>
+          <Text dimColor>
+            {selectedItem.feedTitle} │ {dateStr}
+          </Text>
+        </Box>
         <Box
           borderStyle="single"
           borderColor="gray"
           paddingX={1}
           marginTop={1}
-          height={contentHeight}
+          height={contentHeight - 2}
           width={wrapWidth + 4}
         >
           <Text>{visibleLines.join("\n")}</Text>
         </Box>
         <Text dimColor>
           Line {scrollOffset + 1} to{" "}
-          {Math.min(scrollOffset + contentHeight, lines.length)} of{" "}
+          {Math.min(scrollOffset + contentHeight - 2, lines.length)} of{" "}
           {lines.length} (WASD to scroll)
         </Text>
       </Box>
