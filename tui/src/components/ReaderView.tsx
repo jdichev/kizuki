@@ -3,9 +3,10 @@ import { Box, Text } from "ink";
 import { decode } from "entities";
 import { formatDateTime } from "../utils/date.js";
 import { cleanContent } from "../utils/text.js";
+import { Item } from "../types/index.js";
 
 interface ReaderViewProps {
-  item: any;
+  item: Item;
   scrollOffset: number;
   contentHeight: number;
   terminalWidth: number;
@@ -17,13 +18,16 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
   contentHeight,
 }) => {
   const { dateStr } = formatDateTime(item.published);
-  
+
   // 1. Get raw content (prefer latest_content if available)
   const rawContent = cleanContent(item.latest_content || item.content || "");
-  
+
   // 2. Split into lines for scrolling
   const lines = rawContent.split("\n");
-  const visibleLines = lines.slice(scrollOffset, scrollOffset + contentHeight - 2);
+  const visibleLines = lines.slice(
+    scrollOffset,
+    scrollOffset + contentHeight - 2
+  );
 
   return (
     <Box flexDirection="column" width="100%">

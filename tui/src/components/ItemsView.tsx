@@ -4,10 +4,11 @@ import { SectionHeader } from "./SectionHeader.js";
 import { visualTruncate } from "../utils/text.js";
 import { formatDateTime } from "../utils/date.js";
 import { decode } from "entities";
+import { Item } from "../types/index.js";
 
 interface ItemsViewProps {
   title: string;
-  items: any[];
+  items: Item[];
   activeIndex: number;
   scrollOffset: number;
   visibleHeight: number;
@@ -35,7 +36,8 @@ export const ItemsView: React.FC<ItemsViewProps> = ({
         const feedWidth = Math.floor(terminalWidth * 0.2);
         const dateWidth = 18;
         const wordsWidth = 8;
-        const titleWidth = terminalWidth - feedWidth - dateWidth - wordsWidth - 12;
+        const titleWidth =
+          terminalWidth - feedWidth - dateWidth - wordsWidth - 12;
 
         const row = `${item.read ? " " : "*"} ${visualTruncate(
           decode(item.title),

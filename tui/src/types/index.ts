@@ -46,6 +46,31 @@ export interface ItemCategoryReadStat {
 
 export type GroupingMode = "feed-categories" | "item-categories";
 
+export type View =
+  | "start"
+  | "sidebar"
+  | "items"
+  | "reader"
+  | "confirm-mark-read"
+  | "confirm-exit";
+
+export type AllCategory = {
+  id: -1;
+  title: "All";
+};
+
+export type SidebarHeader = {
+  id: string;
+  title: string;
+  isHeader: true;
+};
+
+export type SidebarCategory = (FeedCategory | ItemCategory | AllCategory) & {
+  isHeader?: false;
+};
+
+export type SidebarEntry = SidebarHeader | SidebarCategory;
+
 export interface Item {
   id?: number;
   title: string;
@@ -67,3 +92,19 @@ export interface Item {
   content?: string;
   latest_content?: string;
 }
+
+export type UseTuiNavigationResult = {
+  terminalHeight: number;
+  terminalWidth: number;
+  view: View;
+  groupingMode: GroupingMode;
+  categories: SidebarEntry[];
+  items: Item[];
+  selectedItem: Item | null;
+  selectedCategory: SidebarCategory | null;
+  activeIndex: number;
+  scrollOffset: number;
+  loading: boolean;
+  contentHeight: number;
+  listVisibleHeight: number;
+};

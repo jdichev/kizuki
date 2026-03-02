@@ -1,33 +1,160 @@
-import { useState, useEffect } from "react";
+import { useEffect, useReducer } from "react";
 import { useInput, useApp, useStdout } from "ink";
 import DataService from "../api/DataService.js";
-import { Item, FeedCategory, ItemCategory } from "../types/index.js";
+import {
+  Item,
+  FeedCategory,
+  ItemCategory,
+  GroupingMode,
+  View,
+  SidebarCategory,
+  SidebarEntry,
+  SidebarHeader,
+  UseTuiNavigationResult,
+} from "../types/index.js";
 import { ITEM_CATEGORY_RANGES, MODE_ITEMS } from "../constants/config.js";
 
 const ds = DataService.getInstance();
 
-export type View = "start" | "sidebar" | "items" | "reader" | "confirm-mark-read" | "confirm-exit";
-export type GroupingMode = "feed-categories" | "item-categories";
+type NavigationState = {
+  terminalHeight: number;
+  terminalWidth: number;
+  view: View;
+  groupingMode: GroupingMode;
+  categories: SidebarEntry[];
+  items: Item[];
+  selectedItem: Item | null;
+  selectedCategory: SidebarCategory | null;
+  activeIndex: number;
+  sidebarIndices: Record<string, number>;
+  itemIndices: Record<string, number>;
+  loading: boolean;
+  scrollOffset: number;
+};
 
-export function useTuiNavigation() {
-  const { exit } = useApp();
-  const { stdout } = useStdout();
-  const [terminalHeight, setTerminalHeight] = useState(stdout.rows || 24);
-  const [terminalWidth, setTerminalWidth] = useState(stdout.columns || 80);
-  
-  const [view, setView] = useState<View>("start");
-  const [groupingMode, setGroupingMode] = useState<GroupingMode>("feed-categories");
-  const [categories, setCategories] = useState<any[]>([]);
-  const [items, setItems] = useState<Item[]>([]);
-  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<any | null>(null);
-  
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [sidebarIndices, setSidebarIndices] = useState<Record<string, number>>({});
-  const [itemIndices, setItemIndices] = useState<Record<string, number>>({});
-  
-  const [loading, setLoading] = useState(false);
-  const [scrollOffset, setScrollOffset] = useState(0);
+type NavigationAction =
+  | { type: "setTerminalSize"; terminalHeight: number; terminalWidth: number }
+  | { type: "setView"; view: View }
+  | { type: "setGroupingMode"; groupingMode: GroupingMode }
+  | { type: "setCategories"; categories: SidebarEntry[] }
+  | { type: "setItems"; items: Item[] }
+  | { type: "setSelectedItem"; selectedItem: Item | null }
+  | { type: "setSelectedCategory"; selectedCategory: SidebarCategory | null }
+  | { type: "setActiveIndex"; activeIndex: number }
+  | { type: "setSidebarIndex"; key: string; index: number }
+  | { type: "setItemIndex"; key: string; index: number }
+  | { type: "setLoading"; loading: boolean }
+  | { type: "setScrollOffset"; scrollOffset: number };
+
+function navigationReducer(
+  state: NavigationState,
+  action: NavigationAction
+): NavigationState {
+  switch (action.type) {
+    case "setTerminalSize":
+      return {
+        ...state,
+        terminalHeight: action.terminalHeight,
+        terminalWidth: action.terminalWidth,
+      };
+    case "setView":
+      return { ...state, view: action.view };
+    case "setGroupingMode":
+      return { ...state, groupingMode: action.groupingMode };
+    case "setCategories":
+      return { ...state, categories: action.categories };
+    case "setItems":
+      return { ...state, items: action.items };
+    case "setSelectedItem":
+      return { ...state, selectedItem: action.selectedItem };
+    case "setSelectedCategory":
+      return { ...state, selectedCategory: action.selectedCategory };
+    case "setActiveIndex":
+      return { ...state, activeIndex: action.activeIndex };
+    case "setSidebarIndex":
+      return {
+        ...state,
+        sidebarIndices: { ...state.sidebarIndices, [action.key]: action.index },
+      };
+    case "setItemIndex":
+      return {
+        ...state,
+        itemIndices: { ...state.itemIndices, [action.key]: action.index },
+      };
+    case "setLoading":
+      return { ...state, loading: action.loading };
+    case "setScrollOffset":
+      return { ...state, scrollOffset: action.scrollOffset };
+    default:
+      return state;
+  }
+}
+
+function isSidebarHeader(
+  entry: SidebarEntry | undefined
+): entry is SidebarHeader {
+  return Boolean(entry && entry.isHeader);
+}
+
+function getCategoryKey(category: SidebarCategory | null): string {
+  if (!category) return "all";
+  return category.id?.toString() || "all";
+}
+
+type TuiStateController = {
+  terminalHeight: number;
+  terminalWidth: number;
+  view: View;
+  groupingMode: GroupingMode;
+  categories: SidebarEntry[];
+  items: Item[];
+  selectedItem: Item | null;
+  selectedCategory: SidebarCategory | null;
+  activeIndex: number;
+  scrollOffset: number;
+  loading: boolean;
+  contentHeight: number;
+  listVisibleHeight: number;
+  setView: (nextView: View) => void;
+  handleMarkAllRead: () => void;
+  moveListSelection: (delta: -1 | 1) => void;
+  handleBackNavigation: () => void;
+  handleForwardNavigation: () => void;
+  handleReload: () => void;
+};
+
+function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
+  const [state, dispatch] = useReducer(navigationReducer, {
+    terminalHeight: stdout.rows || 24,
+    terminalWidth: stdout.columns || 80,
+    view: "start",
+    groupingMode: "feed-categories",
+    categories: [],
+    items: [],
+    selectedItem: null,
+    selectedCategory: null,
+    activeIndex: 0,
+    sidebarIndices: {},
+    itemIndices: {},
+    loading: false,
+    scrollOffset: 0,
+  });
+
+  const {
+    terminalHeight,
+    terminalWidth,
+    view,
+    groupingMode,
+    categories,
+    items,
+    selectedItem,
+    selectedCategory,
+    activeIndex,
+    sidebarIndices,
+    itemIndices,
+    loading,
+    scrollOffset,
+  } = state;
 
   const contentHeight = terminalHeight - 4;
   const listVisibleHeight = contentHeight - 2;
@@ -36,16 +163,22 @@ export function useTuiNavigation() {
   useEffect(() => {
     if (view === "reader") return;
     if (activeIndex < scrollOffset) {
-      setScrollOffset(activeIndex);
+      dispatch({ type: "setScrollOffset", scrollOffset: activeIndex });
     } else if (activeIndex >= scrollOffset + listVisibleHeight) {
-      setScrollOffset(activeIndex - listVisibleHeight + 1);
+      dispatch({
+        type: "setScrollOffset",
+        scrollOffset: activeIndex - listVisibleHeight + 1,
+      });
     }
   }, [activeIndex, scrollOffset, listVisibleHeight, view]);
 
   useEffect(() => {
     const onResize = () => {
-      setTerminalHeight(stdout.rows);
-      setTerminalWidth(stdout.columns);
+      dispatch({
+        type: "setTerminalSize",
+        terminalHeight: stdout.rows,
+        terminalWidth: stdout.columns,
+      });
     };
     stdout.on("resize", onResize);
     return () => {
@@ -55,10 +188,10 @@ export function useTuiNavigation() {
   }, [stdout]);
 
   const handleSelectMode = async (mode: GroupingMode) => {
-    setGroupingMode(mode);
-    setLoading(true);
+    dispatch({ type: "setGroupingMode", groupingMode: mode });
+    dispatch({ type: "setLoading", loading: true });
     try {
-      let result: any[] = [{ id: -1, title: "All" }];
+      let result: SidebarEntry[] = [{ id: -1, title: "All" }];
       if (mode === "feed-categories") {
         const cats = await ds.getFeedCategories();
         const others = cats
@@ -76,146 +209,359 @@ export function useTuiNavigation() {
 
         for (const range of sortedRanges) {
           const children = cats
-            .filter((c) => Number(c.id) >= range.min && Number(c.id) <= range.max)
+            .filter(
+              (c) => Number(c.id) >= range.min && Number(c.id) <= range.max
+            )
             .sort((a, b) => Number(a.id) - Number(b.id));
 
           if (children.length > 0) {
-            result.push({ id: `${range.min}-${range.max}`, title: range.title, isHeader: true });
+            result.push({
+              id: `${range.min}-${range.max}`,
+              title: range.title,
+              isHeader: true,
+            });
             result.push(...children);
           }
         }
 
-        const uncategorized = cats.filter((c) => c.title.toLowerCase() === "uncategorized");
+        const uncategorized = cats.filter(
+          (c) => c.title.toLowerCase() === "uncategorized"
+        );
         if (uncategorized.length > 0) {
           result.push({ id: "0", title: "Uncategorized", isHeader: true });
           result.push(...uncategorized);
         }
       }
-      setCategories(result);
+      dispatch({ type: "setCategories", categories: result });
       const savedIdx = sidebarIndices[mode] || 0;
-      setActiveIndex(Math.min(savedIdx, result.length - 1));
-      setScrollOffset(0);
-      setView("sidebar");
+      dispatch({
+        type: "setActiveIndex",
+        activeIndex: Math.min(savedIdx, result.length - 1),
+      });
+      dispatch({ type: "setScrollOffset", scrollOffset: 0 });
+      dispatch({ type: "setView", view: "sidebar" });
     } finally {
-      setLoading(false);
+      dispatch({ type: "setLoading", loading: false });
     }
   };
 
-  const handleSelectCategory = async (category: any) => {
-    if (!category || category.isHeader) return;
-    setSelectedCategory(category);
-    setLoading(true);
+  const handleSelectCategory = async (category: SidebarEntry | undefined) => {
+    if (!category || isSidebarHeader(category)) return;
+    dispatch({ type: "setSelectedCategory", selectedCategory: category });
+    dispatch({ type: "setLoading", loading: true });
     try {
-      const params: any = { size: 100, unreadOnly: false, bookmarkedOnly: false };
+      const params: {
+        size: number;
+        unreadOnly: boolean;
+        bookmarkedOnly: boolean;
+        selectedFeedCategory?: FeedCategory;
+        selectedItemCategoryIds?: number[];
+      } = { size: 100, unreadOnly: false, bookmarkedOnly: false };
       if (category.id !== -1) {
-        if (groupingMode === "feed-categories") params.selectedFeedCategory = category;
-        else params.selectedItemCategoryIds = [category.id];
+        if (groupingMode === "feed-categories") {
+          params.selectedFeedCategory = category as FeedCategory;
+        } else if (typeof category.id === "number") {
+          params.selectedItemCategoryIds = [category.id];
+        }
       }
       const categoryItems = await ds.getItems(params);
-      setItems(categoryItems);
+      dispatch({ type: "setItems", items: categoryItems });
       const catKey = category.id?.toString() || "all";
-      setActiveIndex(itemIndices[catKey] || 0);
-      setScrollOffset(0);
-      setView("items");
+      dispatch({
+        type: "setActiveIndex",
+        activeIndex: itemIndices[catKey] || 0,
+      });
+      dispatch({ type: "setScrollOffset", scrollOffset: 0 });
+      dispatch({ type: "setView", view: "items" });
     } finally {
-      setLoading(false);
+      dispatch({ type: "setLoading", loading: false });
     }
   };
 
   const handleSelectItem = async (item: Item) => {
     if (!item) return;
-    setLoading(true);
+    dispatch({ type: "setLoading", loading: true });
     try {
       const fullItem = await ds.getItem(item.id);
       if (fullItem) {
-        setSelectedItem(fullItem);
-        setView("reader");
-        setScrollOffset(0);
+        dispatch({ type: "setSelectedItem", selectedItem: fullItem });
+        dispatch({ type: "setView", view: "reader" });
+        dispatch({ type: "setScrollOffset", scrollOffset: 0 });
         ds.markItemRead(fullItem);
-        setItems(prev => prev.map(i => i.id === item.id ? { ...i, read: 1 } : i));
+        dispatch({
+          type: "setItems",
+          items: items.map((i) => (i.id === item.id ? { ...i, read: 1 } : i)),
+        });
       }
     } finally {
-      setLoading(false);
+      dispatch({ type: "setLoading", loading: false });
     }
   };
 
   const handleMarkAllRead = async () => {
     if (!selectedCategory) return;
-    setLoading(true);
+    dispatch({ type: "setLoading", loading: true });
     try {
-      const params: any = groupingMode === "feed-categories" ? { feedCategory: selectedCategory } : { itemCategories: [selectedCategory] };
+      const params =
+        groupingMode === "feed-categories"
+          ? { feedCategory: selectedCategory as FeedCategory }
+          : { itemCategories: [selectedCategory as ItemCategory] };
       await ds.markItemsRead(params);
       const refreshedItems = await ds.getItems({
-        size: 100, unreadOnly: false, bookmarkedOnly: false,
-        selectedFeedCategory: groupingMode === "feed-categories" ? selectedCategory : undefined,
-        selectedItemCategoryIds: groupingMode === "item-categories" ? [selectedCategory.id!] : undefined
+        size: 100,
+        unreadOnly: false,
+        bookmarkedOnly: false,
+        selectedFeedCategory:
+          groupingMode === "feed-categories" ? selectedCategory : undefined,
+        selectedItemCategoryIds:
+          groupingMode === "item-categories" &&
+          typeof selectedCategory.id === "number"
+            ? [selectedCategory.id]
+            : undefined,
       });
-      setItems(refreshedItems);
-      setView("items");
+      dispatch({ type: "setItems", items: refreshedItems });
+      dispatch({ type: "setView", view: "items" });
     } finally {
-      setLoading(false);
+      dispatch({ type: "setLoading", loading: false });
     }
   };
 
-  useInput((input, key) => {
-    if (key.escape) { setView("confirm-exit"); return; }
-    if (view === "confirm-exit") {
-        if (input === "y" || key.return) exit();
-        if (input === "n" || input === "a" || key.leftArrow) setView("start");
-        return;
-    }
-    if (view === "confirm-mark-read") {
-        if (input === "y") handleMarkAllRead();
-        if (input === "n" || input === "a" || key.leftArrow) setView("items");
-        return;
+  const moveListSelection = (delta: -1 | 1) => {
+    if (view === "reader") {
+      const nextOffset =
+        delta < 0 ? Math.max(0, scrollOffset - 1) : scrollOffset + 1;
+      dispatch({ type: "setScrollOffset", scrollOffset: nextOffset });
+      return;
     }
 
-    const list = view === "start" ? MODE_ITEMS : view === "sidebar" ? categories : items;
-    
-    if (input === "w" || key.upArrow) {
-        if (view === "reader") setScrollOffset(prev => Math.max(0, prev - 1));
-        else {
-            let next = activeIndex - 1;
-            while (next >= 0 && list[next]?.isHeader) next--;
-            if (next >= 0) {
-                setActiveIndex(next);
-                if (view === "sidebar") setSidebarIndices(p => ({ ...p, [groupingMode]: next }));
-                if (view === "items") setItemIndices(p => ({ ...p, [selectedCategory.id?.toString() || "all"]: next }));
-            }
-        }
+    const listLength =
+      view === "start"
+        ? MODE_ITEMS.length
+        : view === "sidebar"
+          ? categories.length
+          : items.length;
+    let next = activeIndex + delta;
+
+    if (view === "sidebar") {
+      while (
+        next >= 0 &&
+        next < listLength &&
+        isSidebarHeader(categories[next])
+      ) {
+        next += delta;
+      }
     }
-    if (input === "s" || key.downArrow) {
-        if (view === "reader") setScrollOffset(prev => prev + 1);
-        else {
-            let next = activeIndex + 1;
-            while (next < list.length && list[next]?.isHeader) next++;
-            if (next < list.length) {
-                setActiveIndex(next);
-                if (view === "sidebar") setSidebarIndices(p => ({ ...p, [groupingMode]: next }));
-                if (view === "items") setItemIndices(p => ({ ...p, [selectedCategory.id?.toString() || "all"]: next }));
-            }
-        }
+
+    if (next < 0 || next >= listLength) {
+      return;
     }
-    if (input === "a" || key.leftArrow) {
-        if (view === "reader") { setView("items"); setScrollOffset(0); setActiveIndex(itemIndices[selectedCategory.id?.toString() || "all"] || 0); }
-        else if (view === "items") { setView("sidebar"); setScrollOffset(0); setActiveIndex(sidebarIndices[groupingMode] || 0); }
-        else if (view === "sidebar") { setView("start"); setScrollOffset(0); setActiveIndex(0); }
+
+    dispatch({ type: "setActiveIndex", activeIndex: next });
+
+    if (view === "sidebar") {
+      dispatch({ type: "setSidebarIndex", key: groupingMode, index: next });
     }
-    if (input === "d" || key.rightArrow || key.return) {
-        if (view === "start") handleSelectMode(MODE_ITEMS[activeIndex].value as any);
-        else if (view === "sidebar") handleSelectCategory(categories[activeIndex]);
-        else if (view === "items") handleSelectItem(items[activeIndex]);
+
+    if (view === "items") {
+      dispatch({
+        type: "setItemIndex",
+        key: getCategoryKey(selectedCategory),
+        index: next,
+      });
     }
-    if (input === "r") {
-        if (view === "sidebar") handleSelectMode(groupingMode);
-        else if (view === "items") handleSelectCategory(selectedCategory);
+  };
+
+  const handleBackNavigation = () => {
+    if (view === "reader") {
+      dispatch({ type: "setView", view: "items" });
+      dispatch({ type: "setScrollOffset", scrollOffset: 0 });
+      dispatch({
+        type: "setActiveIndex",
+        activeIndex: itemIndices[getCategoryKey(selectedCategory)] || 0,
+      });
+      return;
     }
-    if (view === "items" && input === "q") setView("confirm-mark-read");
-  });
+
+    if (view === "items") {
+      dispatch({ type: "setView", view: "sidebar" });
+      dispatch({ type: "setScrollOffset", scrollOffset: 0 });
+      dispatch({
+        type: "setActiveIndex",
+        activeIndex: sidebarIndices[groupingMode] || 0,
+      });
+      return;
+    }
+
+    if (view === "sidebar") {
+      dispatch({ type: "setView", view: "start" });
+      dispatch({ type: "setScrollOffset", scrollOffset: 0 });
+      dispatch({ type: "setActiveIndex", activeIndex: 0 });
+    }
+  };
+
+  const handleForwardNavigation = () => {
+    if (view === "start") {
+      handleSelectMode(MODE_ITEMS[activeIndex].value as GroupingMode);
+      return;
+    }
+
+    if (view === "sidebar") {
+      handleSelectCategory(categories[activeIndex]);
+      return;
+    }
+
+    if (view === "items") {
+      handleSelectItem(items[activeIndex]);
+    }
+  };
+
+  const handleReload = () => {
+    if (view === "sidebar") {
+      handleSelectMode(groupingMode);
+      return;
+    }
+
+    if (view === "items") {
+      handleSelectCategory(selectedCategory || undefined);
+    }
+  };
+
+  const setView = (nextView: View) => {
+    dispatch({ type: "setView", view: nextView });
+  };
 
   return {
-    terminalHeight, terminalWidth, view, groupingMode, categories, items,
-    selectedItem, selectedCategory, activeIndex, scrollOffset, loading,
-    contentHeight, listVisibleHeight
+    terminalHeight,
+    terminalWidth,
+    view,
+    groupingMode,
+    categories,
+    items,
+    selectedItem,
+    selectedCategory,
+    activeIndex,
+    scrollOffset,
+    loading,
+    contentHeight,
+    listVisibleHeight,
+    setView,
+    handleMarkAllRead,
+    moveListSelection,
+    handleBackNavigation,
+    handleForwardNavigation,
+    handleReload,
   };
+}
+
+function useTuiInput(
+  exit: () => void,
+  {
+    view,
+    setView,
+    handleMarkAllRead,
+    moveListSelection,
+    handleBackNavigation,
+    handleForwardNavigation,
+    handleReload,
+  }: Pick<
+    TuiStateController,
+    | "view"
+    | "setView"
+    | "handleMarkAllRead"
+    | "moveListSelection"
+    | "handleBackNavigation"
+    | "handleForwardNavigation"
+    | "handleReload"
+  >
+) {
+  useInput((input, key) => {
+    if (key.escape) {
+      setView("confirm-exit");
+      return;
+    }
+    if (view === "confirm-exit") {
+      if (input === "y" || key.return) exit();
+      if (input === "n" || input === "a" || key.leftArrow) {
+        setView("start");
+      }
+      return;
+    }
+    if (view === "confirm-mark-read") {
+      if (input === "y") handleMarkAllRead();
+      if (input === "n" || input === "a" || key.leftArrow) {
+        setView("items");
+      }
+      return;
+    }
+
+    const isUp = input === "w" || key.upArrow;
+    const isDown = input === "s" || key.downArrow;
+    const isBack = input === "a" || key.leftArrow;
+    const isForward = input === "d" || key.rightArrow || key.return;
+    const isReload = input === "r";
+    const isMarkReadConfirm = view === "items" && input === "q";
+
+    if (isUp) {
+      moveListSelection(-1);
+      return;
+    }
+
+    if (isDown) {
+      moveListSelection(1);
+      return;
+    }
+
+    if (isBack) {
+      handleBackNavigation();
+      return;
+    }
+
+    if (isForward) {
+      handleForwardNavigation();
+      return;
+    }
+
+    if (isReload) {
+      handleReload();
+      return;
+    }
+
+    if (isMarkReadConfirm) {
+      setView("confirm-mark-read");
+    }
+  });
+}
+
+export function useTuiNavigation() {
+  const { exit } = useApp();
+  const { stdout } = useStdout();
+  const state = useTuiState(stdout);
+
+  useTuiInput(exit, {
+    view: state.view,
+    setView: state.setView,
+    handleMarkAllRead: state.handleMarkAllRead,
+    moveListSelection: state.moveListSelection,
+    handleBackNavigation: state.handleBackNavigation,
+    handleForwardNavigation: state.handleForwardNavigation,
+    handleReload: state.handleReload,
+  });
+
+  const result: UseTuiNavigationResult = {
+    terminalHeight: state.terminalHeight,
+    terminalWidth: state.terminalWidth,
+    view: state.view,
+    groupingMode: state.groupingMode,
+    categories: state.categories,
+    items: state.items,
+    selectedItem: state.selectedItem,
+    selectedCategory: state.selectedCategory,
+    activeIndex: state.activeIndex,
+    scrollOffset: state.scrollOffset,
+    loading: state.loading,
+    contentHeight: state.contentHeight,
+    listVisibleHeight: state.listVisibleHeight,
+  };
+
+  return result;
 }

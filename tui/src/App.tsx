@@ -1,6 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { useTuiNavigation } from "./hooks/useTuiNavigation.js";
+import type { UseTuiNavigationResult } from "./types/index.js";
 import { Header } from "./components/Header.js";
 import { Footer } from "./components/Footer.js";
 import { SectionHeader } from "./components/SectionHeader.js";
@@ -11,6 +12,7 @@ import { ConfirmationDialog } from "./components/ConfirmationDialog.js";
 import { MODE_ITEMS } from "./constants/config.js";
 
 export default function App() {
+  const navigation: UseTuiNavigationResult = useTuiNavigation();
   const {
     terminalHeight,
     terminalWidth,
@@ -25,12 +27,14 @@ export default function App() {
     loading,
     contentHeight,
     listVisibleHeight,
-  } = useTuiNavigation();
+  } = navigation;
 
   const renderBreadcrumbs = () => {
     const parts = ["KIZUKI"];
     if (view !== "start")
-      parts.push(groupingMode === "feed-categories" ? "FEEDS" : "AI CATEGORIES");
+      parts.push(
+        groupingMode === "feed-categories" ? "FEEDS" : "AI CATEGORIES"
+      );
     if (
       selectedCategory &&
       (view === "items" || view === "reader" || view === "confirm-mark-read")
