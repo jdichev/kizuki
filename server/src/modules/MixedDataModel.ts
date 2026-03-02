@@ -1370,6 +1370,7 @@ export default class DataService {
         items.id,
         items.title,
         items.content,
+        items.latest_content,
         items.json_content,
         items.published,
         items.read,
