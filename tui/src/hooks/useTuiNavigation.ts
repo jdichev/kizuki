@@ -50,6 +50,7 @@ export function useTuiNavigation() {
     stdout.on("resize", onResize);
     return () => {
       stdout.off("resize", onResize);
+      stdout.write("\x1b[2J\x1b[0f");
     };
   }, [stdout]);
 

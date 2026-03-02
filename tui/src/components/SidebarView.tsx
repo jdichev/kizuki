@@ -37,7 +37,8 @@ export const SidebarView: React.FC<SidebarViewProps> = ({
         );
       }
 
-      const idStr = c.id === -1 ? "all" : String(c.id).padStart(7);
+      const idStr = c.id === -1 ? "all".padStart(7) : String(c.id).padStart(7);
+
       const row = `${isSelected ? "▶" : " "} ${idStr} │ ${c.title}`;
       return (
         <Text

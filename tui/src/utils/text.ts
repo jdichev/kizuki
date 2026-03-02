@@ -17,12 +17,10 @@ export function visualTruncate(str: string, width: number): string {
   return result + " ".repeat(Math.max(0, width - w));
 }
 
-export function cleanContent(
-  html: string | undefined,
-  isMarkdown: boolean = false
-): string {
+export function cleanContent(html: string | undefined): string {
   if (!html) return "No content available.";
-  if (isMarkdown) return html;
+  
+  // Simple plain-text cleanup: remove tags, decode entities, normalize newlines
   return decode(html.replace(/<[^>]*>?/gm, ""))
     .split("\n")
     .map((l) => l.trim())

@@ -17,7 +17,6 @@
     "markdown-it": "^14.1.0",
     "entities": "^6.0.0",
     "string-width": "^7.2.0",
-    "wrap-ansi": "^9.0.0",
     "pino": "^9.6.0"
   },
   "devDependencies": {
