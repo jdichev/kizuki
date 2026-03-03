@@ -2,13 +2,13 @@ import stringWidth from "string-width";
 import { decode } from "entities";
 
 export function visualTruncate(str: string, width: number): string {
-  if (stringWidth(str) <= width) return str + " ".repeat(width - stringWidth(str));
+  const normalized = str.replace(/\s+/g, " ").trim();
+  if (stringWidth(normalized) <= width)
+    return normalized + " ".repeat(width - stringWidth(normalized));
   const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
   let result = "",
     w = 0;
-  for (const { segment } of segmenter.segment(
-    str.replace(/\s+/g, " ").trim()
-  )) {
+  for (const { segment } of segmenter.segment(normalized)) {
     const sw = stringWidth(segment);
     if (w + sw > width) break;
     result += segment;
@@ -26,4 +26,9 @@ export function cleanContent(html: string | undefined): string {
     .map((l) => l.trim())
     .filter((l) => l.length > 0)
     .join("\n\n");
+}
+
+export function terminalLink(text: string, url: string): string {
+  // OSC 8 hyperlink sequence
+  return `\u001b]8;;${url}\u001b\\${text}\u001b]8;;\u001b\\`;
 }

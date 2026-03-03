@@ -2,7 +2,7 @@ import React from "react";
 import { Box, Text } from "ink";
 import { decode } from "entities";
 import { formatDateTime } from "../utils/date.js";
-import { cleanContent } from "../utils/text.js";
+import { cleanContent, terminalLink } from "../utils/text.js";
 import { Item } from "../types/index.js";
 
 interface ReaderViewProps {
@@ -39,6 +39,16 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
           {item.feedTitle} │ {dateStr}
         </Text>
       </Box>
+      {item.url && (
+        <Box marginTop={0}>
+          <Text>
+            URL:{" "}
+            <Text color="cyan" underline>
+              {terminalLink(item.url, item.url)}
+            </Text>
+          </Text>
+        </Box>
+      )}
       <Box marginTop={1} height={contentHeight - 2}>
         <Text>{visibleLines.join("\n")}</Text>
       </Box>
