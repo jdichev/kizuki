@@ -28,7 +28,12 @@ Examples:
 
 ### Git policy
 
-Do not commit, push, or pull automatically. Ask first.
+- **Manual Operations Only:** NEVER stage, commit, or push changes automatically.
+- **Two-Turn Protocol:**
+  1.  **Turn 1 (Proposal):** Present `git status` and a proposed commit message derived from the actual code diff. Stop and wait for user approval.
+  2.  **Turn 2 (Execution):** Only after receiving explicit confirmation (e.g., "Commit", "Push", "Go ahead"), proceed with the requested actions.
+- **Transparency:** Always verify and display the outcome of git operations (e.g., via `git status`) immediately after execution.
+- **No Force Pushing:** Never force push to a remote repository unless explicitly directed to do so by the user.
 
 ### Architecture
 
