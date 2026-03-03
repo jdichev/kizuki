@@ -28,6 +28,10 @@ export default function App() {
     loading,
     contentHeight,
     listVisibleHeight,
+    readerSplitEnabled,
+    readerLatestContent,
+    readerLatestLoading,
+    readerLatestError,
   } = navigation;
 
   const renderBreadcrumbs = () => {
@@ -115,6 +119,10 @@ export default function App() {
                 scrollOffset={scrollOffset}
                 contentHeight={contentHeight}
                 terminalWidth={terminalWidth}
+                splitEnabled={readerSplitEnabled}
+                latestContent={readerLatestContent}
+                latestLoading={readerLatestLoading}
+                latestError={readerLatestError}
               />
             )}
 

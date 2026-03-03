@@ -69,7 +69,14 @@ export interface Item {
 }
 
 // TUI Specific Navigation Types
-export type View = "help" | "start" | "sidebar" | "items" | "reader" | "confirm-mark-read" | "confirm-exit";
+export type View =
+  | "help"
+  | "start"
+  | "sidebar"
+  | "items"
+  | "reader"
+  | "confirm-mark-read"
+  | "confirm-exit";
 
 export interface SidebarCategory {
   id: number | string;
@@ -100,5 +107,9 @@ export interface UseTuiNavigationResult {
   loading: boolean;
   contentHeight: number;
   listVisibleHeight: number;
+  readerSplitEnabled: boolean;
+  readerLatestContent: string | null;
+  readerLatestLoading: boolean;
+  readerLatestError: string | null;
   setView: (view: View) => void;
 }

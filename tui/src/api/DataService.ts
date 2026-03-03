@@ -201,4 +201,33 @@ export default class DataService {
     );
     return await response.json();
   }
+
+  public async retrieveLatestContent(
+    url: string,
+    format: "markdown" | "html" = "markdown",
+    forceRefresh = false
+  ): Promise<{ markdown?: string | null; html?: string; fromCache?: boolean }> {
+    const response = await fetch(this.makeUrl("/api/retrieve-latest"), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ url, format, forceRefresh }),
+    });
+
+    if (!response.ok) {
+      let message = "Failed to retrieve latest content";
+      try {
+        const errorData = await response.json();
+        if (errorData?.message) {
+          message = String(errorData.message);
+        }
+      } catch {
+        // ignore parse failures
+      }
+      throw new Error(message);
+    }
+
+    return await response.json();
+  }
 }

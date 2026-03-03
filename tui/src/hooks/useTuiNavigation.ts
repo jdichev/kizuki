@@ -29,6 +29,10 @@ interface NavigationState {
   itemIndices: Record<string, number>;
   loading: boolean;
   scrollOffset: number;
+  readerSplitEnabled: boolean;
+  readerLatestContent: string | null;
+  readerLatestLoading: boolean;
+  readerLatestError: string | null;
 }
 
 type NavigationAction =
@@ -43,7 +47,11 @@ type NavigationAction =
   | { type: "setSidebarIndex"; key: string; index: number }
   | { type: "setItemIndex"; key: string; index: number }
   | { type: "setLoading"; loading: boolean }
-  | { type: "setScrollOffset"; scrollOffset: number };
+  | { type: "setScrollOffset"; scrollOffset: number }
+  | { type: "setReaderSplitEnabled"; readerSplitEnabled: boolean }
+  | { type: "setReaderLatestContent"; readerLatestContent: string | null }
+  | { type: "setReaderLatestLoading"; readerLatestLoading: boolean }
+  | { type: "setReaderLatestError"; readerLatestError: string | null };
 
 function navigationReducer(
   state: NavigationState,
@@ -84,6 +92,14 @@ function navigationReducer(
       return { ...state, loading: action.loading };
     case "setScrollOffset":
       return { ...state, scrollOffset: action.scrollOffset };
+    case "setReaderSplitEnabled":
+      return { ...state, readerSplitEnabled: action.readerSplitEnabled };
+    case "setReaderLatestContent":
+      return { ...state, readerLatestContent: action.readerLatestContent };
+    case "setReaderLatestLoading":
+      return { ...state, readerLatestLoading: action.readerLatestLoading };
+    case "setReaderLatestError":
+      return { ...state, readerLatestError: action.readerLatestError };
     default:
       return state;
   }
@@ -112,12 +128,17 @@ type TuiStateController = {
   loading: boolean;
   contentHeight: number;
   listVisibleHeight: number;
+  readerSplitEnabled: boolean;
+  readerLatestContent: string | null;
+  readerLatestLoading: boolean;
+  readerLatestError: string | null;
   setView: (nextView: View) => void;
   handleMarkAllRead: () => void;
   moveListSelection: (delta: number) => void;
   handleBackNavigation: () => void;
   handleForwardNavigation: () => void;
   handleReload: () => void;
+  handleRetrieveLatestContent: () => void;
 };
 
 function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
@@ -135,6 +156,10 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     itemIndices: {},
     loading: false,
     scrollOffset: 0,
+    readerSplitEnabled: false,
+    readerLatestContent: null,
+    readerLatestLoading: false,
+    readerLatestError: null,
   });
 
   const {
@@ -151,6 +176,10 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     itemIndices,
     loading,
     scrollOffset,
+    readerSplitEnabled,
+    readerLatestContent,
+    readerLatestLoading,
+    readerLatestError,
   } = state;
 
   const contentHeight = terminalHeight - 4;
@@ -201,8 +230,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
         categories: currentCats.map((entry) => {
           if (isSidebarHeader(entry)) return entry;
           const cat = entry as SidebarCategory;
-          if (cat.id === -1)
-            return { ...cat, unreadCount: totalUnread };
+          if (cat.id === -1) return { ...cat, unreadCount: totalUnread };
           const stat = stats.find((s) => Number(s.id) === Number(cat.id));
           return {
             ...cat,
@@ -228,7 +256,11 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
           .sort((a, b) => Number(a.id) - Number(b.id));
         const uncategorized: SidebarCategory[] = cats
           .filter((c) => c.title.toLowerCase() === "uncategorized")
-          .map((c) => ({ id: c.id!, title: c.title, isHeader: false as const }));
+          .map((c) => ({
+            id: c.id!,
+            title: c.title,
+            isHeader: false as const,
+          }));
         result = [...result, ...others, ...uncategorized];
       } else {
         const cats = await ds.getItemCategories();
@@ -241,7 +273,11 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
             .filter(
               (c) => Number(c.id) >= range.min && Number(c.id) <= range.max
             )
-            .map((c) => ({ id: c.id!, title: c.title, isHeader: false as const }))
+            .map((c) => ({
+              id: c.id!,
+              title: c.title,
+              isHeader: false as const,
+            }))
             .sort((a, b) => Number(a.id) - Number(b.id));
 
           if (children.length > 0) {
@@ -256,7 +292,11 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
 
         const uncategorized: SidebarCategory[] = cats
           .filter((c) => c.title.toLowerCase() === "uncategorized")
-          .map((c) => ({ id: c.id!, title: c.title, isHeader: false as const }));
+          .map((c) => ({
+            id: c.id!,
+            title: c.title,
+            isHeader: false as const,
+          }));
         if (uncategorized.length > 0) {
           result.push({ id: "0", title: "Uncategorized", isHeader: true });
           result.push(...uncategorized);
@@ -323,6 +363,13 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
         dispatch({ type: "setSelectedItem", selectedItem: fullItem });
         dispatch({ type: "setView", view: "reader" });
         dispatch({ type: "setScrollOffset", scrollOffset: 0 });
+        dispatch({ type: "setReaderSplitEnabled", readerSplitEnabled: false });
+        dispatch({ type: "setReaderLatestContent", readerLatestContent: null });
+        dispatch({ type: "setReaderLatestError", readerLatestError: null });
+        dispatch({
+          type: "setReaderLatestLoading",
+          readerLatestLoading: false,
+        });
         ds.markItemRead(fullItem);
         dispatch({
           type: "setItems",
@@ -341,15 +388,32 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     try {
       const params =
         groupingMode === "feed-categories"
-          ? { feedCategory: { id: Number(selectedCategory.id), title: selectedCategory.title } as FeedCategory }
-          : { itemCategories: [{ id: Number(selectedCategory.id), title: selectedCategory.title } as ItemCategory] };
+          ? {
+              feedCategory: {
+                id: Number(selectedCategory.id),
+                title: selectedCategory.title,
+              } as FeedCategory,
+            }
+          : {
+              itemCategories: [
+                {
+                  id: Number(selectedCategory.id),
+                  title: selectedCategory.title,
+                } as ItemCategory,
+              ],
+            };
       await ds.markItemsRead(params);
       const refreshedItems = await ds.getItems({
         size: 100,
         unreadOnly: false,
         bookmarkedOnly: false,
         selectedFeedCategory:
-          groupingMode === "feed-categories" ? ({ id: Number(selectedCategory.id), title: selectedCategory.title } as FeedCategory) : undefined,
+          groupingMode === "feed-categories"
+            ? ({
+                id: Number(selectedCategory.id),
+                title: selectedCategory.title,
+              } as FeedCategory)
+            : undefined,
         selectedItemCategoryIds:
           groupingMode === "item-categories" &&
           typeof selectedCategory.id === "number"
@@ -387,7 +451,11 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     // 2. Sidebar-specific jump logic (skip headers)
     if (view === "sidebar") {
       const step = delta > 0 ? 1 : -1;
-      while (next >= 0 && next < listLength && isSidebarHeader(categories[next])) {
+      while (
+        next >= 0 &&
+        next < listLength &&
+        isSidebarHeader(categories[next])
+      ) {
         next += step;
       }
       if (next < 0 || next >= listLength || isSidebarHeader(categories[next])) {
@@ -488,6 +556,72 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     }
   };
 
+  const handleRetrieveLatestContent = async () => {
+    if (view !== "reader" || !selectedItem?.url) {
+      return;
+    }
+
+    const shouldForceRefresh = readerSplitEnabled;
+
+    dispatch({ type: "setReaderSplitEnabled", readerSplitEnabled: true });
+    dispatch({ type: "setReaderLatestLoading", readerLatestLoading: true });
+    dispatch({ type: "setReaderLatestError", readerLatestError: null });
+
+    try {
+      const data = await ds.retrieveLatestContent(
+        selectedItem.url,
+        "markdown",
+        shouldForceRefresh
+      );
+      const latestContent = data.markdown || "";
+
+      if (!latestContent.trim()) {
+        dispatch({
+          type: "setReaderLatestError",
+          readerLatestError: "No latest content returned",
+        });
+        return;
+      }
+
+      const latestWordCount = latestContent
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean).length;
+
+      const updatedSelectedItem: Item = {
+        ...selectedItem,
+        latest_content: latestContent,
+        latestContentWordCount: latestWordCount,
+      };
+
+      dispatch({ type: "setSelectedItem", selectedItem: updatedSelectedItem });
+      dispatch({
+        type: "setReaderLatestContent",
+        readerLatestContent: latestContent,
+      });
+      dispatch({
+        type: "setItems",
+        items: items.map((item) =>
+          item.id === selectedItem.id
+            ? {
+                ...item,
+                latest_content: latestContent,
+                latestContentWordCount: latestWordCount,
+              }
+            : item
+        ),
+      });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to retrieve latest content";
+      dispatch({ type: "setReaderLatestError", readerLatestError: message });
+    } finally {
+      dispatch({ type: "setReaderLatestLoading", readerLatestLoading: false });
+    }
+  };
+
   const setView = (nextView: View) => {
     dispatch({ type: "setView", view: nextView });
   };
@@ -506,12 +640,17 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     loading,
     contentHeight,
     listVisibleHeight,
+    readerSplitEnabled,
+    readerLatestContent,
+    readerLatestLoading,
+    readerLatestError,
     setView,
     handleMarkAllRead,
     moveListSelection,
     handleBackNavigation,
     handleForwardNavigation,
     handleReload,
+    handleRetrieveLatestContent,
   };
 }
 
@@ -525,6 +664,7 @@ function useTuiInput(
     handleBackNavigation,
     handleForwardNavigation,
     handleReload,
+    handleRetrieveLatestContent,
     listVisibleHeight,
   }: Pick<
     TuiStateController,
@@ -535,10 +675,19 @@ function useTuiInput(
     | "handleBackNavigation"
     | "handleForwardNavigation"
     | "handleReload"
+    | "handleRetrieveLatestContent"
     | "listVisibleHeight"
   >
 ) {
   useInput((input, key) => {
+    const normalizedInput = input.toLowerCase();
+    const isFetchLatestShortcut = view === "reader" && normalizedInput === "i";
+
+    if (isFetchLatestShortcut) {
+      handleRetrieveLatestContent();
+      return;
+    }
+
     if (view === "help") {
       setView("start");
       return;
@@ -631,6 +780,7 @@ export function useTuiNavigation() {
     handleBackNavigation: state.handleBackNavigation,
     handleForwardNavigation: state.handleForwardNavigation,
     handleReload: state.handleReload,
+    handleRetrieveLatestContent: state.handleRetrieveLatestContent,
     listVisibleHeight: state.listVisibleHeight,
   });
 
@@ -648,6 +798,10 @@ export function useTuiNavigation() {
     loading: state.loading,
     contentHeight: state.contentHeight,
     listVisibleHeight: state.listVisibleHeight,
+    readerSplitEnabled: state.readerSplitEnabled,
+    readerLatestContent: state.readerLatestContent,
+    readerLatestLoading: state.readerLatestLoading,
+    readerLatestError: state.readerLatestError,
     setView: state.setView,
   };
 

@@ -176,10 +176,7 @@ app.put("/items", jsonParser, async (req: Request, res: Response) => {
     res.json({ success: result });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    pino.error(
-      { error: message },
-      "Error updating item category"
-    );
+    pino.error({ error: message }, "Error updating item category");
     res.status(500).json({
       error: "Failed to update item category",
       message: message,
@@ -342,10 +339,7 @@ app.put("/item-categories", jsonParser, async (req: Request, res: Response) => {
     res.json({ success: result });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    pino.error(
-      { error: message },
-      "Error updating item category"
-    );
+    pino.error({ error: message }, "Error updating item category");
     res.status(500).json({
       error: "Failed to update item category",
       message: message,
@@ -532,7 +526,10 @@ app.post("/feeds", jsonParser, async (req: Request, res: Response) => {
     pino.trace({ result }, "Feed added successfully");
     res.json(result);
   } catch (error: unknown) {
-    pino.error({ error: (error as any).message || String(error) }, "Error adding feed");
+    pino.error(
+      { error: (error as any).message || String(error) },
+      "Error adding feed"
+    );
     res.status(500).json({ error: (error as any).message || String(error) });
   }
 });
@@ -563,7 +560,9 @@ app.post("/opml-import", jsonParser, async (req: Request, res: Response) => {
       { error: (error as any).message || String(error) },
       "Error importing OPML"
     );
-    res.status(500).json({ error: (error as any).message || "Failed to import OPML" });
+    res
+      .status(500)
+      .json({ error: (error as any).message || "Failed to import OPML" });
   }
 });
 
@@ -623,7 +622,9 @@ app.post(
       );
       res
         .status(500)
-        .json({ error: (error as any).message || "Failed to start OPML import" });
+        .json({
+          error: (error as any).message || "Failed to start OPML import",
+        });
     }
   }
 );
@@ -797,7 +798,7 @@ app.post(
   jsonParser,
   async (req: Request, res: Response) => {
     try {
-      const { url, format } = req.body;
+      const { url, format, forceRefresh } = req.body;
 
       if (!url) {
         return res.status(400).json({
@@ -809,16 +810,21 @@ app.post(
       let markdown: string | null = null;
       let fromCache = false;
 
-      // Check if latest content already exists in database
-      markdown = await dataModel.getItemLatestContent(url);
-      if (markdown) {
-        fromCache = true;
-        pino.info({ url }, "Latest content retrieved from cache");
+      if (!forceRefresh) {
+        // Check if latest content already exists in database
+        markdown = await dataModel.getItemLatestContent(url);
+        if (markdown) {
+          fromCache = true;
+          pino.info({ url }, "Latest content retrieved from cache");
+        }
       }
 
-      // Fetch latest content if not cached
+      // Fetch latest content if not cached or force refresh requested
       if (!markdown) {
-        pino.info({ url }, "Retrieving latest article content");
+        pino.info(
+          { url, forceRefresh: Boolean(forceRefresh) },
+          "Retrieving latest article content"
+        );
         markdown = await convertArticleToMarkdown(url);
 
         // Save latest content to database
