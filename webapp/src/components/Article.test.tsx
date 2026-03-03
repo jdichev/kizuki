@@ -57,7 +57,9 @@ test("clicking blocked image link enables external images", async () => {
 
   await waitFor(() => {
     expect(document.querySelector("#content img")).toBeTruthy();
-    expect(document.querySelector("#content .blocked-external-image")).toBeNull();
+    expect(
+      document.querySelector("#content .blocked-external-image")
+    ).toBeNull();
   });
 });
 
