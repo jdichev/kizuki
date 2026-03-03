@@ -708,7 +708,7 @@ export default class DataService {
       SELECT
         feed_categories.id,
         feed_categories.title,
-        count(items.feed_id) as unreadCount
+        count(items.id) as unreadCount
       FROM
         feed_categories
       LEFT JOIN
@@ -719,8 +719,7 @@ export default class DataService {
         items
       ON
         items.feed_id = feeds.id
-      WHERE
-        items.read = 0
+        AND items.read = 0
       GROUP BY
         feed_categories.id
     `;
@@ -739,15 +738,14 @@ export default class DataService {
       SELECT
         item_categories.id,
         item_categories.title,
-        count(items.itemCategoryId) as unreadCount
+        count(items.id) as unreadCount
       FROM
         item_categories
       LEFT JOIN
         items
       ON
         items.itemCategoryId = item_categories.id
-      WHERE
-        items.read = 0
+        AND items.read = 0
       GROUP BY
         item_categories.id
     `;

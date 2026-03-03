@@ -2,6 +2,7 @@ import React from "react";
 import { Box, Text } from "ink";
 import { SectionHeader } from "./SectionHeader.js";
 import { GroupingMode, SidebarEntry } from "../types/index.js";
+import { visualTruncate } from "../utils/text.js";
 
 interface SidebarViewProps {
   groupingMode: GroupingMode;
@@ -46,10 +47,15 @@ export const SidebarView: React.FC<SidebarViewProps> = ({
           );
         }
 
-        const idStr =
-          c.id === -1 ? "all".padStart(7) : String(c.id).padStart(7);
+        const idStr = c.id === -1 ? "all".padStart(7) : String(c.id).padStart(7);
+        const unreadStr =
+          c.unreadCount && c.unreadCount > 0 ? String(c.unreadCount) : "";
+        
+        const titleWidth = terminalWidth - 25;
+        const row = `${isSelected ? "▶" : " "} ${idStr} │ ${visualTruncate(c.title, titleWidth)} │ ${unreadStr.padStart(
+          6
+        )}`;
 
-        const row = `${isSelected ? "▶" : " "} ${idStr} │ ${c.title}`;
         return (
           <Text
             key={realIdx}

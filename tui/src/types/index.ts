@@ -46,37 +46,11 @@ export interface ItemCategoryReadStat {
 
 export type GroupingMode = "feed-categories" | "item-categories";
 
-export type View =
-  | "start"
-  | "sidebar"
-  | "items"
-  | "reader"
-  | "confirm-mark-read"
-  | "confirm-exit";
-
-export type AllCategory = {
-  id: -1;
-  title: "All";
-};
-
-export type SidebarHeader = {
-  id: string;
-  title: string;
-  isHeader: true;
-};
-
-export type SidebarCategory = (FeedCategory | ItemCategory | AllCategory) & {
-  isHeader?: false;
-};
-
-export type SidebarEntry = SidebarHeader | SidebarCategory;
-
 export interface Item {
-  id?: number;
+  id: number;
   title: string;
   read: 0 | 1 | number;
   bookmarked?: 0 | 1 | number;
-  latestContentWordCount?: number;
   published: number;
   created?: number;
   feedTitle?: string;
@@ -86,6 +60,7 @@ export interface Item {
   feedId?: number;
   feedCategoryId?: number;
   itemCategoryId?: number;
+  latestContentWordCount?: number;
   jsonContent?: {
     "yt-id"?: string;
   };
@@ -93,7 +68,25 @@ export interface Item {
   latest_content?: string;
 }
 
-export type UseTuiNavigationResult = {
+// TUI Specific Navigation Types
+export type View = "start" | "sidebar" | "items" | "reader" | "confirm-mark-read" | "confirm-exit";
+
+export interface SidebarCategory {
+  id: number | string;
+  title: string;
+  isHeader?: false;
+  unreadCount?: number;
+}
+
+export interface SidebarHeader {
+  id?: string;
+  title: string;
+  isHeader: true;
+}
+
+export type SidebarEntry = SidebarCategory | SidebarHeader;
+
+export interface UseTuiNavigationResult {
   terminalHeight: number;
   terminalWidth: number;
   view: View;
@@ -107,4 +100,4 @@ export type UseTuiNavigationResult = {
   loading: boolean;
   contentHeight: number;
   listVisibleHeight: number;
-};
+}

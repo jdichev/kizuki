@@ -1,22 +1,21 @@
-import { useEffect, useReducer } from "react";
+import { useReducer, useEffect } from "react";
 import { useInput, useApp, useStdout } from "ink";
 import DataService from "../api/DataService.js";
 import {
   Item,
   FeedCategory,
   ItemCategory,
-  GroupingMode,
   View,
-  SidebarCategory,
+  GroupingMode,
   SidebarEntry,
-  SidebarHeader,
+  SidebarCategory,
   UseTuiNavigationResult,
 } from "../types/index.js";
 import { ITEM_CATEGORY_RANGES, MODE_ITEMS } from "../constants/config.js";
 
 const ds = DataService.getInstance();
 
-type NavigationState = {
+interface NavigationState {
   terminalHeight: number;
   terminalWidth: number;
   view: View;
@@ -30,7 +29,7 @@ type NavigationState = {
   itemIndices: Record<string, number>;
   loading: boolean;
   scrollOffset: number;
-};
+}
 
 type NavigationAction =
   | { type: "setTerminalSize"; terminalHeight: number; terminalWidth: number }
@@ -90,9 +89,7 @@ function navigationReducer(
   }
 }
 
-function isSidebarHeader(
-  entry: SidebarEntry | undefined
-): entry is SidebarHeader {
+function isSidebarHeader(entry: SidebarEntry | undefined): entry is any {
   return Boolean(entry && entry.isHeader);
 }
 
@@ -187,19 +184,51 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     };
   }, [stdout]);
 
+  const refreshReadStats = async (
+    mode: GroupingMode,
+    currentCats: SidebarEntry[]
+  ) => {
+    try {
+      const stats =
+        mode === "feed-categories"
+          ? await ds.getFeedCategoryReadStats()
+          : await ds.getItemCategoryReadStats();
+
+      const totalUnread = stats.reduce((sum, s) => sum + s.unreadCount, 0);
+
+      dispatch({
+        type: "setCategories",
+        categories: currentCats.map((entry) => {
+          if (isSidebarHeader(entry)) return entry;
+          const cat = entry as SidebarCategory;
+          if (cat.id === -1)
+            return { ...cat, unreadCount: totalUnread };
+          const stat = stats.find((s) => Number(s.id) === Number(cat.id));
+          return {
+            ...cat,
+            unreadCount: stat?.unreadCount || 0,
+          };
+        }),
+      });
+    } catch (e) {
+      // ignore
+    }
+  };
+
   const handleSelectMode = async (mode: GroupingMode) => {
     dispatch({ type: "setGroupingMode", groupingMode: mode });
     dispatch({ type: "setLoading", loading: true });
     try {
-      let result: SidebarEntry[] = [{ id: -1, title: "All" }];
+      let result: SidebarEntry[] = [{ id: -1, title: "All", isHeader: false }];
       if (mode === "feed-categories") {
         const cats = await ds.getFeedCategories();
-        const others = cats
+        const others: SidebarCategory[] = cats
           .filter((c) => c.title.toLowerCase() !== "uncategorized")
+          .map((c) => ({ id: c.id!, title: c.title, isHeader: false as const }))
           .sort((a, b) => Number(a.id) - Number(b.id));
-        const uncategorized = cats.filter(
-          (c) => c.title.toLowerCase() === "uncategorized"
-        );
+        const uncategorized: SidebarCategory[] = cats
+          .filter((c) => c.title.toLowerCase() === "uncategorized")
+          .map((c) => ({ id: c.id!, title: c.title, isHeader: false as const }));
         result = [...result, ...others, ...uncategorized];
       } else {
         const cats = await ds.getItemCategories();
@@ -208,10 +237,11 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
         );
 
         for (const range of sortedRanges) {
-          const children = cats
+          const children: SidebarCategory[] = cats
             .filter(
               (c) => Number(c.id) >= range.min && Number(c.id) <= range.max
             )
+            .map((c) => ({ id: c.id!, title: c.title, isHeader: false as const }))
             .sort((a, b) => Number(a.id) - Number(b.id));
 
           if (children.length > 0) {
@@ -224,15 +254,17 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
           }
         }
 
-        const uncategorized = cats.filter(
-          (c) => c.title.toLowerCase() === "uncategorized"
-        );
+        const uncategorized: SidebarCategory[] = cats
+          .filter((c) => c.title.toLowerCase() === "uncategorized")
+          .map((c) => ({ id: c.id!, title: c.title, isHeader: false as const }));
         if (uncategorized.length > 0) {
           result.push({ id: "0", title: "Uncategorized", isHeader: true });
           result.push(...uncategorized);
         }
       }
       dispatch({ type: "setCategories", categories: result });
+      await refreshReadStats(mode, result);
+
       const savedIdx = sidebarIndices[mode] || 0;
       dispatch({
         type: "setActiveIndex",
@@ -247,7 +279,8 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
 
   const handleSelectCategory = async (category: SidebarEntry | undefined) => {
     if (!category || isSidebarHeader(category)) return;
-    dispatch({ type: "setSelectedCategory", selectedCategory: category });
+    const cat = category as SidebarCategory;
+    dispatch({ type: "setSelectedCategory", selectedCategory: cat });
     dispatch({ type: "setLoading", loading: true });
     try {
       const params: {
@@ -257,16 +290,19 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
         selectedFeedCategory?: FeedCategory;
         selectedItemCategoryIds?: number[];
       } = { size: 100, unreadOnly: false, bookmarkedOnly: false };
-      if (category.id !== -1) {
+      if (cat.id !== -1) {
         if (groupingMode === "feed-categories") {
-          params.selectedFeedCategory = category as FeedCategory;
-        } else if (typeof category.id === "number") {
-          params.selectedItemCategoryIds = [category.id];
+          params.selectedFeedCategory = {
+            id: Number(cat.id),
+            title: cat.title,
+          } as FeedCategory;
+        } else if (typeof cat.id === "number") {
+          params.selectedItemCategoryIds = [cat.id];
         }
       }
       const categoryItems = await ds.getItems(params);
       dispatch({ type: "setItems", items: categoryItems });
-      const catKey = category.id?.toString() || "all";
+      const catKey = cat.id?.toString() || "all";
       dispatch({
         type: "setActiveIndex",
         activeIndex: itemIndices[catKey] || 0,
@@ -292,6 +328,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
           type: "setItems",
           items: items.map((i) => (i.id === item.id ? { ...i, read: 1 } : i)),
         });
+        refreshReadStats(groupingMode, categories);
       }
     } finally {
       dispatch({ type: "setLoading", loading: false });
@@ -304,15 +341,15 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     try {
       const params =
         groupingMode === "feed-categories"
-          ? { feedCategory: selectedCategory as FeedCategory }
-          : { itemCategories: [selectedCategory as ItemCategory] };
+          ? { feedCategory: { id: Number(selectedCategory.id), title: selectedCategory.title } as FeedCategory }
+          : { itemCategories: [{ id: Number(selectedCategory.id), title: selectedCategory.title } as ItemCategory] };
       await ds.markItemsRead(params);
       const refreshedItems = await ds.getItems({
         size: 100,
         unreadOnly: false,
         bookmarkedOnly: false,
         selectedFeedCategory:
-          groupingMode === "feed-categories" ? selectedCategory : undefined,
+          groupingMode === "feed-categories" ? ({ id: Number(selectedCategory.id), title: selectedCategory.title } as FeedCategory) : undefined,
         selectedItemCategoryIds:
           groupingMode === "item-categories" &&
           typeof selectedCategory.id === "number"
@@ -320,6 +357,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
             : undefined,
       });
       dispatch({ type: "setItems", items: refreshedItems });
+      await refreshReadStats(groupingMode, categories);
       dispatch({ type: "setView", view: "items" });
     } finally {
       dispatch({ type: "setLoading", loading: false });
