@@ -114,7 +114,7 @@ type TuiStateController = {
   listVisibleHeight: number;
   setView: (nextView: View) => void;
   handleMarkAllRead: () => void;
-  moveListSelection: (delta: -1 | 1) => void;
+  moveListSelection: (delta: number) => void;
   handleBackNavigation: () => void;
   handleForwardNavigation: () => void;
   handleReload: () => void;
@@ -124,7 +124,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
   const [state, dispatch] = useReducer(navigationReducer, {
     terminalHeight: stdout.rows || 24,
     terminalWidth: stdout.columns || 80,
-    view: "start",
+    view: "help",
     groupingMode: "feed-categories",
     categories: [],
     items: [],
@@ -364,10 +364,9 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     }
   };
 
-  const moveListSelection = (delta: -1 | 1) => {
+  const moveListSelection = (delta: number) => {
     if (view === "reader") {
-      const nextOffset =
-        delta < 0 ? Math.max(0, scrollOffset - 1) : scrollOffset + 1;
+      const nextOffset = Math.max(0, scrollOffset + delta);
       dispatch({ type: "setScrollOffset", scrollOffset: nextOffset });
       return;
     }
@@ -378,28 +377,53 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
         : view === "sidebar"
           ? categories.length
           : items.length;
+
+    if (listLength === 0) return;
+
+    // 1. Calculate the new logical active index
     let next = activeIndex + delta;
+    next = Math.max(0, Math.min(listLength - 1, next));
 
+    // 2. Sidebar-specific jump logic (skip headers)
     if (view === "sidebar") {
-      while (
-        next >= 0 &&
-        next < listLength &&
-        isSidebarHeader(categories[next])
-      ) {
-        next += delta;
+      const step = delta > 0 ? 1 : -1;
+      while (next >= 0 && next < listLength && isSidebarHeader(categories[next])) {
+        next += step;
       }
-    }
-
-    if (next < 0 || next >= listLength) {
-      return;
+      if (next < 0 || next >= listLength || isSidebarHeader(categories[next])) {
+        // Fallback to first non-header
+        const first = categories.findIndex((c) => !isSidebarHeader(c));
+        next = first !== -1 ? first : activeIndex;
+      }
     }
 
     dispatch({ type: "setActiveIndex", activeIndex: next });
 
+    // 3. Update scroll position
+    if (Math.abs(delta) > 1) {
+      // PAGING: Attempt to center the new index
+      const halfPage = Math.floor(listVisibleHeight / 2);
+      let newScroll = next - halfPage;
+      // Clamp scroll to ensure we don't show empty space at bottom
+      const maxScroll = Math.max(0, listLength - listVisibleHeight);
+      newScroll = Math.max(0, Math.min(maxScroll, newScroll));
+      dispatch({ type: "setScrollOffset", scrollOffset: newScroll });
+    } else {
+      // SINGLE STEP: Scroll only if selection moves off-screen
+      if (next < scrollOffset) {
+        dispatch({ type: "setScrollOffset", scrollOffset: next });
+      } else if (next >= scrollOffset + listVisibleHeight) {
+        dispatch({
+          type: "setScrollOffset",
+          scrollOffset: next - listVisibleHeight + 1,
+        });
+      }
+    }
+
+    // 4. Persist index
     if (view === "sidebar") {
       dispatch({ type: "setSidebarIndex", key: groupingMode, index: next });
     }
-
     if (view === "items") {
       dispatch({
         type: "setItemIndex",
@@ -501,6 +525,7 @@ function useTuiInput(
     handleBackNavigation,
     handleForwardNavigation,
     handleReload,
+    listVisibleHeight,
   }: Pick<
     TuiStateController,
     | "view"
@@ -510,9 +535,14 @@ function useTuiInput(
     | "handleBackNavigation"
     | "handleForwardNavigation"
     | "handleReload"
+    | "listVisibleHeight"
   >
 ) {
   useInput((input, key) => {
+    if (view === "help") {
+      setView("start");
+      return;
+    }
     if (key.escape) {
       setView("confirm-exit");
       return;
@@ -534,10 +564,18 @@ function useTuiInput(
 
     const isUp = input === "w" || key.upArrow;
     const isDown = input === "s" || key.downArrow;
+    const isPageUp = (input === "u" && key.ctrl) || key.pageUp;
+    const isPageDown = (input === "d" && key.ctrl) || key.pageDown;
     const isBack = input === "a" || key.leftArrow;
     const isForward = input === "d" || key.rightArrow || key.return;
     const isReload = input === "r";
+    const isHelp = input === "?" || input === "h";
     const isMarkReadConfirm = view === "items" && input === "q";
+
+    if (isHelp) {
+      setView("help");
+      return;
+    }
 
     if (isUp) {
       moveListSelection(-1);
@@ -546,6 +584,16 @@ function useTuiInput(
 
     if (isDown) {
       moveListSelection(1);
+      return;
+    }
+
+    if (isPageUp) {
+      moveListSelection(-listVisibleHeight);
+      return;
+    }
+
+    if (isPageDown) {
+      moveListSelection(listVisibleHeight);
       return;
     }
 
@@ -583,6 +631,7 @@ export function useTuiNavigation() {
     handleBackNavigation: state.handleBackNavigation,
     handleForwardNavigation: state.handleForwardNavigation,
     handleReload: state.handleReload,
+    listVisibleHeight: state.listVisibleHeight,
   });
 
   const result: UseTuiNavigationResult = {
@@ -599,6 +648,7 @@ export function useTuiNavigation() {
     loading: state.loading,
     contentHeight: state.contentHeight,
     listVisibleHeight: state.listVisibleHeight,
+    setView: state.setView,
   };
 
   return result;

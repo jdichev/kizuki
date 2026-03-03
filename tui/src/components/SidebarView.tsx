@@ -1,8 +1,9 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { SectionHeader } from "./SectionHeader.js";
-import { GroupingMode, SidebarEntry } from "../types/index.js";
+import { GroupingMode, SidebarEntry, SidebarCategory } from "../types/index.js";
 import { visualTruncate } from "../utils/text.js";
+import { Scrollbar } from "./Scrollbar.js";
 
 interface SidebarViewProps {
   groupingMode: GroupingMode;
@@ -21,7 +22,7 @@ export const SidebarView: React.FC<SidebarViewProps> = ({
   visibleHeight,
   terminalWidth,
 }) => (
-  <Box flexDirection="column">
+  <Box flexDirection="column" width="100%">
     <SectionHeader
       title={
         groupingMode === "feed-categories"
@@ -30,41 +31,51 @@ export const SidebarView: React.FC<SidebarViewProps> = ({
       }
       terminalWidth={terminalWidth}
     />
-    {categories
-      .slice(scrollOffset, scrollOffset + visibleHeight)
-      .map((c, i) => {
-        const realIdx = i + scrollOffset;
-        const isSelected = realIdx === activeIndex;
+    <Box flexDirection="row">
+      <Box flexDirection="column" flexGrow={1}>
+        {categories
+          .slice(scrollOffset, scrollOffset + visibleHeight)
+          .map((entry, i) => {
+            const realIdx = i + scrollOffset;
+            const isSelected = realIdx === activeIndex;
 
-        if (c.isHeader) {
-          const rangeId = String(c.id).padStart(7);
-          return (
-            <Text key={`h-${realIdx}`} bold color="magenta">
-              {`  ${rangeId} │ ${c.title.toUpperCase()}`.padEnd(
-                terminalWidth - 4
-              )}
-            </Text>
-          );
-        }
+            if (entry.isHeader) {
+              const rangeId = String(entry.id).padStart(7);
+              return (
+                <Text key={`h-${realIdx}`} bold color="magenta">
+                  {`  ${rangeId} │ ${entry.title.toUpperCase()}`.padEnd(
+                    terminalWidth - 6
+                  )}
+                </Text>
+              );
+            }
 
-        const idStr = c.id === -1 ? "all".padStart(7) : String(c.id).padStart(7);
-        const unreadStr =
-          c.unreadCount && c.unreadCount > 0 ? String(c.unreadCount) : "";
-        
-        const titleWidth = terminalWidth - 25;
-        const row = `${isSelected ? "▶" : " "} ${idStr} │ ${visualTruncate(c.title, titleWidth)} │ ${unreadStr.padStart(
-          6
-        )}`;
+            const cat = entry as SidebarCategory;
+            const idStr = cat.id === -1 ? "all".padStart(7) : String(cat.id).padStart(7);
+            const unreadStr =
+              cat.unreadCount && cat.unreadCount > 0 ? String(cat.unreadCount) : "";
+            
+            const titleWidth = terminalWidth - 27;
+            const row = `${isSelected ? "▶" : " "} ${idStr} │ ${visualTruncate(cat.title, titleWidth)} │ ${unreadStr.padStart(
+              6
+            )}`;
 
-        return (
-          <Text
-            key={realIdx}
-            backgroundColor={isSelected ? "white" : undefined}
-            color={isSelected ? "black" : undefined}
-          >
-            {row.padEnd(terminalWidth - 4)}
-          </Text>
-        );
-      })}
+            return (
+              <Text
+                key={realIdx}
+                backgroundColor={isSelected ? "white" : undefined}
+                color={isSelected ? "black" : undefined}
+              >
+                {row.padEnd(terminalWidth - 6)}
+              </Text>
+            );
+          })}
+      </Box>
+      <Scrollbar
+        scrollOffset={scrollOffset}
+        visibleHeight={visibleHeight}
+        totalItems={categories.length}
+      />
+    </Box>
   </Box>
 );

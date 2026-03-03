@@ -7,10 +7,14 @@ interface HeaderProps {
   terminalWidth: number;
 }
 
-export const Header: React.FC<HeaderProps> = ({ breadcrumbs, terminalWidth }) => (
+export const Header: React.FC<HeaderProps> = ({
+  breadcrumbs,
+  terminalWidth,
+}) => (
   <Box height={1} width="100%">
-    <Text backgroundColor="green" color="white">
-      {visualTruncate(` ${breadcrumbs}`, terminalWidth - 2)}
+    <Text backgroundColor="magenta" color="white">
+      {` `}
+      {visualTruncate(` ${breadcrumbs}`, terminalWidth - 3)}
     </Text>
   </Box>
 );

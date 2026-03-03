@@ -9,6 +9,7 @@ import { SidebarView } from "./components/SidebarView.js";
 import { ItemsView } from "./components/ItemsView.js";
 import { ReaderView } from "./components/ReaderView.js";
 import { ConfirmationDialog } from "./components/ConfirmationDialog.js";
+import { HelpDialog } from "./components/HelpDialog.js";
 import { MODE_ITEMS } from "./constants/config.js";
 
 export default function App() {
@@ -31,7 +32,7 @@ export default function App() {
 
   const renderBreadcrumbs = () => {
     const parts = ["KIZUKI"];
-    if (view !== "start")
+    if (view !== "start" && view !== "help")
       parts.push(
         groupingMode === "feed-categories" ? "FEEDS" : "AI CATEGORIES"
       );
@@ -58,6 +59,14 @@ export default function App() {
           <Text>Loading...</Text>
         ) : (
           <>
+            {view === "help" && (
+              <HelpDialog
+                width={Math.max(40, Math.floor(terminalWidth * 0.6))}
+                height={Math.max(12, Math.floor(contentHeight * 0.6))}
+                onClose={() => navigation.setView("start")}
+              />
+            )}
+
             {view === "start" && (
               <Box flexDirection="column">
                 <SectionHeader
