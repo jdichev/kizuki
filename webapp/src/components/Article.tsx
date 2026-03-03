@@ -40,6 +40,15 @@ function withExternalImagesBlocked(
     placeholder.setAttribute("aria-label", "External image");
     placeholder.innerHTML = '<i class="bi bi-image" aria-hidden="true"></i>';
 
+    const closestAnchor = imageNode.closest("a");
+    if (closestAnchor?.contains(imageNode)) {
+      closestAnchor.classList.add("blocked-external-image-link");
+      closestAnchor.setAttribute("href", "#");
+      closestAnchor.setAttribute("title", "Load external images");
+      closestAnchor.removeAttribute("target");
+      closestAnchor.removeAttribute("rel");
+    }
+
     const parent = imageNode.parentElement;
     if (parent?.tagName.toLowerCase() === "picture") {
       parent.replaceWith(placeholder);
@@ -327,6 +336,18 @@ export default function Article({
     setAreExternalImagesAllowed((previous) => !previous);
   };
 
+  const handleContentClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    const blockedImagePlaceholder = target.closest(".blocked-external-image");
+    const blockedImageLink = target.closest("a.blocked-external-image-link");
+    if (!blockedImageLink && !blockedImagePlaceholder) {
+      return;
+    }
+
+    event.preventDefault();
+    setAreExternalImagesAllowed(true);
+  };
+
   const renderedSummaryHtml = useMemo(
     () => withExternalImagesBlocked(summary, areExternalImagesAllowed),
     [summary, areExternalImagesAllowed]
@@ -387,12 +408,10 @@ export default function Article({
               onSummarize={handleSummarize}
               onRetrieveLatest={handleRetrieveLatest}
               onBookmark={handleBookmark}
-              onToggleExternalImages={handleToggleExternalImages}
               isLoadingSummary={isLoadingSummary}
               isLoadingContent={isLoadingContent}
               isBookmarking={isBookmarking}
               isBookmarked={article?.bookmarked === 1}
-              areExternalImagesAllowed={areExternalImagesAllowed}
             />,
             topOptions.current
           )}
@@ -465,7 +484,7 @@ export default function Article({
             )}
           </p>
 
-          <div id="content">
+          <div id="content" onClick={handleContentClick}>
             {videoId ? (
               <>
                 <div>

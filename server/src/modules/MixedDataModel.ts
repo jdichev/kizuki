@@ -1505,6 +1505,7 @@ export default class DataService {
         items.published,
         items.read,
         items.bookmarked,
+        items.url,
         items.latest_content_word_count AS latestContentWordCount,
         items.feed_id AS feedId,
         feeds.title AS feedTitle,

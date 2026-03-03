@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import Article from "./Article";
 
 const textArticle = {
@@ -34,26 +34,31 @@ test("renders article", async () => {
 });
 
 test("loads external images when toggled for an article", async () => {
-  const topOptionsContainer = document.createElement("div");
-  document.body.appendChild(topOptionsContainer);
-
-  render(
-    <Article
-      article={textArticle}
-      topOptions={{ current: topOptionsContainer }}
-    />
-  );
+  render(<Article article={textArticle} />);
 
   const toggleButton = screen.getByRole("button", {
-    name: "Toggle external images",
+    name: "Load",
   });
 
   fireEvent.click(toggleButton);
 
   expect(document.querySelector("#content img")).toBeTruthy();
   expect(document.querySelector("#content .blocked-external-image")).toBeNull();
+});
 
-  topOptionsContainer.remove();
+test("clicking blocked image link enables external images", async () => {
+  render(<Article article={textArticle} />);
+
+  const blockedImagePlaceholder = screen.getByRole("img", {
+    name: "External image",
+  });
+
+  fireEvent.click(blockedImagePlaceholder);
+
+  await waitFor(() => {
+    expect(document.querySelector("#content img")).toBeTruthy();
+    expect(document.querySelector("#content .blocked-external-image")).toBeNull();
+  });
 });
 
 test("renders article placeholder", async () => {

@@ -39,11 +39,15 @@ export const ItemsView: React.FC<ItemsViewProps> = ({
         const titleWidth =
           terminalWidth - feedWidth - dateWidth - wordsWidth - 12;
 
+        const isVideo =
+          item.url?.includes("youtube.com") || item.url?.includes("youtu.be");
+        const wordsLabel = isVideo ? "vid" : `${item.latestContentWordCount || 0}w`;
+
         const row = `${item.read ? " " : "*"} ${visualTruncate(
           decode(item.title),
           titleWidth
         )} │ ${visualTruncate(item.feedTitle || "", feedWidth)} │ ${visualTruncate(
-          `${item.latestContentWordCount || 0}w`,
+          wordsLabel,
           wordsWidth - 1
         )} │ ${dateTimeStr}`;
 
