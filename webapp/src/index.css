@@ -618,6 +618,40 @@ table.feeds-table {
   color: var(--content-body-color);
 }
 
+.image-privacy-strip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  margin: 0.25rem 0 0.5rem;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid var(--frame-border-color);
+  background-color: var(--items-list-bg);
+  color: var(--weak-color);
+  font-size: 0.72rem;
+  line-height: 1.2;
+}
+
+.btn-image-privacy-toggle {
+  border: none;
+  background: transparent;
+  color: var(--link-color);
+  padding: 0;
+  margin-left: auto;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.btn-image-privacy-toggle:hover {
+  color: var(--link-highlight-color);
+  text-decoration: underline;
+}
+
+.btn-image-privacy-toggle:focus-visible {
+  outline: 2px solid var(--link-color);
+  outline-offset: 2px;
+}
+
 .text-summary {
   margin-bottom: 1.5rem;
   padding: 1rem;
@@ -643,6 +677,24 @@ table.feeds-table {
 #content img,
 #content iframe {
   display: inline-block;
+}
+
+#content .blocked-external-image {
+  width: 50%;
+  min-height: 36px;
+  margin: 0.5rem auto;
+  border: 1px dashed var(--frame-border-color);
+  background-color: var(--items-list-bg);
+  color: var(--weak-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+#content .blocked-external-image i {
+  font-size: 1rem;
 }
 
 #player {

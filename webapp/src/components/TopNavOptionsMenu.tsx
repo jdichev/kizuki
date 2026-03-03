@@ -4,20 +4,24 @@ interface TopNavOptionsMenuProps {
   onSummarize: () => void;
   onRetrieveLatest: () => void;
   onBookmark: () => void;
+  onToggleExternalImages: () => void;
   isLoadingSummary: boolean;
   isLoadingContent: boolean;
   isBookmarking: boolean;
   isBookmarked: boolean;
+  areExternalImagesAllowed: boolean;
 }
 
 export default function TopNavOptionsMenu({
   onSummarize,
   onRetrieveLatest,
   onBookmark,
+  onToggleExternalImages,
   isLoadingSummary,
   isLoadingContent,
   isBookmarking,
   isBookmarked,
+  areExternalImagesAllowed,
 }: TopNavOptionsMenuProps) {
   return (
     <div className="top-nav-icon-buttons">
@@ -47,6 +51,25 @@ export default function TopNavOptionsMenu({
         <i
           className={
             isLoadingContent ? "bi bi-hourglass-split" : "bi bi-cloud-download"
+          }
+        />
+      </button>
+
+      <button
+        type="button"
+        className="top-nav-icon-btn"
+        title={
+          areExternalImagesAllowed
+            ? "External images enabled (click to block)"
+            : "Load external images for this item"
+        }
+        onClick={onToggleExternalImages}
+        aria-label="Toggle external images"
+        aria-pressed={areExternalImagesAllowed}
+      >
+        <i
+          className={
+            areExternalImagesAllowed ? "bi bi-image-fill" : "bi bi-image"
           }
         />
       </button>

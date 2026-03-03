@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import Article from "./Article";
 
 const textArticle = {
@@ -27,6 +27,33 @@ test("renders article", async () => {
   expect(renderedCommentsLink.getAttribute("href")).toEqual(
     textArticle.comments
   );
+  expect(
+    document.querySelector("#content .blocked-external-image")
+  ).toBeTruthy();
+  expect(document.querySelector("#content img")).toBeNull();
+});
+
+test("loads external images when toggled for an article", async () => {
+  const topOptionsContainer = document.createElement("div");
+  document.body.appendChild(topOptionsContainer);
+
+  render(
+    <Article
+      article={textArticle}
+      topOptions={{ current: topOptionsContainer }}
+    />
+  );
+
+  const toggleButton = screen.getByRole("button", {
+    name: "Toggle external images",
+  });
+
+  fireEvent.click(toggleButton);
+
+  expect(document.querySelector("#content img")).toBeTruthy();
+  expect(document.querySelector("#content .blocked-external-image")).toBeNull();
+
+  topOptionsContainer.remove();
 });
 
 test("renders article placeholder", async () => {
@@ -60,4 +87,5 @@ test("renders video article", async () => {
       .getAttribute("src")
       ?.includes(ytVideoArticle.jsonContent["yt-id"])
   ).toBeTruthy();
+  expect(screen.queryByText("External images blocked for privacy")).toBeNull();
 });

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ReactDOM from "react-dom";
 /* eslint-disable react/no-danger */
 import FormattedDate from "./FormattedDate";
@@ -7,6 +7,65 @@ import DataService from "../service/DataService";
 import TopNavOptionsMenu from "./TopNavOptionsMenu";
 
 const ds = DataService.getInstance();
+
+function isExternalImageSource(src: string): boolean {
+  return /^https?:\/\//i.test(src) || src.startsWith("//");
+}
+
+function withExternalImagesBlocked(
+  html: string | null | undefined,
+  areExternalImagesAllowed: boolean
+): string {
+  if (!html) {
+    return "";
+  }
+
+  if (areExternalImagesAllowed) {
+    return html;
+  }
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
+  const images = doc.querySelectorAll("img");
+
+  images.forEach((imageNode) => {
+    const src = imageNode.getAttribute("src")?.trim() || "";
+    if (!isExternalImageSource(src)) {
+      return;
+    }
+
+    const placeholder = doc.createElement("div");
+    placeholder.className = "blocked-external-image";
+    placeholder.setAttribute("role", "img");
+    placeholder.setAttribute("aria-label", "External image");
+    placeholder.innerHTML = '<i class="bi bi-image" aria-hidden="true"></i>';
+
+    const parent = imageNode.parentElement;
+    if (parent?.tagName.toLowerCase() === "picture") {
+      parent.replaceWith(placeholder);
+      return;
+    }
+
+    imageNode.replaceWith(placeholder);
+  });
+
+  return doc.body.innerHTML;
+}
+
+function hasExternalImages(html: string | null | undefined): boolean {
+  if (!html) {
+    return false;
+  }
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
+  const images = doc.querySelectorAll("img");
+
+  return Array.from(images).some((imageNode) => {
+    const src = imageNode.getAttribute("src")?.trim() || "";
+    return isExternalImageSource(src);
+  });
+}
 
 // @ts-ignore
 export default function Article({
@@ -29,6 +88,8 @@ export default function Article({
   const [isRetrievedContentExpanded, setIsRetrievedContentExpanded] =
     useState(false);
   const [isBookmarking, setIsBookmarking] = useState(false);
+  const [areExternalImagesAllowed, setAreExternalImagesAllowed] =
+    useState(false);
 
   useEffect(() => {
     setVideoId(undefined);
@@ -38,6 +99,7 @@ export default function Article({
     setRetrievedContent(null);
     setRetrieveError(null);
     setIsRetrievedContentExpanded(false);
+    setAreExternalImagesAllowed(false);
 
     if (!article || !article.url) return;
 
@@ -261,6 +323,30 @@ export default function Article({
     }
   };
 
+  const handleToggleExternalImages = () => {
+    setAreExternalImagesAllowed((previous) => !previous);
+  };
+
+  const renderedSummaryHtml = useMemo(
+    () => withExternalImagesBlocked(summary, areExternalImagesAllowed),
+    [summary, areExternalImagesAllowed]
+  );
+
+  const renderedRetrievedContentHtml = useMemo(
+    () => withExternalImagesBlocked(retrievedContent, areExternalImagesAllowed),
+    [retrievedContent, areExternalImagesAllowed]
+  );
+
+  const renderedArticleContentHtml = useMemo(
+    () => withExternalImagesBlocked(article?.content, areExternalImagesAllowed),
+    [article?.content, areExternalImagesAllowed]
+  );
+
+  const hasExternalImagesInArticle = useMemo(
+    () => hasExternalImages(article?.content),
+    [article?.content]
+  );
+
   // Keyboard shortcut handler
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
@@ -301,15 +387,44 @@ export default function Article({
               onSummarize={handleSummarize}
               onRetrieveLatest={handleRetrieveLatest}
               onBookmark={handleBookmark}
+              onToggleExternalImages={handleToggleExternalImages}
               isLoadingSummary={isLoadingSummary}
               isLoadingContent={isLoadingContent}
               isBookmarking={isBookmarking}
               isBookmarked={article?.bookmarked === 1}
+              areExternalImagesAllowed={areExternalImagesAllowed}
             />,
             topOptions.current
           )}
         <article>
           <h1 id="title" dangerouslySetInnerHTML={{ __html: article.title }} />
+
+          {hasExternalImagesInArticle && (
+            <div
+              className="image-privacy-strip"
+              role="status"
+              aria-live="polite"
+            >
+              <i
+                className={
+                  areExternalImagesAllowed ? "bi bi-image-fill" : "bi bi-image"
+                }
+                aria-hidden="true"
+              />
+              <span>
+                {areExternalImagesAllowed
+                  ? "External images enabled for this item"
+                  : "External images blocked for privacy"}
+              </span>
+              <button
+                type="button"
+                className="btn-image-privacy-toggle"
+                onClick={handleToggleExternalImages}
+              >
+                {areExternalImagesAllowed ? "Block" : "Load"}
+              </button>
+            </div>
+          )}
 
           <p>
             <a
@@ -378,7 +493,7 @@ export default function Article({
                 {summary && (
                   <div
                     dangerouslySetInnerHTML={{
-                      __html: summary,
+                      __html: renderedSummaryHtml,
                     }}
                   />
                 )}
@@ -415,7 +530,7 @@ export default function Article({
                 {isRetrievedContentExpanded && retrievedContent && (
                   <div
                     dangerouslySetInnerHTML={{
-                      __html: retrievedContent,
+                      __html: renderedRetrievedContentHtml,
                     }}
                   />
                 )}
@@ -430,8 +545,7 @@ export default function Article({
 
             <div
               dangerouslySetInnerHTML={{
-                //@ts-ignore
-                __html: article.content,
+                __html: renderedArticleContentHtml,
               }}
             />
           </div>
