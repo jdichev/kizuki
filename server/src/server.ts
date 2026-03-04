@@ -12,6 +12,7 @@ import GoogleAiService from "./modules/GoogleAiService";
 import GoogleServiceUsageManager from "./modules/GoogleServiceUsageManager";
 import projectConfig from "forestconfig";
 import { convertArticleToMarkdown } from "./modules/ArticleToMarkdown";
+import { shouldFetchLatestContent, isBetterContent } from "./modules/ContentFilter";
 
 const pino = pinoLib({
   level: process.env.LOG_LEVEL || "info",
@@ -807,16 +808,25 @@ app.post(
         });
       }
 
+      if (!shouldFetchLatestContent(url)) {
+        return res.json({
+          markdown: null,
+          fromCache: false,
+          skipped: true,
+          reason: "URL is in excluded domains (social media, video, or blocked site)",
+        });
+      }
+
       let markdown: string | null = null;
       let fromCache = false;
 
-      if (!forceRefresh) {
-        // Check if latest content already exists in database
-        markdown = await dataModel.getItemLatestContent(url);
-        if (markdown) {
-          fromCache = true;
-          pino.info({ url }, "Latest content retrieved from cache");
-        }
+      // Always check database first
+      const cachedMarkdown = await dataModel.getItemLatestContent(url);
+
+      if (!forceRefresh && cachedMarkdown) {
+        markdown = cachedMarkdown;
+        fromCache = true;
+        pino.info({ url }, "Latest content retrieved from cache");
       }
 
       // Fetch latest content if not cached or force refresh requested
@@ -825,10 +835,28 @@ app.post(
           { url, forceRefresh: Boolean(forceRefresh) },
           "Retrieving latest article content"
         );
-        markdown = await convertArticleToMarkdown(url);
+        try {
+          const newMarkdown = await convertArticleToMarkdown(url);
 
-        // Save latest content to database
-        await dataModel.updateItemLatestContent(url, markdown);
+          // Check if the new content is better than what we already have (if any)
+          if (isBetterContent(newMarkdown, cachedMarkdown)) {
+            markdown = newMarkdown;
+            // Save latest content to database
+            await dataModel.updateItemLatestContent(url, markdown);
+            pino.info({ url }, "Item latest content updated with better content");
+          } else {
+            markdown = cachedMarkdown || newMarkdown;
+            pino.info({ url }, "Retrieved content was not better than existing content");
+          }
+        } catch (fetchError: any) {
+          // If fetch fails but we have cached content, use it
+          if (cachedMarkdown) {
+            markdown = cachedMarkdown;
+            fromCache = true;
+          } else {
+            throw fetchError;
+          }
+        }
       }
 
       let content = markdown;

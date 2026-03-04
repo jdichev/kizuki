@@ -370,12 +370,18 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
           type: "setReaderLatestLoading",
           readerLatestLoading: false,
         });
+
         ds.markItemRead(fullItem);
         dispatch({
           type: "setItems",
           items: items.map((i) => (i.id === item.id ? { ...i, read: 1 } : i)),
         });
         refreshReadStats(groupingMode, categories);
+
+        // Automatically fetch latest content on open
+        setTimeout(() => {
+          handleRetrieveLatestContent(fullItem);
+        }, 0);
       }
     } finally {
       dispatch({ type: "setLoading", loading: false });
@@ -556,23 +562,40 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     }
   };
 
-  const handleRetrieveLatestContent = async () => {
-    if (view !== "reader" || !selectedItem?.url) {
+  const handleRetrieveLatestContent = async (itemOverride?: Item) => {
+    const targetItem = itemOverride || selectedItem;
+
+    if (!targetItem?.url) {
       return;
     }
 
-    const shouldForceRefresh = readerSplitEnabled;
+    // Only skip if manually triggered and not in reader view
+    if (itemOverride === undefined && view !== "reader") {
+      return;
+    }
 
-    dispatch({ type: "setReaderSplitEnabled", readerSplitEnabled: true });
+    // Manual trigger uses forceRefresh, auto-open fetch (with itemOverride) uses cache first
+    const shouldForceRefresh = itemOverride === undefined;
+
     dispatch({ type: "setReaderLatestLoading", readerLatestLoading: true });
     dispatch({ type: "setReaderLatestError", readerLatestError: null });
 
     try {
       const data = await ds.retrieveLatestContent(
-        selectedItem.url,
+        targetItem.url,
         "markdown",
         shouldForceRefresh
       );
+
+      // Handle skipped URLs
+      if ((data as any).skipped) {
+        dispatch({
+          type: "setReaderLatestLoading",
+          readerLatestLoading: false,
+        });
+        return;
+      }
+
       const latestContent = data.markdown || "";
 
       if (!latestContent.trim()) {
@@ -589,20 +612,31 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
         .filter(Boolean).length;
 
       const updatedSelectedItem: Item = {
-        ...selectedItem,
+        ...targetItem,
         latest_content: latestContent,
         latestContentWordCount: latestWordCount,
       };
 
-      dispatch({ type: "setSelectedItem", selectedItem: updatedSelectedItem });
+      if (
+        !selectedItem ||
+        selectedItem.id === targetItem.id ||
+        (itemOverride && itemOverride.id === targetItem.id)
+      ) {
+        dispatch({
+          type: "setSelectedItem",
+          selectedItem: updatedSelectedItem,
+        });
+      }
+
       dispatch({
         type: "setReaderLatestContent",
         readerLatestContent: latestContent,
       });
+
       dispatch({
         type: "setItems",
         items: items.map((item) =>
-          item.id === selectedItem.id
+          item.id === targetItem.id
             ? {
                 ...item,
                 latest_content: latestContent,
@@ -704,7 +738,7 @@ function useTuiInput(
       return;
     }
     if (view === "confirm-mark-read") {
-      if (input === "y") handleMarkAllRead();
+      if (input === "y" || key.return) handleMarkAllRead();
       if (input === "n" || input === "a" || key.leftArrow) {
         setView("items");
       }
