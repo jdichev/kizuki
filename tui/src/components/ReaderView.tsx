@@ -2,7 +2,7 @@ import React from "react";
 import { Box, Text } from "ink";
 import { decode } from "entities";
 import { formatDateTime } from "../utils/date.js";
-import { cleanContent, terminalLink } from "../utils/text.js";
+import { cleanContent, renderMarkdown, terminalLink } from "../utils/text.js";
 import { Item } from "../types/index.js";
 
 interface ReaderViewProps {
@@ -28,14 +28,22 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
 }) => {
   const { dateStr } = formatDateTime(item.published);
 
-  const baseContent = cleanContent(item.content || "");
-  const preferredContent = cleanContent(
-    item.latest_content || item.content || ""
-  );
-  const loadedLatest = cleanContent(latestContent || item.latest_content || "");
+  const paneWidth = splitEnabled
+    ? Math.max(20, Math.floor(terminalWidth / 2) - 2)
+    : terminalWidth - 2;
 
-  const leftContent = splitEnabled ? baseContent : preferredContent;
-  const rightContent = loadedLatest;
+  const baseContentRaw = item.content || "";
+  const preferredContentRaw = item.latest_content || item.content || "";
+  const loadedLatestRaw = latestContent || item.latest_content || "";
+  const hasPreferredLatest = Boolean(item.latest_content);
+
+  const leftContent = splitEnabled
+    ? cleanContent(baseContentRaw)
+    : hasPreferredLatest
+      ? renderMarkdown(preferredContentRaw, paneWidth)
+      : cleanContent(preferredContentRaw);
+  const rightContent = renderMarkdown(loadedLatestRaw, paneWidth);
+
   const visibleHeight = Math.max(1, contentHeight - 3);
 
   const leftLines = leftContent.split("\n");
@@ -86,10 +94,7 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
       {splitEnabled && (
         <>
           <Box marginTop={1} flexDirection="row" height={visibleHeight}>
-            <Box
-              flexGrow={1}
-              width={Math.max(20, Math.floor(terminalWidth / 2) - 2)}
-            >
+            <Box flexGrow={1} width={paneWidth}>
               <Box flexDirection="column">
                 <Text bold>Original Content</Text>
                 <Text>{leftVisibleLines.join("\n")}</Text>
@@ -100,21 +105,20 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
               <Text dimColor>│</Text>
             </Box>
 
-            <Box
-              flexGrow={1}
-              width={Math.max(20, Math.floor(terminalWidth / 2) - 2)}
-            >
+            <Box flexGrow={1} width={paneWidth}>
               <Box flexDirection="column">
                 <Text bold color="cyan">
                   Retrieved Latest
                 </Text>
-                {latestLoading && rightContent.length === 0 && (
+                {latestLoading && loadedLatestRaw.length === 0 && (
                   <Text dimColor>Retrieving latest content...</Text>
                 )}
-                {!latestLoading && latestError && rightContent.length === 0 && (
-                  <Text color="red">{latestError}</Text>
-                )}
-                {rightContent.length > 0 && (
+                {!latestLoading &&
+                  latestError &&
+                  loadedLatestRaw.length === 0 && (
+                    <Text color="red">{latestError}</Text>
+                  )}
+                {loadedLatestRaw.length > 0 && (
                   <Text>{rightVisibleLines.join("\n")}</Text>
                 )}
               </Box>

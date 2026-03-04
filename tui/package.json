@@ -11,23 +11,27 @@
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
   },
   "dependencies": {
+    "entities": "^6.0.0",
     "ink": "^6.0.0",
-    "react": "^19.0.0",
     "ink-select-input": "^6.0.0",
     "ink-text-input": "^6.0.0",
     "markdown-it": "^14.1.0",
-    "entities": "^6.0.0",
-    "string-width": "^7.2.0",
-    "pino": "^9.6.0"
+    "marked": "^15.0.12",
+    "marked-terminal": "^7.3.0",
+    "pino": "^9.6.0",
+    "react": "^19.0.0",
+    "string-width": "^7.2.0"
   },
   "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/markdown-it": "^14.1.2",
+    "@types/marked": "^5.0.2",
+    "@types/marked-terminal": "^6.1.1",
+    "@types/node": "^22.13.5",
+    "@types/react": "^19.0.0",
+    "ink-testing-library": "^4.0.0",
     "jest": "^30.2.0",
     "ts-jest": "^29.4.6",
-    "@types/jest": "^30.0.0",
-    "ink-testing-library": "^4.0.0",
-    "@types/react": "^19.0.0",
-    "@types/markdown-it": "^14.1.2",
-    "@types/node": "^22.13.5",
     "typescript": "^5.7.3"
   }
 }
