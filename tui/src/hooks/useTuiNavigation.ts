@@ -33,6 +33,9 @@ interface NavigationState {
   readerLatestContent: string | null;
   readerLatestLoading: boolean;
   readerLatestError: string | null;
+  readerSummary: string | null;
+  readerSummaryLoading: boolean;
+  readerSummaryError: string | null;
 }
 
 type NavigationAction =
@@ -51,7 +54,10 @@ type NavigationAction =
   | { type: "setReaderSplitEnabled"; readerSplitEnabled: boolean }
   | { type: "setReaderLatestContent"; readerLatestContent: string | null }
   | { type: "setReaderLatestLoading"; readerLatestLoading: boolean }
-  | { type: "setReaderLatestError"; readerLatestError: string | null };
+  | { type: "setReaderLatestError"; readerLatestError: string | null }
+  | { type: "setReaderSummary"; readerSummary: string | null }
+  | { type: "setReaderSummaryLoading"; readerSummaryLoading: boolean }
+  | { type: "setReaderSummaryError"; readerSummaryError: string | null };
 
 function navigationReducer(
   state: NavigationState,
@@ -100,6 +106,12 @@ function navigationReducer(
       return { ...state, readerLatestLoading: action.readerLatestLoading };
     case "setReaderLatestError":
       return { ...state, readerLatestError: action.readerLatestError };
+    case "setReaderSummary":
+      return { ...state, readerSummary: action.readerSummary };
+    case "setReaderSummaryLoading":
+      return { ...state, readerSummaryLoading: action.readerSummaryLoading };
+    case "setReaderSummaryError":
+      return { ...state, readerSummaryError: action.readerSummaryError };
     default:
       return state;
   }
@@ -132,6 +144,9 @@ type TuiStateController = {
   readerLatestContent: string | null;
   readerLatestLoading: boolean;
   readerLatestError: string | null;
+  readerSummary: string | null;
+  readerSummaryLoading: boolean;
+  readerSummaryError: string | null;
   setView: (nextView: View) => void;
   handleMarkAllRead: () => void;
   moveListSelection: (delta: number) => void;
@@ -139,6 +154,7 @@ type TuiStateController = {
   handleForwardNavigation: () => void;
   handleReload: () => void;
   handleRetrieveLatestContent: () => void;
+  handleSummarize: () => void;
 };
 
 function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
@@ -160,6 +176,9 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     readerLatestContent: null,
     readerLatestLoading: false,
     readerLatestError: null,
+    readerSummary: null,
+    readerSummaryLoading: false,
+    readerSummaryError: null,
   });
 
   const {
@@ -180,6 +199,9 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     readerLatestContent,
     readerLatestLoading,
     readerLatestError,
+    readerSummary,
+    readerSummaryLoading,
+    readerSummaryError,
   } = state;
 
   const contentHeight = terminalHeight - 4;
@@ -370,6 +392,9 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
           type: "setReaderLatestLoading",
           readerLatestLoading: false,
         });
+        dispatch({ type: "setReaderSummary", readerSummary: null });
+        dispatch({ type: "setReaderSummaryLoading", readerSummaryLoading: false });
+        dispatch({ type: "setReaderSummaryError", readerSummaryError: null });
 
         ds.markItemRead(fullItem);
         dispatch({
@@ -656,6 +681,64 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     }
   };
 
+  const handleSummarize = async () => {
+    if (view !== "reader" || !selectedItem) {
+      return;
+    }
+
+    let currentContent = readerLatestContent || selectedItem.latest_content || selectedItem.content || "";
+    let currentWordCount = (currentContent || "").trim().split(/\s+/).filter(Boolean).length;
+
+    dispatch({ type: "setReaderSummaryLoading", readerSummaryLoading: true });
+    dispatch({ type: "setReaderSummaryError", readerSummaryError: null });
+
+    try {
+      // If content is missing or too short (less than 160 words), fetch latest first
+      if (!currentContent || currentWordCount < 160) {
+        // We use forceRefresh=false for the initial fetch to see if we have something in cache
+        const data = await ds.retrieveLatestContent(selectedItem.url!, "markdown", false);
+        if (data.markdown) {
+          currentContent = data.markdown;
+          // Update the content in the UI
+          dispatch({ type: "setReaderLatestContent", readerLatestContent: currentContent });
+        }
+      }
+
+      if (!currentContent) {
+        throw new Error("No content available to summarize");
+      }
+
+      const summaryData = await ds.summarize(currentContent, selectedItem.url, "markdown");
+      const summary = summaryData.summary || "";
+
+      if (!summary) {
+        throw new Error("Failed to generate summary");
+      }
+
+      dispatch({ type: "setReaderSummary", readerSummary: summary });
+
+      // Update selectedItem with summary
+      const updatedSelectedItem: Item = {
+        ...selectedItem,
+        summary: summary,
+      };
+      dispatch({ type: "setSelectedItem", selectedItem: updatedSelectedItem });
+
+      // Update items list
+      dispatch({
+        type: "setItems",
+        items: items.map((item) =>
+          item.id === selectedItem.id ? { ...item, summary: summary } : item
+        ),
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to summarize article";
+      dispatch({ type: "setReaderSummaryError", readerSummaryError: message });
+    } finally {
+      dispatch({ type: "setReaderSummaryLoading", readerSummaryLoading: false });
+    }
+  };
+
   const setView = (nextView: View) => {
     dispatch({ type: "setView", view: nextView });
   };
@@ -678,6 +761,9 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     readerLatestContent,
     readerLatestLoading,
     readerLatestError,
+    readerSummary,
+    readerSummaryLoading,
+    readerSummaryError,
     setView,
     handleMarkAllRead,
     moveListSelection,
@@ -685,6 +771,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     handleForwardNavigation,
     handleReload,
     handleRetrieveLatestContent,
+    handleSummarize,
   };
 }
 
@@ -699,6 +786,7 @@ function useTuiInput(
     handleForwardNavigation,
     handleReload,
     handleRetrieveLatestContent,
+    handleSummarize,
     listVisibleHeight,
   }: Pick<
     TuiStateController,
@@ -710,15 +798,22 @@ function useTuiInput(
     | "handleForwardNavigation"
     | "handleReload"
     | "handleRetrieveLatestContent"
+    | "handleSummarize"
     | "listVisibleHeight"
   >
 ) {
   useInput((input, key) => {
     const normalizedInput = input.toLowerCase();
     const isFetchLatestShortcut = view === "reader" && normalizedInput === "i";
+    const isSummarizeShortcut = view === "reader" && normalizedInput === "o";
 
     if (isFetchLatestShortcut) {
       handleRetrieveLatestContent();
+      return;
+    }
+
+    if (isSummarizeShortcut) {
+      handleSummarize();
       return;
     }
 
@@ -731,14 +826,20 @@ function useTuiInput(
       return;
     }
     if (view === "confirm-exit") {
-      if (input === "y" || key.return) exit();
+      if (input === "y" || key.return) {
+        exit();
+        return;
+      }
       if (input === "n" || input === "a" || key.leftArrow) {
         setView("start");
       }
       return;
     }
     if (view === "confirm-mark-read") {
-      if (input === "y" || key.return) handleMarkAllRead();
+      if (input === "y" || key.return) {
+        handleMarkAllRead();
+        return;
+      }
       if (input === "n" || input === "a" || key.leftArrow) {
         setView("items");
       }
@@ -815,6 +916,7 @@ export function useTuiNavigation() {
     handleForwardNavigation: state.handleForwardNavigation,
     handleReload: state.handleReload,
     handleRetrieveLatestContent: state.handleRetrieveLatestContent,
+    handleSummarize: state.handleSummarize,
     listVisibleHeight: state.listVisibleHeight,
   });
 
@@ -836,6 +938,9 @@ export function useTuiNavigation() {
     readerLatestContent: state.readerLatestContent,
     readerLatestLoading: state.readerLatestLoading,
     readerLatestError: state.readerLatestError,
+    readerSummary: state.readerSummary,
+    readerSummaryLoading: state.readerSummaryLoading,
+    readerSummaryError: state.readerSummaryError,
     setView: state.setView,
   };
 

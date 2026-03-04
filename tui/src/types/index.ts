@@ -66,6 +66,7 @@ export interface Item {
   };
   content?: string;
   latest_content?: string;
+  summary?: string;
 }
 
 // TUI Specific Navigation Types
@@ -111,5 +112,8 @@ export interface UseTuiNavigationResult {
   readerLatestContent: string | null;
   readerLatestLoading: boolean;
   readerLatestError: string | null;
+  readerSummary: string | null;
+  readerSummaryLoading: boolean;
+  readerSummaryError: string | null;
   setView: (view: View) => void;
 }

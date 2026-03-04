@@ -14,6 +14,9 @@ interface ReaderViewProps {
   latestContent: string | null;
   latestLoading: boolean;
   latestError: string | null;
+  summary: string | null;
+  summaryLoading: boolean;
+  summaryError: string | null;
 }
 
 export const ReaderView: React.FC<ReaderViewProps> = ({
@@ -25,20 +28,38 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
   latestContent,
   latestLoading,
   latestError,
+  summary,
+  summaryLoading,
+  summaryError,
 }) => {
   const { dateStr } = formatDateTime(item.published);
 
-  // Set the reading pane width to 80 characters (or terminal width - 2 if smaller)
-  const paneWidth = Math.min(80, terminalWidth - 2);
+  // If summary is available or currently loading, show the right pane
+  const currentSummaryRaw = summary || item.summary || "";
+  const showSummaryPane = Boolean(currentSummaryRaw) || summaryLoading;
 
-  // Prioritize the retrieved latest content (either from state or from the item itself)
+  // Reading pane width: if split, each gets half minus margin
+  const paneWidth = showSummaryPane
+    ? Math.floor(terminalWidth / 2) - 2
+    : Math.min(80, terminalWidth - 2);
+
+  // Prioritize the retrieved latest content
   const displayContentRaw = latestContent || item.latest_content || item.content || "";
   const displayContent = renderMarkdown(displayContentRaw, paneWidth);
+  const summaryContent = currentSummaryRaw ? renderMarkdown(currentSummaryRaw, paneWidth) : "";
 
   const visibleHeight = Math.max(1, contentHeight - 4); // Adjusted for footer
 
-  const lines = displayContent.split("\n");
-  const visibleLines = lines.slice(
+  const contentLines = displayContent.split("\n");
+  const summaryLines = summaryContent.split("\n");
+
+  const maxLines = Math.max(contentLines.length, summaryLines.length);
+
+  const visibleContentLines = contentLines.slice(
+    scrollOffset,
+    scrollOffset + visibleHeight
+  );
+  const visibleSummaryLines = summaryLines.slice(
     scrollOffset,
     scrollOffset + visibleHeight
   );
@@ -60,7 +81,7 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
               </Text>
             )}
             <Text dimColor>
-              I: Refetch Latest
+              I: Refetch | O: Summarize
             </Text>
           </Box>
         </Box>
@@ -71,7 +92,8 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
         )}
       </Box>
 
-      <Box marginTop={1} height={visibleHeight} paddingX={1} justifyContent="flex-start">
+      <Box marginTop={1} height={visibleHeight} paddingX={1} flexDirection="row">
+        {/* Main Content Pane */}
         <Box flexDirection="column" width={paneWidth}>
           {latestLoading && !latestContent && !item.latest_content && (
             <Box marginBottom={1}>
@@ -80,26 +102,46 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
               </Text>
             </Box>
           )}
-          <Text>{visibleLines.join("\n")}</Text>
+          <Text>{visibleContentLines.join("\n")}</Text>
         </Box>
+
+        {/* Summary Pane */}
+        {showSummaryPane && (
+          <>
+            <Box marginX={1}>
+              <Text dimColor>│</Text>
+            </Box>
+            <Box flexDirection="column" width={paneWidth}>
+              <Text bold color="green">Summary</Text>
+              {summaryLoading && !currentSummaryRaw ? (
+                <Text color="green" bold>[SUMMARIZING...]</Text>
+              ) : (
+                <Text>{visibleSummaryLines.join("\n")}</Text>
+              )}
+            </Box>
+          </>
+        )}
       </Box>
 
       <Box height={1} marginTop={0} paddingX={1} justifyContent="space-between">
         <Box>
           {latestLoading ? (
-            <Text color="cyan" bold>
-              ⌛ Loading better content...
-            </Text>
+            <Text color="cyan" bold>⌛ Loading content...</Text>
           ) : latestError ? (
             <Text color="red">⚠ {latestError}</Text>
+          ) : summaryError ? (
+            <Text color="red">⚠ {summaryError}</Text>
           ) : (
-            <Text dimColor>
-              {scrollOffset > 0 ? `↑ ${scrollOffset} lines` : ""}
-            </Text>
+            <Box>
+              <Text dimColor>
+                {scrollOffset > 0 ? `↑ ${scrollOffset} lines` : ""}
+              </Text>
+              <Text dimColor> │ I: Refetch | O: Summarize</Text>
+            </Box>
           )}
         </Box>
         <Text dimColor>
-          Line {scrollOffset + 1} of {lines.length} | {item.latestContentWordCount || 0} words
+          Line {scrollOffset + 1} of {maxLines} | {item.latestContentWordCount || 0} words
         </Text>
       </Box>
     </Box>
