@@ -153,7 +153,7 @@ export default function App() {
         )}
       </Box>
 
-      <Footer terminalWidth={terminalWidth} />
+      <Footer terminalWidth={terminalWidth} view={view} />
     </Box>
   );
 }

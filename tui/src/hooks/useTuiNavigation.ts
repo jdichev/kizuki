@@ -154,7 +154,6 @@ type TuiStateController = {
   handleBackNavigation: () => void;
   handleForwardNavigation: () => void;
   handleReload: () => void;
-  handleRetrieveLatestContent: () => void;
   handleSummarize: () => void;
 };
 
@@ -393,7 +392,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
           type: "setReaderLatestLoading",
           readerLatestLoading: false,
         });
-        dispatch({ type: "setReaderSummary", readerSummary: null });
+        dispatch({ type: "setReaderSummary", readerSummary: fullItem.summary || null });
         dispatch({ type: "setReaderSummaryLoading", readerSummaryLoading: false });
         dispatch({ type: "setReaderSummaryError", readerSummaryError: null });
 
@@ -705,12 +704,49 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     try {
       // If content is missing or too short (less than 160 words), fetch latest first
       if (!currentContent || currentWordCount < 160) {
-        // We use forceRefresh=false for the initial fetch to see if we have something in cache
-        const data = await ds.retrieveLatestContent(selectedItem.url!, "markdown", false);
-        if (data.markdown) {
-          currentContent = data.markdown;
-          // Update the content in the UI
-          dispatch({ type: "setReaderLatestContent", readerLatestContent: currentContent });
+        dispatch({ type: "setReaderLatestLoading", readerLatestLoading: true });
+        try {
+          // 1. Try with cache first
+          let data = await ds.retrieveLatestContent(selectedItem.url!, "markdown", false);
+          let newContent = data.markdown || "";
+          let newWordCount = newContent.trim().split(/\s+/).filter(Boolean).length;
+
+          // 2. If still too short, force refresh
+          if (newWordCount < 160) {
+            data = await ds.retrieveLatestContent(selectedItem.url!, "markdown", true);
+            newContent = data.markdown || "";
+            newWordCount = newContent.trim().split(/\s+/).filter(Boolean).length;
+          }
+
+          if (newContent) {
+            currentContent = newContent;
+            currentWordCount = newWordCount;
+
+            // Update the content in the UI immediately
+            dispatch({ type: "setReaderLatestContent", readerLatestContent: currentContent });
+
+            // Update selectedItem and items list with new content
+            const itemWithContent: Item = {
+              ...selectedItem,
+              latest_content: currentContent,
+              latestContentWordCount: currentWordCount,
+            };
+            dispatch({ type: "setSelectedItem", selectedItem: itemWithContent });
+            dispatch({
+              type: "setItems",
+              items: items.map((item) =>
+                item.id === selectedItem.id
+                  ? {
+                      ...item,
+                      latest_content: currentContent,
+                      latestContentWordCount: currentWordCount,
+                    }
+                  : item
+              ),
+            });
+          }
+        } finally {
+          dispatch({ type: "setReaderLatestLoading", readerLatestLoading: false });
         }
       }
 
@@ -781,7 +817,6 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     handleBackNavigation,
     handleForwardNavigation,
     handleReload,
-    handleRetrieveLatestContent,
     handleSummarize,
   };
 }
@@ -797,7 +832,6 @@ function useTuiInput(
     handleBackNavigation,
     handleForwardNavigation,
     handleReload,
-    handleRetrieveLatestContent,
     handleSummarize,
     listVisibleHeight,
   }: Pick<
@@ -809,20 +843,13 @@ function useTuiInput(
     | "handleBackNavigation"
     | "handleForwardNavigation"
     | "handleReload"
-    | "handleRetrieveLatestContent"
     | "handleSummarize"
     | "listVisibleHeight"
   >
 ) {
   useInput((input, key) => {
     const normalizedInput = input.toLowerCase();
-    const isFetchLatestShortcut = view === "reader" && normalizedInput === "i";
     const isSummarizeShortcut = view === "reader" && normalizedInput === "o";
-
-    if (isFetchLatestShortcut) {
-      handleRetrieveLatestContent();
-      return;
-    }
 
     if (isSummarizeShortcut) {
       handleSummarize();
@@ -931,7 +958,6 @@ export function useTuiNavigation() {
     handleBackNavigation: state.handleBackNavigation,
     handleForwardNavigation: state.handleForwardNavigation,
     handleReload: state.handleReload,
-    handleRetrieveLatestContent: state.handleRetrieveLatestContent,
     handleSummarize: state.handleSummarize,
     listVisibleHeight: state.listVisibleHeight,
   });

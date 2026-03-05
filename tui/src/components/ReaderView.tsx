@@ -78,9 +78,6 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
                 [RETRIEVING LATEST...] 
               </Text>
             )}
-            <Text dimColor>
-              I: Refetch | O: Summarize
-            </Text>
           </Box>
         </Box>
         {item.url && (
@@ -134,7 +131,6 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
               <Text dimColor>
                 {scrollOffset > 0 ? `↑ ${scrollOffset} lines` : ""}
               </Text>
-              <Text dimColor> │ I: Refetch | O: Summarize</Text>
             </Box>
           )}
         </Box>
