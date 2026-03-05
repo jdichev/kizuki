@@ -147,6 +147,7 @@ type TuiStateController = {
   readerSummary: string | null;
   readerSummaryLoading: boolean;
   readerSummaryError: string | null;
+  dispatch: React.Dispatch<NavigationAction>;
   setView: (nextView: View) => void;
   handleMarkAllRead: () => void;
   moveListSelection: (delta: number) => void;
@@ -562,17 +563,26 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
 
   const handleForwardNavigation = () => {
     if (view === "start") {
-      handleSelectMode(MODE_ITEMS[activeIndex].value as GroupingMode);
+      const modeItem = MODE_ITEMS[activeIndex];
+      if (modeItem) {
+        handleSelectMode(modeItem.value as GroupingMode);
+      }
       return;
     }
 
     if (view === "sidebar") {
-      handleSelectCategory(categories[activeIndex]);
+      const category = categories[activeIndex];
+      if (category) {
+        handleSelectCategory(category);
+      }
       return;
     }
 
     if (view === "items") {
-      handleSelectItem(items[activeIndex]);
+      const item = items[activeIndex];
+      if (item) {
+        handleSelectItem(item);
+      }
     }
   };
 
@@ -764,6 +774,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     readerSummary,
     readerSummaryLoading,
     readerSummaryError,
+    dispatch,
     setView,
     handleMarkAllRead,
     moveListSelection,
@@ -777,6 +788,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
 
 function useTuiInput(
   exit: () => void,
+  dispatch: React.Dispatch<NavigationAction>,
   {
     view,
     setView,
@@ -832,6 +844,8 @@ function useTuiInput(
       }
       if (input === "n" || input === "a" || key.leftArrow) {
         setView("start");
+        // Reset activeIndex to 0 to avoid out-of-bounds on MODE_ITEMS
+        dispatch({ type: "setActiveIndex", activeIndex: 0 });
       }
       return;
     }
@@ -842,6 +856,8 @@ function useTuiInput(
       }
       if (input === "n" || input === "a" || key.leftArrow) {
         setView("items");
+        // Active index should be restored from itemIndices in handleSelectCategory, 
+        // but let's ensure it's safe here or at least handled in handleForward
       }
       return;
     }
@@ -907,7 +923,7 @@ export function useTuiNavigation() {
   const { stdout } = useStdout();
   const state = useTuiState(stdout);
 
-  useTuiInput(exit, {
+  useTuiInput(exit, state.dispatch, {
     view: state.view,
     setView: state.setView,
     handleMarkAllRead: state.handleMarkAllRead,
