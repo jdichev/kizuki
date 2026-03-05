@@ -38,10 +38,8 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
   const currentSummaryRaw = summary || item.summary || "";
   const showSummaryPane = Boolean(currentSummaryRaw) || summaryLoading;
 
-  // Reading pane width: if split, each gets half minus margin
-  const paneWidth = showSummaryPane
-    ? Math.floor(terminalWidth / 2) - 2
-    : Math.min(80, terminalWidth - 2);
+  // Always use 50% of terminal width for consistent layout
+  const paneWidth = Math.floor(terminalWidth / 2) - 2;
 
   // Prioritize the retrieved latest content
   const displayContentRaw = latestContent || item.latest_content || item.content || "";
