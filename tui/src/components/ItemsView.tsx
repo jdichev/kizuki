@@ -13,6 +13,7 @@ interface ItemsViewProps {
   scrollOffset: number;
   visibleHeight: number;
   terminalWidth: number;
+  unreadOnly: boolean;
 }
 
 export const ItemsView: React.FC<ItemsViewProps> = ({
@@ -22,9 +23,13 @@ export const ItemsView: React.FC<ItemsViewProps> = ({
   scrollOffset,
   visibleHeight,
   terminalWidth,
+  unreadOnly,
 }) => (
   <Box flexDirection="column" width="100%">
-    <SectionHeader title={`Articles: ${title}`} terminalWidth={terminalWidth} />
+    <SectionHeader
+      title={`${unreadOnly ? "[UNREAD ONLY] " : ""}Articles: ${title}`}
+      terminalWidth={terminalWidth}
+    />
     <Box flexDirection="row">
       <Box flexDirection="column" flexGrow={1}>
         {items.length === 0 ? (

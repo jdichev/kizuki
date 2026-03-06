@@ -116,5 +116,6 @@ export interface UseTuiNavigationResult {
   readerSummaryLoading: boolean;
   readerSummaryError: string | null;
   readerSummaryPending: boolean;
+  unreadOnly: boolean;
   setView: (view: View) => void;
 }

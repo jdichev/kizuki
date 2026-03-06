@@ -37,6 +37,7 @@ export const HelpDialog: React.FC<HelpDialogProps> = ({ width, height, onClose }
           <Text color="gray">  ↑/W or ↓/S - Move selection</Text>
           <Text color="gray">  →/D or Enter - Go deeper / Open</Text>
           <Text color="gray">  ←/A - Go back</Text>
+          <Text color="gray">  E - Toggle unread-only</Text>
           <Text color="gray">  Q - Mark all as read</Text>
           <Text color="gray">  R - Reload / Refresh</Text>
           <Text color="gray">  ? - Show this help</Text>

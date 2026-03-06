@@ -36,6 +36,7 @@ export default function App() {
     readerSummaryLoading,
     readerSummaryError,
     readerSummaryPending,
+    unreadOnly,
   } = navigation;
 
   const renderBreadcrumbs = () => {
@@ -114,6 +115,7 @@ export default function App() {
                 scrollOffset={scrollOffset}
                 visibleHeight={listVisibleHeight}
                 terminalWidth={terminalWidth}
+                unreadOnly={unreadOnly}
               />
             )}
 

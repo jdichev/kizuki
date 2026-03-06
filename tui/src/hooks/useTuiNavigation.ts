@@ -37,6 +37,7 @@ interface NavigationState {
   readerSummaryLoading: boolean;
   readerSummaryError: string | null;
   readerSummaryPending: boolean;
+  unreadOnly: boolean;
 }
 
 type NavigationAction =
@@ -59,7 +60,8 @@ type NavigationAction =
   | { type: "setReaderSummary"; readerSummary: string | null }
   | { type: "setReaderSummaryLoading"; readerSummaryLoading: boolean }
   | { type: "setReaderSummaryError"; readerSummaryError: string | null }
-  | { type: "setReaderSummaryPending"; readerSummaryPending: boolean };
+  | { type: "setReaderSummaryPending"; readerSummaryPending: boolean }
+  | { type: "setUnreadOnly"; unreadOnly: boolean };
 
 function navigationReducer(
   state: NavigationState,
@@ -116,6 +118,8 @@ function navigationReducer(
       return { ...state, readerSummaryError: action.readerSummaryError };
     case "setReaderSummaryPending":
       return { ...state, readerSummaryPending: action.readerSummaryPending };
+    case "setUnreadOnly":
+      return { ...state, unreadOnly: action.unreadOnly };
     default:
       return state;
   }
@@ -152,6 +156,7 @@ type TuiStateController = {
   readerSummaryLoading: boolean;
   readerSummaryError: string | null;
   readerSummaryPending: boolean;
+  unreadOnly: boolean;
   dispatch: React.Dispatch<NavigationAction>;
   setView: (nextView: View) => void;
   handleMarkAllRead: () => void;
@@ -159,6 +164,7 @@ type TuiStateController = {
   handleBackNavigation: () => void;
   handleForwardNavigation: () => void;
   handleReload: () => void;
+  handleToggleUnreadOnly: () => void;
 };
 
 function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
@@ -184,6 +190,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     readerSummaryLoading: false,
     readerSummaryError: null,
     readerSummaryPending: false,
+    unreadOnly: false,
   });
 
   const {
@@ -208,6 +215,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     readerSummaryLoading,
     readerSummaryError,
     readerSummaryPending,
+    unreadOnly,
   } = state;
 
   const contentHeight = terminalHeight - 4;
@@ -367,7 +375,10 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     }
   };
 
-  const handleSelectCategory = async (category: SidebarEntry | undefined) => {
+  const handleSelectCategory = async (
+    category: SidebarEntry | undefined,
+    unreadOnlyOverride?: boolean
+  ) => {
     if (!category || isSidebarHeader(category)) return;
     const cat = category as SidebarCategory;
     dispatch({ type: "setSelectedCategory", selectedCategory: cat });
@@ -379,7 +390,11 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
         bookmarkedOnly: boolean;
         selectedFeedCategory?: FeedCategory;
         selectedItemCategoryIds?: number[];
-      } = { size: 100, unreadOnly: false, bookmarkedOnly: false };
+      } = {
+        size: 100,
+        unreadOnly: unreadOnlyOverride ?? unreadOnly,
+        bookmarkedOnly: false,
+      };
       if (cat.id !== -1) {
         if (groupingMode === "feed-categories") {
           params.selectedFeedCategory = {
@@ -461,7 +476,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
       await ds.markItemsRead(params);
       const refreshedItems = await ds.getItems({
         size: 100,
-        unreadOnly: false,
+        unreadOnly: unreadOnly,
         bookmarkedOnly: false,
         selectedFeedCategory:
           groupingMode === "feed-categories"
@@ -618,6 +633,16 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
 
     if (view === "items") {
       handleSelectCategory(selectedCategory || undefined);
+    }
+  };
+
+  const handleToggleUnreadOnly = () => {
+    const nextUnreadOnly = !unreadOnly;
+    dispatch({ type: "setUnreadOnly", unreadOnly: nextUnreadOnly });
+
+    // If we are in items view, we need to refresh the list
+    if (view === "items") {
+      handleSelectCategory(selectedCategory || undefined, nextUnreadOnly);
     }
   };
 
@@ -848,6 +873,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     readerSummaryLoading,
     readerSummaryError,
     readerSummaryPending,
+    unreadOnly,
     dispatch,
     setView,
     handleMarkAllRead,
@@ -855,6 +881,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     handleBackNavigation,
     handleForwardNavigation,
     handleReload,
+    handleToggleUnreadOnly,
   };
 }
 
@@ -869,6 +896,7 @@ function useTuiInput(
     handleBackNavigation,
     handleForwardNavigation,
     handleReload,
+    handleToggleUnreadOnly,
     listVisibleHeight,
   }: Pick<
     TuiStateController,
@@ -879,11 +907,18 @@ function useTuiInput(
     | "handleBackNavigation"
     | "handleForwardNavigation"
     | "handleReload"
+    | "handleToggleUnreadOnly"
     | "listVisibleHeight"
   >
 ) {
   useInput((input, key) => {
     const normalizedInput = input.toLowerCase();
+    const isUnreadOnlyShortcut = view === "items" && normalizedInput === "e";
+
+    if (isUnreadOnlyShortcut) {
+      handleToggleUnreadOnly();
+      return;
+    }
 
     if (view === "help") {
       setView("start");
@@ -987,6 +1022,7 @@ export function useTuiNavigation() {
     handleBackNavigation: state.handleBackNavigation,
     handleForwardNavigation: state.handleForwardNavigation,
     handleReload: state.handleReload,
+    handleToggleUnreadOnly: state.handleToggleUnreadOnly,
     listVisibleHeight: state.listVisibleHeight,
   });
 
@@ -1012,6 +1048,7 @@ export function useTuiNavigation() {
     readerSummaryLoading: state.readerSummaryLoading,
     readerSummaryError: state.readerSummaryError,
     readerSummaryPending: state.readerSummaryPending,
+    unreadOnly: state.unreadOnly,
     setView: state.setView,
   };
 
