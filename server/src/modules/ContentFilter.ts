@@ -12,19 +12,36 @@ export function shouldFetchLatestContent(url: string): boolean {
       "linkedin.com",
       "tiktok.com",
       "reddit.com",
+      "threads.net",
+      "mastodon.social",
+      "bsky.app",
+      "tumblr.com",
+      "pinterest.com",
+      "snapchat.com",
     ];
 
-    // Video platforms
-    const videoDomains = ["youtube.com", "youtu.be", "vimeo.com"];
-
-    // Known bot-blocking or problematic sites
-    const blockerDomains = ["news.yahoo.com", "finance.yahoo.com", "yahoo.com"];
+    // Known bot-blocking or hard pay-walled sites
+    const blockerDomains = [
+      "news.yahoo.com",
+      "finance.yahoo.com",
+      "yahoo.com",
+      "wsj.com",
+      "ft.com",
+      "economist.com",
+      "nytimes.com",
+      "bloomberg.com",
+      "barrons.com",
+      "businessinsider.com",
+      "wired.com",
+      "theatlantic.com",
+      "newyorker.com",
+      "washingtonpost.com",
+      "latimes.com",
+      "chicagotribune.com",
+      "quora.com",
+    ];
 
     if (socialDomains.some((d) => hostname === d || hostname.endsWith("." + d))) {
-      return false;
-    }
-
-    if (videoDomains.some((d) => hostname === d || hostname.endsWith("." + d))) {
       return false;
     }
 
@@ -50,6 +67,10 @@ export function isBetterContent(newContent: string, oldContent: string | null): 
     "invalid content type",
     "disallowed by robots.txt",
     "no content available",
+    "enable javascript",
+    "access denied",
+    "403 forbidden",
+    "cloudflare",
   ];
 
   const lowerContent = newContent.toLowerCase();

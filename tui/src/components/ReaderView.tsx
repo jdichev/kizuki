@@ -17,6 +17,7 @@ interface ReaderViewProps {
   summary: string | null;
   summaryLoading: boolean;
   summaryError: string | null;
+  summaryPending: boolean;
 }
 
 export const ReaderView: React.FC<ReaderViewProps> = ({
@@ -31,12 +32,13 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
   summary,
   summaryLoading,
   summaryError,
+  summaryPending,
 }) => {
   const { dateStr } = formatDateTime(item.published);
 
-  // If summary is available or currently loading, show the right pane
+  // If summary is available or any relevant loading/pending/error state exists, show the right pane
   const currentSummaryRaw = summary || item.summary || "";
-  const showSummaryPane = Boolean(currentSummaryRaw) || summaryLoading;
+  const showSummaryPane = Boolean(currentSummaryRaw) || summaryLoading || summaryPending || latestLoading || summaryError;
 
   // Always use 50% of terminal width for consistent layout
   const paneWidth = Math.floor(terminalWidth / 2) - 2;
@@ -72,13 +74,6 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
           <Text dimColor>
             {item.feedTitle} │ {dateStr}
           </Text>
-          <Box>
-            {latestLoading && (
-              <Text color="cyan" bold>
-                [RETRIEVING LATEST...] 
-              </Text>
-            )}
-          </Box>
         </Box>
         {item.url && (
           <Text dimColor>
@@ -108,9 +103,19 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
             </Box>
             <Box flexDirection="column" width={paneWidth}>
               <Text bold color="green">Summary</Text>
-              {summaryLoading && !currentSummaryRaw ? (
+              {summaryPending && !currentSummaryRaw && (
+                <Text color="gray" italic>[AI Summary will start in 1s...]</Text>
+              )}
+              {latestLoading && !currentSummaryRaw && (
+                <Text color="cyan" bold>[RETRIEVING LATEST...]</Text>
+              )}
+              {summaryLoading && !latestLoading && !currentSummaryRaw && (
                 <Text color="green" bold>[SUMMARIZING...]</Text>
-              ) : (
+              )}
+              {!summaryPending && !latestLoading && !summaryLoading && !currentSummaryRaw && summaryError && (
+                <Text color="red">⚠ {summaryError}</Text>
+              )}
+              {currentSummaryRaw && (
                 <Text>{visibleSummaryLines.join("\n")}</Text>
               )}
             </Box>
@@ -120,19 +125,9 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
 
       <Box height={1} marginTop={0} paddingX={1} justifyContent="space-between">
         <Box>
-          {latestLoading ? (
-            <Text color="cyan" bold>⌛ Loading content...</Text>
-          ) : latestError ? (
-            <Text color="red">⚠ {latestError}</Text>
-          ) : summaryError ? (
-            <Text color="red">⚠ {summaryError}</Text>
-          ) : (
-            <Box>
-              <Text dimColor>
-                {scrollOffset > 0 ? `↑ ${scrollOffset} lines` : ""}
-              </Text>
-            </Box>
-          )}
+          <Text dimColor>
+            {scrollOffset > 0 ? `↑ ${scrollOffset} lines` : ""}
+          </Text>
         </Box>
         <Text dimColor>
           Line {scrollOffset + 1} of {maxLines} | {item.latestContentWordCount || 0} words

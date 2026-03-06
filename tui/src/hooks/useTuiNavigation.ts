@@ -36,6 +36,7 @@ interface NavigationState {
   readerSummary: string | null;
   readerSummaryLoading: boolean;
   readerSummaryError: string | null;
+  readerSummaryPending: boolean;
 }
 
 type NavigationAction =
@@ -57,7 +58,8 @@ type NavigationAction =
   | { type: "setReaderLatestError"; readerLatestError: string | null }
   | { type: "setReaderSummary"; readerSummary: string | null }
   | { type: "setReaderSummaryLoading"; readerSummaryLoading: boolean }
-  | { type: "setReaderSummaryError"; readerSummaryError: string | null };
+  | { type: "setReaderSummaryError"; readerSummaryError: string | null }
+  | { type: "setReaderSummaryPending"; readerSummaryPending: boolean };
 
 function navigationReducer(
   state: NavigationState,
@@ -112,6 +114,8 @@ function navigationReducer(
       return { ...state, readerSummaryLoading: action.readerSummaryLoading };
     case "setReaderSummaryError":
       return { ...state, readerSummaryError: action.readerSummaryError };
+    case "setReaderSummaryPending":
+      return { ...state, readerSummaryPending: action.readerSummaryPending };
     default:
       return state;
   }
@@ -147,6 +151,7 @@ type TuiStateController = {
   readerSummary: string | null;
   readerSummaryLoading: boolean;
   readerSummaryError: string | null;
+  readerSummaryPending: boolean;
   dispatch: React.Dispatch<NavigationAction>;
   setView: (nextView: View) => void;
   handleMarkAllRead: () => void;
@@ -154,7 +159,6 @@ type TuiStateController = {
   handleBackNavigation: () => void;
   handleForwardNavigation: () => void;
   handleReload: () => void;
-  handleSummarize: () => void;
 };
 
 function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
@@ -179,6 +183,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     readerSummary: null,
     readerSummaryLoading: false,
     readerSummaryError: null,
+    readerSummaryPending: false,
   });
 
   const {
@@ -202,6 +207,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     readerSummary,
     readerSummaryLoading,
     readerSummaryError,
+    readerSummaryPending,
   } = state;
 
   const contentHeight = terminalHeight - 4;
@@ -219,6 +225,28 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
       });
     }
   }, [activeIndex, scrollOffset, listVisibleHeight, view]);
+
+  // Auto-summarize effect
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+
+    if (view === "reader" && selectedItem && !selectedItem.summary && !readerSummary) {
+      dispatch({ type: "setReaderSummaryPending", readerSummaryPending: true });
+      
+      timer = setTimeout(() => {
+        dispatch({ type: "setReaderSummaryPending", readerSummaryPending: false });
+        handleSummarize(selectedItem);
+      }, 1000);
+    } else {
+      dispatch({ type: "setReaderSummaryPending", readerSummaryPending: false });
+    }
+
+    return () => {
+      if (timer) {
+        clearTimeout(timer);
+      }
+    };
+  }, [view, selectedItem?.id, !!selectedItem?.summary, !!readerSummary]);
 
   useEffect(() => {
     const onResize = () => {
@@ -392,6 +420,8 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
           type: "setReaderLatestLoading",
           readerLatestLoading: false,
         });
+        
+        // If summary exists, show it immediately
         dispatch({ type: "setReaderSummary", readerSummary: fullItem.summary || null });
         dispatch({ type: "setReaderSummaryLoading", readerSummaryLoading: false });
         dispatch({ type: "setReaderSummaryError", readerSummaryError: null });
@@ -402,11 +432,6 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
           items: items.map((i) => (i.id === item.id ? { ...i, read: 1 } : i)),
         });
         refreshReadStats(groupingMode, categories);
-
-        // Automatically fetch latest content on open
-        setTimeout(() => {
-          handleRetrieveLatestContent(fullItem);
-        }, 0);
       }
     } finally {
       dispatch({ type: "setLoading", loading: false });
@@ -690,12 +715,20 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     }
   };
 
-  const handleSummarize = async () => {
-    if (view !== "reader" || !selectedItem) {
+  const handleSummarize = async (itemOverride?: Item) => {
+    const targetItem = itemOverride || selectedItem;
+    
+    // Only skip if manually triggered (no override) and not in reader view
+    if (!itemOverride && view !== "reader") {
       return;
     }
 
-    let currentContent = readerLatestContent || selectedItem.latest_content || selectedItem.content || "";
+    if (!targetItem) return;
+
+    // Skip if summary already exists
+    if (targetItem.summary) return;
+
+    let currentContent = readerLatestContent || targetItem.latest_content || targetItem.content || "";
     let currentWordCount = (currentContent || "").trim().split(/\s+/).filter(Boolean).length;
 
     dispatch({ type: "setReaderSummaryLoading", readerSummaryLoading: true });
@@ -707,14 +740,14 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
         dispatch({ type: "setReaderLatestLoading", readerLatestLoading: true });
         try {
           // 1. Try with cache first
-          let data = await ds.retrieveLatestContent(selectedItem.url!, "markdown", false);
+          let data = await ds.retrieveLatestContent(targetItem.url!, "markdown", false);
           let newContent = data.markdown || "";
           let newWordCount = newContent.trim().split(/\s+/).filter(Boolean).length;
 
           // 2. If still too short, force refresh
           if (newWordCount < 240) {
 
-            data = await ds.retrieveLatestContent(selectedItem.url!, "markdown", true);
+            data = await ds.retrieveLatestContent(targetItem.url!, "markdown", true);
             newContent = data.markdown || "";
             newWordCount = newContent.trim().split(/\s+/).filter(Boolean).length;
           }
@@ -728,7 +761,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
 
             // Update selectedItem and items list with new content
             const itemWithContent: Item = {
-              ...selectedItem,
+              ...targetItem,
               latest_content: currentContent,
               latestContentWordCount: currentWordCount,
             };
@@ -736,7 +769,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
             dispatch({
               type: "setItems",
               items: items.map((item) =>
-                item.id === selectedItem.id
+                item.id === targetItem.id
                   ? {
                       ...item,
                       latest_content: currentContent,
@@ -751,11 +784,14 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
         }
       }
 
-      if (!currentContent) {
-        throw new Error("No content available to summarize");
+      // Re-calculate word count after potential fetches
+      const finalWordCount = (currentContent || "").trim().split(/\s+/).filter(Boolean).length;
+
+      if (!currentContent || finalWordCount < 240) {
+        throw new Error(`Insufficient text collected for summarization (${finalWordCount} words found, minimum 240 required)`);
       }
 
-      const summaryData = await ds.summarize(currentContent, selectedItem.url, "markdown");
+      const summaryData = await ds.summarize(currentContent, targetItem.url, "markdown");
       const summary = summaryData.summary || "";
 
       if (!summary) {
@@ -766,7 +802,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
 
       // Update selectedItem with summary
       const updatedSelectedItem: Item = {
-        ...selectedItem,
+        ...targetItem,
         summary: summary,
       };
       dispatch({ type: "setSelectedItem", selectedItem: updatedSelectedItem });
@@ -775,7 +811,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
       dispatch({
         type: "setItems",
         items: items.map((item) =>
-          item.id === selectedItem.id ? { ...item, summary: summary } : item
+          item.id === targetItem.id ? { ...item, summary: summary } : item
         ),
       });
     } catch (error: unknown) {
@@ -811,6 +847,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     readerSummary,
     readerSummaryLoading,
     readerSummaryError,
+    readerSummaryPending,
     dispatch,
     setView,
     handleMarkAllRead,
@@ -818,7 +855,6 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     handleBackNavigation,
     handleForwardNavigation,
     handleReload,
-    handleSummarize,
   };
 }
 
@@ -833,7 +869,6 @@ function useTuiInput(
     handleBackNavigation,
     handleForwardNavigation,
     handleReload,
-    handleSummarize,
     listVisibleHeight,
   }: Pick<
     TuiStateController,
@@ -844,18 +879,11 @@ function useTuiInput(
     | "handleBackNavigation"
     | "handleForwardNavigation"
     | "handleReload"
-    | "handleSummarize"
     | "listVisibleHeight"
   >
 ) {
   useInput((input, key) => {
     const normalizedInput = input.toLowerCase();
-    const isSummarizeShortcut = view === "reader" && normalizedInput === "o";
-
-    if (isSummarizeShortcut) {
-      handleSummarize();
-      return;
-    }
 
     if (view === "help") {
       setView("start");
@@ -959,7 +987,6 @@ export function useTuiNavigation() {
     handleBackNavigation: state.handleBackNavigation,
     handleForwardNavigation: state.handleForwardNavigation,
     handleReload: state.handleReload,
-    handleSummarize: state.handleSummarize,
     listVisibleHeight: state.listVisibleHeight,
   });
 
@@ -984,6 +1011,7 @@ export function useTuiNavigation() {
     readerSummary: state.readerSummary,
     readerSummaryLoading: state.readerSummaryLoading,
     readerSummaryError: state.readerSummaryError,
+    readerSummaryPending: state.readerSummaryPending,
     setView: state.setView,
   };
 

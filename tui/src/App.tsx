@@ -35,6 +35,7 @@ export default function App() {
     readerSummary,
     readerSummaryLoading,
     readerSummaryError,
+    readerSummaryPending,
   } = navigation;
 
   const renderBreadcrumbs = () => {
@@ -129,6 +130,7 @@ export default function App() {
                 summary={readerSummary}
                 summaryLoading={readerSummaryLoading}
                 summaryError={readerSummaryError}
+                summaryPending={readerSummaryPending}
               />
             )}
 
