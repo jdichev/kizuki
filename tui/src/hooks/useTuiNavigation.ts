@@ -702,8 +702,8 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     dispatch({ type: "setReaderSummaryError", readerSummaryError: null });
 
     try {
-      // If content is missing or too short (less than 160 words), fetch latest first
-      if (!currentContent || currentWordCount < 160) {
+      // If content is missing or too short (less than 240 words), fetch latest first
+      if (!currentContent || currentWordCount < 240) {
         dispatch({ type: "setReaderLatestLoading", readerLatestLoading: true });
         try {
           // 1. Try with cache first
@@ -712,7 +712,8 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
           let newWordCount = newContent.trim().split(/\s+/).filter(Boolean).length;
 
           // 2. If still too short, force refresh
-          if (newWordCount < 160) {
+          if (newWordCount < 240) {
+
             data = await ds.retrieveLatestContent(selectedItem.url!, "markdown", true);
             newContent = data.markdown || "";
             newWordCount = newContent.trim().split(/\s+/).filter(Boolean).length;
