@@ -12,7 +12,11 @@ import GoogleAiService from "./modules/GoogleAiService";
 import GoogleServiceUsageManager from "./modules/GoogleServiceUsageManager";
 import projectConfig from "forestconfig";
 import { convertArticleToMarkdown } from "./modules/ArticleToMarkdown";
-import { shouldFetchLatestContent, isBetterContent } from "./modules/ContentFilter";
+import {
+  shouldFetchLatestContent,
+  isBetterContent,
+} from "./modules/ContentFilter";
+import { countWordLikeTokens } from "./modules/WordCount";
 
 const pino = pinoLib({
   level: process.env.LOG_LEVEL || "info",
@@ -30,9 +34,158 @@ const aiService = GoogleAiService.getInstance();
 const serviceUsageManager = GoogleServiceUsageManager.getInstance();
 
 const markdownRenderer = new MarkdownIt();
+const SUMMARY_MIN_WORD_COUNT = 240;
 
 const renderMarkdownToHtml = (content: string) => {
   return markdownRenderer.render(content);
+};
+
+type LatestContentResolution = {
+  markdown: string | null;
+  fromCache: boolean;
+  skipped: boolean;
+  reason?: string;
+};
+
+const retrieveLatestMarkdown = async (
+  url: string,
+  forceRefresh: boolean
+): Promise<LatestContentResolution> => {
+  if (!shouldFetchLatestContent(url)) {
+    return {
+      markdown: null,
+      fromCache: false,
+      skipped: true,
+      reason:
+        "URL is in excluded domains (social media, video, or blocked site)",
+    };
+  }
+
+  const cachedMarkdown = await dataModel.getItemLatestContent(url);
+
+  if (!forceRefresh && cachedMarkdown) {
+    pino.info({ url }, "Latest content retrieved from cache");
+    return {
+      markdown: cachedMarkdown,
+      fromCache: true,
+      skipped: false,
+    };
+  }
+
+  pino.info(
+    { url, forceRefresh: Boolean(forceRefresh) },
+    "Retrieving latest article content"
+  );
+
+  try {
+    const newMarkdown = await convertArticleToMarkdown(url);
+
+    if (isBetterContent(newMarkdown, cachedMarkdown)) {
+      await dataModel.updateItemLatestContent(url, newMarkdown);
+      pino.info({ url }, "Item latest content updated with better content");
+
+      return {
+        markdown: newMarkdown,
+        fromCache: false,
+        skipped: false,
+      };
+    }
+
+    const resolvedMarkdown = cachedMarkdown || newMarkdown;
+    pino.info(
+      { url },
+      "Retrieved content was not better than existing content"
+    );
+
+    return {
+      markdown: resolvedMarkdown,
+      fromCache: Boolean(cachedMarkdown),
+      skipped: false,
+    };
+  } catch (fetchError: unknown) {
+    if (cachedMarkdown) {
+      return {
+        markdown: cachedMarkdown,
+        fromCache: true,
+        skipped: false,
+      };
+    }
+
+    throw fetchError;
+  }
+};
+
+type SummaryContentResolution = {
+  content: string;
+  wordCount: number;
+  usedLatestContent: boolean;
+  latestContentFromCache: boolean;
+};
+
+const resolveSummaryContent = async (params: {
+  url?: string;
+  content?: string;
+  forceRefreshLatest: boolean;
+}): Promise<SummaryContentResolution | { skipped: true; reason: string }> => {
+  const providedContent =
+    typeof params.content === "string" ? params.content : "";
+  const providedWordCount = countWordLikeTokens(providedContent, {
+    stripHtml: true,
+  });
+
+  if (providedWordCount >= SUMMARY_MIN_WORD_COUNT) {
+    return {
+      content: providedContent,
+      wordCount: providedWordCount,
+      usedLatestContent: false,
+      latestContentFromCache: false,
+    };
+  }
+
+  if (!params.url) {
+    return {
+      skipped: true,
+      reason: `Insufficient text for summarization (${providedWordCount} words found, minimum ${SUMMARY_MIN_WORD_COUNT} required)`,
+    };
+  }
+
+  const latestResult = await retrieveLatestMarkdown(
+    params.url,
+    params.forceRefreshLatest
+  );
+
+  if (latestResult.skipped) {
+    return {
+      skipped: true,
+      reason:
+        latestResult.reason ||
+        "Latest content retrieval is not available for this URL",
+    };
+  }
+
+  const latestContent = latestResult.markdown || "";
+  const latestWordCount = countWordLikeTokens(latestContent);
+
+  if (latestWordCount < SUMMARY_MIN_WORD_COUNT) {
+    if (providedWordCount > latestWordCount && providedWordCount > 0) {
+      return {
+        skipped: true,
+        reason: `Insufficient text for summarization (${providedWordCount} words found, minimum ${SUMMARY_MIN_WORD_COUNT} required)`,
+      };
+    }
+
+    return {
+      skipped: true,
+      reason: `Insufficient text for summarization (${latestWordCount} words found, minimum ${SUMMARY_MIN_WORD_COUNT} required)`,
+    };
+  }
+
+  return {
+    content: latestContent,
+    wordCount: latestWordCount,
+    usedLatestContent: true,
+    latestContentFromCache: latestResult.fromCache,
+  };
 };
 
 const app: Application = express();
@@ -621,11 +774,9 @@ app.post(
         { error: (error as any).message || String(error) },
         "Error starting OPML import"
       );
-      res
-        .status(500)
-        .json({
-          error: (error as any).message || "Failed to start OPML import",
-        });
+      res.status(500).json({
+        error: (error as any).message || "Failed to start OPML import",
+      });
     }
   }
 );
@@ -729,12 +880,17 @@ app.delete("/settings/:key", (req: Request, res: Response) => {
 
 app.post("/api/summarize", jsonParser, async (req: Request, res: Response) => {
   try {
-    const { content, format, url } = req.body;
+    const { content, format, url, forceRefreshLatest } = req.body as {
+      content?: string;
+      format?: "markdown" | "html";
+      url?: string;
+      forceRefreshLatest?: boolean;
+    };
 
-    if (!content) {
+    if (!content && !url) {
       return res.status(400).json({
-        error: "Content is required",
-        message: "Please provide content to summarize",
+        error: "Content or URL is required",
+        message: "Please provide content or URL to summarize",
       });
     }
 
@@ -760,11 +916,32 @@ app.post("/api/summarize", jsonParser, async (req: Request, res: Response) => {
 
     // Generate summary if not cached
     if (!summary) {
+      const resolvedContent = await resolveSummaryContent({
+        url,
+        content,
+        forceRefreshLatest: Boolean(forceRefreshLatest),
+      });
+
+      if ("skipped" in resolvedContent) {
+        return res.json({
+          summary: null,
+          html: undefined,
+          fromCache: false,
+          skipped: true,
+          reason: resolvedContent.reason,
+          message: resolvedContent.reason,
+        });
+      }
+
       pino.info(
-        { contentLength: content.length },
+        {
+          contentLength: resolvedContent.content.length,
+          wordCount: resolvedContent.wordCount,
+          usedLatestContent: resolvedContent.usedLatestContent,
+        },
         "Summarizing article content"
       );
-      summary = await aiService.summarizeArticle(content);
+      summary = await aiService.summarizeArticle(resolvedContent.content);
 
       // Save summary to database if URL is provided
       if (url) {
@@ -781,6 +958,7 @@ app.post("/api/summarize", jsonParser, async (req: Request, res: Response) => {
       summary,
       html: format === "html" ? responseContent : undefined,
       fromCache,
+      skipped: false,
     });
   } catch (error: unknown) {
     pino.error(
@@ -799,7 +977,11 @@ app.post(
   jsonParser,
   async (req: Request, res: Response) => {
     try {
-      const { url, format, forceRefresh } = req.body;
+      const { url, format, forceRefresh } = req.body as {
+        url?: string;
+        format?: "markdown" | "html";
+        forceRefresh?: boolean;
+      };
 
       if (!url) {
         return res.status(400).json({
@@ -808,56 +990,24 @@ app.post(
         });
       }
 
-      if (!shouldFetchLatestContent(url)) {
+      const latestResult = await retrieveLatestMarkdown(
+        url,
+        Boolean(forceRefresh)
+      );
+
+      if (latestResult.skipped) {
         return res.json({
           markdown: null,
           fromCache: false,
           skipped: true,
-          reason: "URL is in excluded domains (social media, video, or blocked site)",
+          reason:
+            latestResult.reason ||
+            "Latest content retrieval is not available for this URL",
         });
       }
 
-      let markdown: string | null = null;
-      let fromCache = false;
-
-      // Always check database first
-      const cachedMarkdown = await dataModel.getItemLatestContent(url);
-
-      if (!forceRefresh && cachedMarkdown) {
-        markdown = cachedMarkdown;
-        fromCache = true;
-        pino.info({ url }, "Latest content retrieved from cache");
-      }
-
-      // Fetch latest content if not cached or force refresh requested
-      if (!markdown) {
-        pino.info(
-          { url, forceRefresh: Boolean(forceRefresh) },
-          "Retrieving latest article content"
-        );
-        try {
-          const newMarkdown = await convertArticleToMarkdown(url);
-
-          // Check if the new content is better than what we already have (if any)
-          if (isBetterContent(newMarkdown, cachedMarkdown)) {
-            markdown = newMarkdown;
-            // Save latest content to database
-            await dataModel.updateItemLatestContent(url, markdown);
-            pino.info({ url }, "Item latest content updated with better content");
-          } else {
-            markdown = cachedMarkdown || newMarkdown;
-            pino.info({ url }, "Retrieved content was not better than existing content");
-          }
-        } catch (fetchError: any) {
-          // If fetch fails but we have cached content, use it
-          if (cachedMarkdown) {
-            markdown = cachedMarkdown;
-            fromCache = true;
-          } else {
-            throw fetchError;
-          }
-        }
-      }
+      const markdown = latestResult.markdown;
+      const fromCache = latestResult.fromCache;
 
       let content = markdown;
       if (format === "html" && markdown) {
@@ -868,6 +1018,7 @@ app.post(
         markdown,
         html: format === "html" ? content : undefined,
         fromCache,
+        skipped: false,
       });
     } catch (error: unknown) {
       pino.error(

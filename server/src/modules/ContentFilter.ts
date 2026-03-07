@@ -1,3 +1,5 @@
+import { countWordLikeTokens } from "./WordCount";
+
 export function shouldFetchLatestContent(url: string): boolean {
   try {
     const urlObj = new URL(url);
@@ -41,11 +43,15 @@ export function shouldFetchLatestContent(url: string): boolean {
       "quora.com",
     ];
 
-    if (socialDomains.some((d) => hostname === d || hostname.endsWith("." + d))) {
+    if (
+      socialDomains.some((d) => hostname === d || hostname.endsWith("." + d))
+    ) {
       return false;
     }
 
-    if (blockerDomains.some((d) => hostname === d || hostname.endsWith("." + d))) {
+    if (
+      blockerDomains.some((d) => hostname === d || hostname.endsWith("." + d))
+    ) {
       return false;
     }
 
@@ -55,7 +61,10 @@ export function shouldFetchLatestContent(url: string): boolean {
   }
 }
 
-export function isBetterContent(newContent: string, oldContent: string | null): boolean {
+export function isBetterContent(
+  newContent: string,
+  oldContent: string | null
+): boolean {
   if (!newContent || newContent.trim().length === 0) {
     return false;
   }
@@ -82,8 +91,8 @@ export function isBetterContent(newContent: string, oldContent: string | null): 
     return true;
   }
 
-  const newWordCount = newContent.trim().split(/\s+/).length;
-  const oldWordCount = oldContent.trim().split(/\s+/).length;
+  const newWordCount = countWordLikeTokens(newContent);
+  const oldWordCount = countWordLikeTokens(oldContent);
 
   // Significant improvement if it's longer
   // If old content was very short (e.g. just a summary), and new one is much longer, it's better.

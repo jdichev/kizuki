@@ -91,7 +91,10 @@ function navigationReducer(
     case "setCategoriesIndex":
       return {
         ...state,
-        categoriesIndices: { ...state.categoriesIndices, [action.key]: action.index },
+        categoriesIndices: {
+          ...state.categoriesIndices,
+          [action.key]: action.index,
+        },
       };
     case "setItemIndex":
       return {
@@ -238,15 +241,26 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
 
-    if (view === "reader" && selectedItem && !selectedItem.summary && !readerSummary) {
+    if (
+      view === "reader" &&
+      selectedItem &&
+      !selectedItem.summary &&
+      !readerSummary
+    ) {
       dispatch({ type: "setReaderSummaryPending", readerSummaryPending: true });
-      
+
       timer = setTimeout(() => {
-        dispatch({ type: "setReaderSummaryPending", readerSummaryPending: false });
+        dispatch({
+          type: "setReaderSummaryPending",
+          readerSummaryPending: false,
+        });
         handleSummarize(selectedItem);
       }, 1000);
     } else {
-      dispatch({ type: "setReaderSummaryPending", readerSummaryPending: false });
+      dispatch({
+        type: "setReaderSummaryPending",
+        readerSummaryPending: false,
+      });
     }
 
     return () => {
@@ -305,7 +319,9 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     dispatch({ type: "setGroupingMode", groupingMode: mode });
     dispatch({ type: "setLoading", loading: true });
     try {
-      let result: CategoriesEntry[] = [{ id: -1, title: "All", isHeader: false }];
+      let result: CategoriesEntry[] = [
+        { id: -1, title: "All", isHeader: false },
+      ];
       if (mode === "feed-categories") {
         const cats = await ds.getFeedCategories();
         const others: CategoryEntry[] = cats
@@ -435,10 +451,16 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
           type: "setReaderLatestLoading",
           readerLatestLoading: false,
         });
-        
+
         // If summary exists, show it immediately
-        dispatch({ type: "setReaderSummary", readerSummary: fullItem.summary || null });
-        dispatch({ type: "setReaderSummaryLoading", readerSummaryLoading: false });
+        dispatch({
+          type: "setReaderSummary",
+          readerSummary: fullItem.summary || null,
+        });
+        dispatch({
+          type: "setReaderSummaryLoading",
+          readerSummaryLoading: false,
+        });
         dispatch({ type: "setReaderSummaryError", readerSummaryError: null });
 
         ds.markItemRead(fullItem);
@@ -529,7 +551,11 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
       ) {
         next += step;
       }
-      if (next < 0 || next >= listLength || isCategoriesHeader(categories[next])) {
+      if (
+        next < 0 ||
+        next >= listLength ||
+        isCategoriesHeader(categories[next])
+      ) {
         // Fallback to first non-header
         const first = categories.findIndex((c) => !isCategoriesHeader(c));
         next = first !== -1 ? first : activeIndex;
@@ -742,7 +768,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
 
   const handleSummarize = async (itemOverride?: Item) => {
     const targetItem = itemOverride || selectedItem;
-    
+
     // Only skip if manually triggered (no override) and not in reader view
     if (!itemOverride && view !== "reader") {
       return;
@@ -753,70 +779,30 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     // Skip if summary already exists
     if (targetItem.summary) return;
 
-    let currentContent = readerLatestContent || targetItem.latest_content || targetItem.content || "";
-    let currentWordCount = (currentContent || "").trim().split(/\s+/).filter(Boolean).length;
+    const currentContent =
+      readerLatestContent ||
+      targetItem.latest_content ||
+      targetItem.content ||
+      "";
 
     dispatch({ type: "setReaderSummaryLoading", readerSummaryLoading: true });
     dispatch({ type: "setReaderSummaryError", readerSummaryError: null });
 
     try {
-      // If content is missing or too short (less than 240 words), fetch latest first
-      if (!currentContent || currentWordCount < 240) {
-        dispatch({ type: "setReaderLatestLoading", readerLatestLoading: true });
-        try {
-          // 1. Try with cache first
-          let data = await ds.retrieveLatestContent(targetItem.url!, "markdown", false);
-          let newContent = data.markdown || "";
-          let newWordCount = newContent.trim().split(/\s+/).filter(Boolean).length;
+      const summaryData = await ds.summarize(
+        currentContent,
+        targetItem.url,
+        "markdown"
+      );
 
-          // 2. If still too short, force refresh
-          if (newWordCount < 240) {
-
-            data = await ds.retrieveLatestContent(targetItem.url!, "markdown", true);
-            newContent = data.markdown || "";
-            newWordCount = newContent.trim().split(/\s+/).filter(Boolean).length;
-          }
-
-          if (newContent) {
-            currentContent = newContent;
-            currentWordCount = newWordCount;
-
-            // Update the content in the UI immediately
-            dispatch({ type: "setReaderLatestContent", readerLatestContent: currentContent });
-
-            // Update selectedItem and items list with new content
-            const itemWithContent: Item = {
-              ...targetItem,
-              latest_content: currentContent,
-              latestContentWordCount: currentWordCount,
-            };
-            dispatch({ type: "setSelectedItem", selectedItem: itemWithContent });
-            dispatch({
-              type: "setItems",
-              items: items.map((item) =>
-                item.id === targetItem.id
-                  ? {
-                      ...item,
-                      latest_content: currentContent,
-                      latestContentWordCount: currentWordCount,
-                    }
-                  : item
-              ),
-            });
-          }
-        } finally {
-          dispatch({ type: "setReaderLatestLoading", readerLatestLoading: false });
-        }
+      if (summaryData.skipped) {
+        throw new Error(
+          summaryData.message ||
+            summaryData.reason ||
+            "Summarization skipped by server prerequisites"
+        );
       }
 
-      // Re-calculate word count after potential fetches
-      const finalWordCount = (currentContent || "").trim().split(/\s+/).filter(Boolean).length;
-
-      if (!currentContent || finalWordCount < 240) {
-        throw new Error(`Insufficient text collected for summarization (${finalWordCount} words found, minimum 240 required)`);
-      }
-
-      const summaryData = await ds.summarize(currentContent, targetItem.url, "markdown");
       const summary = summaryData.summary || "";
 
       if (!summary) {
@@ -840,10 +826,14 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
         ),
       });
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Failed to summarize article";
+      const message =
+        error instanceof Error ? error.message : "Failed to summarize article";
       dispatch({ type: "setReaderSummaryError", readerSummaryError: message });
     } finally {
-      dispatch({ type: "setReaderSummaryLoading", readerSummaryLoading: false });
+      dispatch({
+        type: "setReaderSummaryLoading",
+        readerSummaryLoading: false,
+      });
     }
   };
 
@@ -947,7 +937,7 @@ function useTuiInput(
       }
       if (input === "n" || input === "a" || key.leftArrow) {
         setView("items");
-        // Active index should be restored from itemIndices in handleSelectCategory, 
+        // Active index should be restored from itemIndices in handleSelectCategory,
         // but let's ensure it's safe here or at least handled in handleForward
       }
       return;

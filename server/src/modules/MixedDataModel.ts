@@ -9,6 +9,7 @@ import TurndownService from "turndown";
 import { gfm } from "turndown-plugin-gfm";
 import opmlParser from "./OpmlParser";
 import FeedFinder from "./FeedFinder";
+import { countWordLikeTokens } from "./WordCount";
 
 const pino = pinoLib({
   level: process.env.LOG_LEVEL || "info",
@@ -1873,13 +1874,7 @@ export default class DataService {
   }
 
   public static countWords(content: string): number {
-    const normalizedContent = (content || "").trim();
-
-    if (!normalizedContent) {
-      return 0;
-    }
-
-    return normalizedContent.split(/\s+/).filter(Boolean).length;
+    return countWordLikeTokens(content);
   }
 
   public async insertItem(item: Item, feedId: number | undefined) {

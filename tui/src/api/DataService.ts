@@ -232,10 +232,17 @@ export default class DataService {
   }
 
   public async summarize(
-    content: string,
+    content?: string,
     url?: string,
     format: "markdown" | "html" = "markdown"
-  ): Promise<{ summary?: string; html?: string }> {
+  ): Promise<{
+    summary?: string | null;
+    html?: string;
+    fromCache?: boolean;
+    skipped?: boolean;
+    reason?: string;
+    message?: string;
+  }> {
     const response = await fetch(this.makeUrl("/api/summarize"), {
       method: "POST",
       headers: {

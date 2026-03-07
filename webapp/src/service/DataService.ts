@@ -681,4 +681,40 @@ export default class DataService {
       return false;
     }
   }
+
+  public async summarize(
+    content?: string,
+    url?: string,
+    format: "markdown" | "html" = "markdown"
+  ): Promise<{
+    summary?: string | null;
+    html?: string;
+    fromCache?: boolean;
+    skipped?: boolean;
+    reason?: string;
+    message?: string;
+  }> {
+    const response = await fetch(this.makeUrl("/api/summarize"), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ content, url, format }),
+    });
+
+    if (!response.ok) {
+      let message = "Failed to summarize content";
+      try {
+        const errorData = await response.json();
+        if (errorData?.message) {
+          message = String(errorData.message);
+        }
+      } catch {
+        // ignore parse failures
+      }
+      throw new Error(message);
+    }
+
+    return await response.json();
+  }
 }

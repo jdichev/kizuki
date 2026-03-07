@@ -197,83 +197,16 @@ export default function Article({
     setSummaryError(null);
 
     try {
-      let contentToSummarize = article.content;
-      let shouldFetchLatest = false;
+      const data = await ds.summarize(article.content, article.url, "html");
 
-      // If no content or content is too short, fetch the full article
-      if (!article.content) {
-        shouldFetchLatest = true;
-      } else {
-        // Count words in the article content (strip HTML tags first)
-        const textContent = article.content
-          .replace(/<[^>]*>/g, " ")
-          .replace(/\s+/g, " ")
-          .trim();
-        const wordCount = textContent.split(/\s+/).length;
-
-        if (wordCount < 90) {
-          shouldFetchLatest = true;
-        }
+      if (data.skipped) {
+        throw new Error(
+          data.message ||
+            data.reason ||
+            "Summarization skipped by server prerequisites"
+        );
       }
 
-      // Fetch the full article if needed
-      if (shouldFetchLatest && article.url) {
-        try {
-          const retrieveUrl = `${serverConfig.protocol}//${serverConfig.hostname}:${serverConfig.port}/api/retrieve-latest`;
-          const retrieveResponse = await fetch(retrieveUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ url: article.url, format: "html" }),
-          });
-
-          if (retrieveResponse.ok) {
-            const retrieveData = await retrieveResponse.json();
-            contentToSummarize = retrieveData.markdown;
-            // Also update the displayed retrieved content as HTML
-            if (retrieveData.html) {
-              setRetrievedContent(retrieveData.html);
-            } else {
-              setRetrievedContent(retrieveData.markdown);
-            }
-          } else {
-            const errorData = await retrieveResponse.json();
-            throw new Error(
-              `Failed to retrieve article: ${errorData.message || "Unknown error"}`
-            );
-          }
-        } catch (retrieveError: any) {
-          console.warn("Failed to retrieve full article:", retrieveError);
-          throw new Error(
-            `Cannot summarize: ${retrieveError.message || "Failed to retrieve article content"}`
-          );
-        }
-      }
-
-      if (!contentToSummarize) {
-        throw new Error("No content available to summarize");
-      }
-
-      const url = `${serverConfig.protocol}//${serverConfig.hostname}:${serverConfig.port}/api/summarize`;
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          content: contentToSummarize,
-          format: "html",
-          url: article.url,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to summarize");
-      }
-
-      const data = await response.json();
       // Use HTML version if available, otherwise use plain summary
       setSummary(data.html || data.summary);
     } catch (error: any) {
