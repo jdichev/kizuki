@@ -69,6 +69,12 @@ export default function FeedAdd() {
         url: data[`url-${index}`],
         title: data[`title-${index}`],
         feedCategoryId: parseInt(data[`feedCategory-${index}`]),
+        autoSummarize:
+          data[`autoSummarize-${index}`] === "inherit"
+            ? null
+            : Number(data[`autoSummarize-${index}`])
+              ? 1
+              : 0,
       });
 
       setCheckedFeeds((prev) => {
@@ -182,6 +188,17 @@ export default function FeedAdd() {
                               </option>
                             );
                           })}
+                        </select>
+                        <select
+                          className="form-select mt-2"
+                          {...register(`autoSummarize-${i}`)}
+                          defaultValue="inherit"
+                        >
+                          <option value="inherit">
+                            Auto summarize: Inherit category
+                          </option>
+                          <option value="1">Auto summarize: Enabled</option>
+                          <option value="0">Auto summarize: Disabled</option>
                         </select>
                       </div>
                       <div>

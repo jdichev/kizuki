@@ -258,6 +258,12 @@ export default class FeedUpdater {
           ? feedRes.links[0]
           : "",
       feedCategoryId: feedData.feedCategoryId,
+      autoSummarize:
+        feedData.autoSummarize === null || feedData.autoSummarize === undefined
+          ? null
+          : Number(feedData.autoSummarize)
+            ? 1
+            : 0,
     };
 
     try {

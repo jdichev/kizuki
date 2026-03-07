@@ -90,16 +90,12 @@ export default function FeedCategoryList() {
                     <tr key={category.id}>
                       <td>{category.id}</td>
                       <td>
-                        {category.id === 0 ? (
-                          category.title
-                        ) : (
-                          <Link
-                            to={`/feed-categories/edit/${category.id}`}
-                            className="text-decoration-none"
-                          >
-                            {category.title}
-                          </Link>
-                        )}
+                        <Link
+                          to={`/feed-categories/edit/${category.id}`}
+                          className="text-decoration-none"
+                        >
+                          {category.title}
+                        </Link>
                       </td>
                       <td>{category.text || "\u2014"}</td>
                       {category.id !== 0 && (

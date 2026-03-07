@@ -10,6 +10,9 @@ export interface Feed {
   categoryTitle?: string;
   hidden?: boolean;
   updateFrequency?: number;
+  // Feed-level override: null/undefined means inherit category setting.
+  autoSummarize?: number | null;
+  effectiveAutoSummarize?: number;
 }
 
 export interface FeedCategory {
@@ -17,6 +20,7 @@ export interface FeedCategory {
   title: string;
   text?: string;
   expanded?: boolean;
+  autoSummarize?: number;
 }
 
 export interface FeedReadStat {
@@ -59,6 +63,7 @@ export interface Item {
   comments?: string;
   feedId?: number;
   feedCategoryId?: number;
+  effectiveAutoSummarize?: number;
   itemCategoryId?: number;
   latestContentWordCount?: number;
   jsonContent?: {

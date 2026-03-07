@@ -42,6 +42,12 @@ export default function FeedEdit() {
       setValue("feedUrl", feed?.feedUrl);
       setValue("title", feed?.title);
       setValue("feedCategoryId", feed?.feedCategoryId);
+      setValue(
+        "autoSummarize",
+        feed?.autoSummarize === null || feed?.autoSummarize === undefined
+          ? "inherit"
+          : String(Number(feed.autoSummarize) ? 1 : 0)
+      );
     };
 
     loadFormFeedData();
@@ -52,6 +58,11 @@ export default function FeedEdit() {
       data.id = feedId;
       data.feedCategoryId = parseInt(data.feedCategoryId);
       data.id = parseInt(data.id);
+      if (data.autoSummarize === "inherit") {
+        data.autoSummarize = null;
+      } else {
+        data.autoSummarize = Number(data.autoSummarize) ? 1 : 0;
+      }
 
       await ds.updateFeed(data as Feed);
 
@@ -121,6 +132,20 @@ export default function FeedEdit() {
                       </option>
                     );
                   })}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="autoSummarize" className="form-label">
+                  Automatic Summarization
+                </label>
+                <select
+                  className="form-select"
+                  id="autoSummarize"
+                  {...register("autoSummarize")}
+                >
+                  <option value="inherit">Inherit category setting</option>
+                  <option value="1">Enabled</option>
+                  <option value="0">Disabled</option>
                 </select>
               </div>
               <button type="submit" className="btn btn-primary">

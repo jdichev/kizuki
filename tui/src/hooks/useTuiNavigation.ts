@@ -240,10 +240,14 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
   // Auto-summarize effect
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
+    const autoSummarizeEnabled = Boolean(
+      selectedItem && Number(selectedItem.effectiveAutoSummarize ?? 1)
+    );
 
     if (
       view === "reader" &&
       selectedItem &&
+      autoSummarizeEnabled &&
       !selectedItem.summary &&
       !readerSummary
     ) {
@@ -268,7 +272,13 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
         clearTimeout(timer);
       }
     };
-  }, [view, selectedItem?.id, !!selectedItem?.summary, !!readerSummary]);
+  }, [
+    view,
+    selectedItem?.id,
+    selectedItem?.effectiveAutoSummarize,
+    !!selectedItem?.summary,
+    !!readerSummary,
+  ]);
 
   useEffect(() => {
     const onResize = () => {

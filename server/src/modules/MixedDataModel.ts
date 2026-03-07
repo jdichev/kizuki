@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS "feed_categories" (
 	"id"	INTEGER NOT NULL UNIQUE,
 	"title"	TEXT NOT NULL,
 	"text"	TEXT,
+  "autoSummarize"	INTEGER NOT NULL DEFAULT 1,
 	PRIMARY KEY("id" AUTOINCREMENT)
 );
 CREATE TABLE IF NOT EXISTS "feeds" (
@@ -49,6 +50,7 @@ CREATE TABLE IF NOT EXISTS "feeds" (
 	"feedType"	TEXT,
 	"error"	INTEGER DEFAULT 0,
 	"feedCategoryId"	INTEGER DEFAULT 0,
+  "autoSummarize"	INTEGER,
 	"updateFrequency"	INTEGER DEFAULT 0,
 	PRIMARY KEY("id" AUTOINCREMENT)
 );
@@ -279,6 +281,16 @@ export default class DataService {
       ALTER TABLE items ADD COLUMN latest_content_word_count INTEGER DEFAULT 0;
     `;
 
+    // Migration: Add feed category level auto summarization setting
+    const addFeedCategoryAutoSummarizeColumn = `
+      ALTER TABLE feed_categories ADD COLUMN autoSummarize INTEGER NOT NULL DEFAULT 1;
+    `;
+
+    // Migration: Add feed level override for auto summarization (NULL means inherit)
+    const addFeedAutoSummarizeColumn = `
+      ALTER TABLE feeds ADD COLUMN autoSummarize INTEGER;
+    `;
+
     const ensureItemsFts = `
       CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
         title,
@@ -387,6 +399,36 @@ export default class DataService {
       }
     }
 
+    // Try to add autoSummarize column to feed_categories
+    try {
+      this.database.exec(addFeedCategoryAutoSummarizeColumn);
+      pino.info("Added autoSummarize column to feed_categories table");
+    } catch (error: unknown) {
+      if (
+        error instanceof Error &&
+        !error.message.includes("duplicate column")
+      ) {
+        pino.debug(
+          "feed_categories.autoSummarize migration might already exist or be skipped"
+        );
+      }
+    }
+
+    // Try to add autoSummarize override column to feeds
+    try {
+      this.database.exec(addFeedAutoSummarizeColumn);
+      pino.info("Added autoSummarize column to feeds table");
+    } catch (error: unknown) {
+      if (
+        error instanceof Error &&
+        !error.message.includes("duplicate column")
+      ) {
+        pino.debug(
+          "feeds.autoSummarize migration might already exist or be skipped"
+        );
+      }
+    }
+
     try {
       const createMetaTable = `
         CREATE TABLE IF NOT EXISTS app_meta (
@@ -486,6 +528,8 @@ export default class DataService {
         feeds.feedUrl,
         feeds.feedType,
         feeds.feedCategoryId,
+        feeds.autoSummarize,
+        COALESCE(feeds.autoSummarize, feed_categories.autoSummarize, 1) AS effectiveAutoSummarize,
         feeds.error,
         feeds.updateFrequency,
         feed_categories.title as categoryTitle,
@@ -570,7 +614,8 @@ export default class DataService {
       SET
         title = ?,
         feedCategoryId = ?,
-        feedUrl = ?
+        feedUrl = ?,
+        autoSummarize = ?
       WHERE
         id = ?
     `;
@@ -578,7 +623,17 @@ export default class DataService {
     try {
       this.database
         .prepare(query)
-        .run(feed.title, feed.feedCategoryId, feed.feedUrl, feed.id);
+        .run(
+          feed.title,
+          feed.feedCategoryId,
+          feed.feedUrl,
+          feed.autoSummarize === null || feed.autoSummarize === undefined
+            ? null
+            : Number(feed.autoSummarize)
+              ? 1
+              : 0,
+          feed.id
+        );
       pino.debug("feed updated %o", feed);
       return true;
     } catch (error) {
@@ -591,8 +646,8 @@ export default class DataService {
     pino.debug(feed, "input for insert feed");
 
     const query = `
-      INSERT INTO feeds (title, url, feedUrl, feedType, feedCategoryId)
-      VALUES( ?, ?, ?, ?, ? );
+      INSERT INTO feeds (title, url, feedUrl, feedType, feedCategoryId, autoSummarize)
+      VALUES( ?, ?, ?, ?, ?, ? );
     `;
 
     const feedExist = await this.feedExists(feed);
@@ -624,7 +679,18 @@ export default class DataService {
     try {
       this.database
         .prepare(query)
-        .run(feed.title, feed.url, feed.feedUrl, feed.feedType, categoryId);
+        .run(
+          feed.title,
+          feed.url,
+          feed.feedUrl,
+          feed.feedType,
+          categoryId,
+          feed.autoSummarize === null || feed.autoSummarize === undefined
+            ? null
+            : Number(feed.autoSummarize)
+              ? 1
+              : 0
+        );
       pino.debug(feed, "feed added");
     } catch (error) {
       pino.error(error);
@@ -785,7 +851,14 @@ export default class DataService {
     `;
 
     try {
-      const rows = this.database.prepare(query).all();
+      const rows = this.database
+        .prepare(
+          `
+          SELECT id, title, text, autoSummarize
+          FROM feed_categories
+        `
+        )
+        .all();
       return (rows as FeedCategory[]) || [];
     } catch (error) {
       pino.error(error);
@@ -793,13 +866,27 @@ export default class DataService {
     }
   }
 
-  private async feedCategoryExists(feedCategory: FeedCategory) {
-    const query = `
+  private async feedCategoryExists(
+    feedCategory: FeedCategory,
+    options: { excludeId?: number } = {}
+  ) {
+    const excludeId = options.excludeId;
+    const query =
+      excludeId !== undefined
+        ? `
+      SELECT id FROM feed_categories
+      WHERE title = ? AND id != ?
+    `
+        : `
       SELECT id FROM feed_categories
       WHERE title = ?
     `;
 
     try {
+      if (excludeId !== undefined) {
+        return this.database.prepare(query).get(feedCategory.title, excludeId);
+      }
+
       return this.database.prepare(query).get(feedCategory.title);
     } catch (error) {
       pino.error(error);
@@ -824,7 +911,18 @@ export default class DataService {
     }
 
     try {
-      this.database.prepare(query).run(feedCategory.title, feedCategory.text);
+      this.database
+        .prepare(
+          `
+          INSERT INTO feed_categories (title, text, autoSummarize)
+          VALUES( ?, ?, ? );
+        `
+        )
+        .run(
+          feedCategory.title,
+          feedCategory.text,
+          Number(feedCategory.autoSummarize ?? 1) ? 1 : 0
+        );
       return true;
     } catch (error) {
       pino.error(error);
@@ -837,11 +935,13 @@ export default class DataService {
   ): Promise<boolean> {
     const query = `
       UPDATE feed_categories
-      SET title = ?, text = ?
+      SET title = ?, text = ?, autoSummarize = ?
       WHERE id = ?;
     `;
 
-    const exist = await this.feedCategoryExists(feedCategory);
+    const exist = await this.feedCategoryExists(feedCategory, {
+      excludeId: feedCategory.id,
+    });
 
     if (exist) {
       return false;
@@ -850,7 +950,12 @@ export default class DataService {
     try {
       this.database
         .prepare(query)
-        .run(feedCategory.title, feedCategory.text, feedCategory.id);
+        .run(
+          feedCategory.title,
+          feedCategory.text,
+          Number(feedCategory.autoSummarize ?? 1) ? 1 : 0,
+          feedCategory.id
+        );
       return true;
     } catch (error) {
       pino.error(error);
@@ -1380,11 +1485,14 @@ export default class DataService {
         items.feed_id AS feedId,
         feeds.title AS feedTitle,
         feeds.feedCategoryId,
+        COALESCE(feeds.autoSummarize, feed_categories.autoSummarize, 1) AS effectiveAutoSummarize,
         item_categories.title AS categoryTitle
       FROM
         items
       LEFT JOIN feeds ON
         feeds.id = items.feed_id
+      LEFT JOIN feed_categories ON
+        feed_categories.id = feeds.feedCategoryId
       LEFT JOIN item_categories ON
         item_categories.id = items.itemCategoryId
       WHERE items.id = ?
@@ -1510,12 +1618,15 @@ export default class DataService {
         items.latest_content_word_count AS latestContentWordCount,
         items.feed_id AS feedId,
         feeds.title AS feedTitle,
-        feeds.feedCategoryId
+        feeds.feedCategoryId,
+        COALESCE(feeds.autoSummarize, feed_categories.autoSummarize, 1) AS effectiveAutoSummarize
       FROM
         items
       __SEARCH_JOIN_PLACEHOLDER__
       LEFT JOIN feeds ON
         feeds.id = items.feed_id
+      LEFT JOIN feed_categories ON
+        feed_categories.id = feeds.feedCategoryId
       __WHERE_PLACEHOLDER1__
       __WHERE_PLACEHOLDER2__
       ORDER BY items.${params.order ? params.order : "created"} DESC

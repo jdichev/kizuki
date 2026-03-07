@@ -12,6 +12,9 @@ interface Feed {
   categoryTitle?: string;
   hidden?: boolean;
   updateFrequency?: number;
+  // Feed-level override: null/undefined means inherit category setting.
+  autoSummarize?: number | null;
+  effectiveAutoSummarize?: number;
 }
 
 interface FeedCategory {
@@ -19,6 +22,7 @@ interface FeedCategory {
   title: string;
   text?: string;
   expanded?: boolean;
+  autoSummarize?: number;
 }
 
 interface FeedReadStat {
@@ -62,11 +66,13 @@ interface Item {
   comments?: string;
   feedId?: number;
   feedCategoryId?: number;
+  effectiveAutoSummarize?: number;
   itemCategoryId?: number;
   jsonContent?: {
     "yt-id"?: string;
   };
   content?: string;
+  summary?: string;
 }
 
 // Components

@@ -103,7 +103,7 @@ export default function Article({
   useEffect(() => {
     setVideoId(undefined);
     setVideoKind(null);
-    setSummary(null);
+    setSummary(article?.summary || null);
     setSummaryError(null);
     setRetrievedContent(null);
     setRetrieveError(null);
@@ -158,6 +158,39 @@ export default function Article({
       setVideoKind(null);
     }
   }, [article]);
+
+  useEffect(() => {
+    if (!article) {
+      return;
+    }
+
+    const autoSummarizeEnabled = Boolean(
+      Number(article.effectiveAutoSummarize ?? 1)
+    );
+
+    if (!autoSummarizeEnabled) {
+      return;
+    }
+
+    if (article.summary || summary || isLoadingSummary || summaryError) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void handleSummarize();
+    }, 900);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [
+    article?.id,
+    article?.summary,
+    article?.effectiveAutoSummarize,
+    summary,
+    isLoadingSummary,
+    summaryError,
+  ]);
 
   // Load YouTube IFrame API
   useEffect(() => {

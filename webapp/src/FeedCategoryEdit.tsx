@@ -9,6 +9,7 @@ const ds = DataService.getInstance();
 export default function FeedCategoryEdit() {
   const { categoryId } = useParams<{ categoryId: string }>();
   const isNew = !categoryId;
+  const isUncategorized = !isNew && Number(categoryId) === 0;
   const navigate = useNavigate();
 
   const {
@@ -24,7 +25,8 @@ export default function FeedCategoryEdit() {
   useEffect(() => {
     const loadFormFeedCategoryData = async () => {
       if (isNew) {
-        setFormFeedCategoryData({ title: "", text: "" });
+        setFormFeedCategoryData({ title: "", text: "", autoSummarize: 1 });
+        setValue("autoSummarize", true);
       } else {
         const categoryIdNum = parseInt(categoryId || "0", 10);
         const feedCategories = await ds.getFeedCategories();
@@ -36,6 +38,7 @@ export default function FeedCategoryEdit() {
           setFormFeedCategoryData(feedCategory);
           setValue("title", feedCategory.title);
           setValue("text", feedCategory.text);
+          setValue("autoSummarize", Boolean(feedCategory.autoSummarize ?? 1));
         }
       }
     };
@@ -45,10 +48,13 @@ export default function FeedCategoryEdit() {
 
   const onSubmit = useCallback(
     async (data: FieldValues) => {
+      const existingTitle = formFeedCategoryData?.title || "";
+      const existingText = formFeedCategoryData?.text || "";
       const feedCategory: FeedCategory = {
         id: isNew ? undefined : parseInt(categoryId || "0", 10),
-        title: data.title,
-        text: data.text,
+        title: isUncategorized ? existingTitle : data.title,
+        text: isUncategorized ? existingText : data.text,
+        autoSummarize: data.autoSummarize ? 1 : 0,
       };
 
       if (isNew) {
@@ -59,7 +65,7 @@ export default function FeedCategoryEdit() {
 
       navigate("/feed-categories/list");
     },
-    [navigate, categoryId, isNew]
+    [navigate, categoryId, isNew, isUncategorized, formFeedCategoryData]
   );
 
   return (
@@ -77,6 +83,11 @@ export default function FeedCategoryEdit() {
                   ? `- ${formFeedCategoryData.title}`
                   : ""}
               </h3>
+              {isUncategorized && (
+                <p className="text-muted">
+                  For Uncategorized, only automatic summarization can be edited.
+                </p>
+              )}
               <div>
                 <label htmlFor="title" className="form-label">
                   Category Title
@@ -86,7 +97,8 @@ export default function FeedCategoryEdit() {
                   className="form-control"
                   id="title"
                   maxLength={256}
-                  required
+                  required={!isUncategorized}
+                  disabled={isUncategorized}
                   {...register("title")}
                 />
                 {errors.title && <p>Title is required</p>}
@@ -99,8 +111,20 @@ export default function FeedCategoryEdit() {
                   className="form-control"
                   id="text"
                   rows={4}
+                  disabled={isUncategorized}
                   {...register("text")}
                 />
+              </div>
+              <div className="form-check mt-3 mb-3">
+                <input
+                  type="checkbox"
+                  className="form-check-input"
+                  id="autoSummarize"
+                  {...register("autoSummarize")}
+                />
+                <label className="form-check-label" htmlFor="autoSummarize">
+                  Enable automatic summarization for this category
+                </label>
               </div>
 
               <button type="submit" className="btn btn-primary">

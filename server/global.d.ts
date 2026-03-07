@@ -16,6 +16,9 @@ interface Feed {
   updateFrequency?: number;
   lastUpdate?: number;
   nextUpdate?: number;
+  // Feed-level override: null/undefined means inherit from category
+  autoSummarize?: number | null;
+  effectiveAutoSummarize?: number;
 }
 
 interface FeedData {
@@ -28,6 +31,7 @@ interface Category {
   title: string;
   text?: string;
   expanded?: boolean;
+  autoSummarize?: number;
 }
 
 // Alias for backwards compatibility
