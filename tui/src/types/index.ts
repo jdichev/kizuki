@@ -73,36 +73,36 @@ export interface Item {
 export type View =
   | "help"
   | "start"
-  | "sidebar"
+  | "categories"
   | "items"
   | "reader"
   | "confirm-mark-read"
   | "confirm-exit";
 
-export interface SidebarCategory {
+export interface CategoryEntry {
   id: number | string;
   title: string;
   isHeader?: false;
   unreadCount?: number;
 }
 
-export interface SidebarHeader {
+export interface CategoryHeader {
   id?: string;
   title: string;
   isHeader: true;
 }
 
-export type SidebarEntry = SidebarCategory | SidebarHeader;
+export type CategoriesEntry = CategoryEntry | CategoryHeader;
 
 export interface UseTuiNavigationResult {
   terminalHeight: number;
   terminalWidth: number;
   view: View;
   groupingMode: GroupingMode;
-  categories: SidebarEntry[];
+  categories: CategoriesEntry[];
   items: Item[];
   selectedItem: Item | null;
-  selectedCategory: SidebarCategory | null;
+  selectedCategory: CategoryEntry | null;
   activeIndex: number;
   scrollOffset: number;
   loading: boolean;

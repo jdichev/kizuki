@@ -1,20 +1,20 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { SectionHeader } from "./SectionHeader.js";
-import { GroupingMode, SidebarEntry, SidebarCategory } from "../types/index.js";
+import { GroupingMode, CategoriesEntry, CategoryEntry } from "../types/index.js";
 import { visualTruncate } from "../utils/text.js";
 import { Scrollbar } from "./Scrollbar.js";
 
-interface SidebarViewProps {
+interface CategoriesViewProps {
   groupingMode: GroupingMode;
-  categories: SidebarEntry[];
+  categories: CategoriesEntry[];
   activeIndex: number;
   scrollOffset: number;
   visibleHeight: number;
   terminalWidth: number;
 }
 
-export const SidebarView: React.FC<SidebarViewProps> = ({
+export const CategoriesView: React.FC<CategoriesViewProps> = ({
   groupingMode,
   categories,
   activeIndex,
@@ -50,20 +50,23 @@ export const SidebarView: React.FC<SidebarViewProps> = ({
               );
             }
 
-            const cat = entry as SidebarCategory;
-            const idStr = cat.id === -1 ? "all".padStart(7) : String(cat.id).padStart(7);
+            const cat = entry as CategoryEntry;
+            const idStr =
+              cat.id === -1 ? "all".padStart(7) : String(cat.id).padStart(7);
             const unreadStr =
-              cat.unreadCount && cat.unreadCount > 0 ? String(cat.unreadCount) : "";
-            
+              cat.unreadCount && cat.unreadCount > 0
+                ? String(cat.unreadCount)
+                : "";
+
             const titleWidth = terminalWidth - 27;
-            const row = `${isSelected ? "▶" : " "} ${idStr} │ ${visualTruncate(cat.title, titleWidth)} │ ${unreadStr.padStart(
+            const row = `  ${idStr} │ ${visualTruncate(cat.title, titleWidth)} │ ${unreadStr.padStart(
               6
             )}`;
 
             return (
               <Text
                 key={realIdx}
-                backgroundColor={isSelected ? "white" : undefined}
+                backgroundColor={isSelected ? "yellowBright" : undefined}
                 color={isSelected ? "black" : undefined}
               >
                 {row.padEnd(terminalWidth - 6)}

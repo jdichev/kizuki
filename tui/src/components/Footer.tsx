@@ -13,7 +13,7 @@ export const Footer: React.FC<FooterProps> = ({ terminalWidth, view }) => {
 
     if (view === "start") {
       keys = "WASD/Arrows: Select Mode | Enter: Open | Esc: Exit";
-    } else if (view === "sidebar") {
+    } else if (view === "categories") {
       keys = "WASD/Arrows: Select Category | Enter: Open | R: Reload | Esc: Exit";
     } else if (view === "items") {
       keys = "WASD/Arrows: Select Item | Enter: Open | E: Toggle Unread | Q: Mark All Read | R: Reload | Esc: Exit";

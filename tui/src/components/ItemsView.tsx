@@ -35,39 +35,44 @@ export const ItemsView: React.FC<ItemsViewProps> = ({
         {items.length === 0 ? (
           <Text>No items found.</Text>
         ) : (
-          items.slice(scrollOffset, scrollOffset + visibleHeight).map((item, i) => {
-            const realIdx = i + scrollOffset;
-            const isSelected = realIdx === activeIndex;
-            const { dateTimeStr } = formatDateTime(item.published);
+          items
+            .slice(scrollOffset, scrollOffset + visibleHeight)
+            .map((item, i) => {
+              const realIdx = i + scrollOffset;
+              const isSelected = realIdx === activeIndex;
+              const { dateTimeStr } = formatDateTime(item.published);
 
-            const feedWidth = Math.floor(terminalWidth * 0.2);
-            const dateWidth = 18;
-            const wordsWidth = 8;
-            const titleWidth =
-              terminalWidth - feedWidth - dateWidth - wordsWidth - 14;
+              const feedWidth = Math.floor(terminalWidth * 0.2);
+              const dateWidth = 18;
+              const wordsWidth = 8;
+              const titleWidth =
+                terminalWidth - feedWidth - dateWidth - wordsWidth - 14;
 
-            const isVideo =
-              item.url?.includes("youtube.com") || item.url?.includes("youtu.be");
-            const wordsLabel = isVideo ? "vid" : `${item.latestContentWordCount || 0}w`;
+              const isVideo =
+                item.url?.includes("youtube.com") ||
+                item.url?.includes("youtu.be");
+              const wordsLabel = isVideo
+                ? "vid"
+                : `${item.latestContentWordCount || 0}w`;
 
-            const row = `${item.read ? " " : "*"} ${visualTruncate(
-              decode(item.title),
-              titleWidth
-            )} │ ${visualTruncate(item.feedTitle || "", feedWidth)} │ ${visualTruncate(
-              wordsLabel,
-              wordsWidth - 1
-            )} │ ${dateTimeStr}`;
+              const row = `${item.read ? " " : "*"} ${visualTruncate(
+                decode(item.title),
+                titleWidth
+              )} │ ${visualTruncate(item.feedTitle || "", feedWidth)} │ ${visualTruncate(
+                wordsLabel,
+                wordsWidth - 1
+              )} │ ${dateTimeStr}`;
 
-            return (
-              <Text
-                key={item.id}
-                backgroundColor={isSelected ? "white" : undefined}
-                color={isSelected ? "black" : undefined}
-              >
-                {row.padEnd(terminalWidth - 6)}
-              </Text>
-            );
-          })
+              return (
+                <Text
+                  key={item.id}
+                  backgroundColor={isSelected ? "yellowBright" : undefined}
+                  color={isSelected ? "black" : undefined}
+                >
+                  {row.padEnd(terminalWidth - 6)}
+                </Text>
+              );
+            })
         )}
       </Box>
       <Scrollbar

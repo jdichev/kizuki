@@ -7,8 +7,8 @@ import {
   ItemCategory,
   View,
   GroupingMode,
-  SidebarEntry,
-  SidebarCategory,
+  CategoriesEntry,
+  CategoryEntry,
   UseTuiNavigationResult,
 } from "../types/index.js";
 import { ITEM_CATEGORY_RANGES, MODE_ITEMS } from "../constants/config.js";
@@ -20,12 +20,12 @@ interface NavigationState {
   terminalWidth: number;
   view: View;
   groupingMode: GroupingMode;
-  categories: SidebarEntry[];
+  categories: CategoriesEntry[];
   items: Item[];
   selectedItem: Item | null;
-  selectedCategory: SidebarCategory | null;
+  selectedCategory: CategoryEntry | null;
   activeIndex: number;
-  sidebarIndices: Record<string, number>;
+  categoriesIndices: Record<string, number>;
   itemIndices: Record<string, number>;
   loading: boolean;
   scrollOffset: number;
@@ -44,12 +44,12 @@ type NavigationAction =
   | { type: "setTerminalSize"; terminalHeight: number; terminalWidth: number }
   | { type: "setView"; view: View }
   | { type: "setGroupingMode"; groupingMode: GroupingMode }
-  | { type: "setCategories"; categories: SidebarEntry[] }
+  | { type: "setCategories"; categories: CategoriesEntry[] }
   | { type: "setItems"; items: Item[] }
   | { type: "setSelectedItem"; selectedItem: Item | null }
-  | { type: "setSelectedCategory"; selectedCategory: SidebarCategory | null }
+  | { type: "setSelectedCategory"; selectedCategory: CategoryEntry | null }
   | { type: "setActiveIndex"; activeIndex: number }
-  | { type: "setSidebarIndex"; key: string; index: number }
+  | { type: "setCategoriesIndex"; key: string; index: number }
   | { type: "setItemIndex"; key: string; index: number }
   | { type: "setLoading"; loading: boolean }
   | { type: "setScrollOffset"; scrollOffset: number }
@@ -88,10 +88,10 @@ function navigationReducer(
       return { ...state, selectedCategory: action.selectedCategory };
     case "setActiveIndex":
       return { ...state, activeIndex: action.activeIndex };
-    case "setSidebarIndex":
+    case "setCategoriesIndex":
       return {
         ...state,
-        sidebarIndices: { ...state.sidebarIndices, [action.key]: action.index },
+        categoriesIndices: { ...state.categoriesIndices, [action.key]: action.index },
       };
     case "setItemIndex":
       return {
@@ -125,11 +125,11 @@ function navigationReducer(
   }
 }
 
-function isSidebarHeader(entry: SidebarEntry | undefined): entry is any {
+function isCategoriesHeader(entry: CategoriesEntry | undefined): entry is any {
   return Boolean(entry && entry.isHeader);
 }
 
-function getCategoryKey(category: SidebarCategory | null): string {
+function getCategoryKey(category: CategoryEntry | null): string {
   if (!category) return "all";
   return category.id?.toString() || "all";
 }
@@ -139,10 +139,10 @@ type TuiStateController = {
   terminalWidth: number;
   view: View;
   groupingMode: GroupingMode;
-  categories: SidebarEntry[];
+  categories: CategoriesEntry[];
   items: Item[];
   selectedItem: Item | null;
-  selectedCategory: SidebarCategory | null;
+  selectedCategory: CategoryEntry | null;
   activeIndex: number;
   scrollOffset: number;
   loading: boolean;
@@ -178,7 +178,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     selectedItem: null,
     selectedCategory: null,
     activeIndex: 0,
-    sidebarIndices: {},
+    categoriesIndices: {},
     itemIndices: {},
     loading: false,
     scrollOffset: 0,
@@ -203,7 +203,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     selectedItem,
     selectedCategory,
     activeIndex,
-    sidebarIndices,
+    categoriesIndices,
     itemIndices,
     loading,
     scrollOffset,
@@ -273,7 +273,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
 
   const refreshReadStats = async (
     mode: GroupingMode,
-    currentCats: SidebarEntry[]
+    currentCats: CategoriesEntry[]
   ) => {
     try {
       const stats =
@@ -286,8 +286,8 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
       dispatch({
         type: "setCategories",
         categories: currentCats.map((entry) => {
-          if (isSidebarHeader(entry)) return entry;
-          const cat = entry as SidebarCategory;
+          if (isCategoriesHeader(entry)) return entry;
+          const cat = entry as CategoryEntry;
           if (cat.id === -1) return { ...cat, unreadCount: totalUnread };
           const stat = stats.find((s) => Number(s.id) === Number(cat.id));
           return {
@@ -305,14 +305,14 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     dispatch({ type: "setGroupingMode", groupingMode: mode });
     dispatch({ type: "setLoading", loading: true });
     try {
-      let result: SidebarEntry[] = [{ id: -1, title: "All", isHeader: false }];
+      let result: CategoriesEntry[] = [{ id: -1, title: "All", isHeader: false }];
       if (mode === "feed-categories") {
         const cats = await ds.getFeedCategories();
-        const others: SidebarCategory[] = cats
+        const others: CategoryEntry[] = cats
           .filter((c) => c.title.toLowerCase() !== "uncategorized")
           .map((c) => ({ id: c.id!, title: c.title, isHeader: false as const }))
           .sort((a, b) => Number(a.id) - Number(b.id));
-        const uncategorized: SidebarCategory[] = cats
+        const uncategorized: CategoryEntry[] = cats
           .filter((c) => c.title.toLowerCase() === "uncategorized")
           .map((c) => ({
             id: c.id!,
@@ -327,7 +327,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
         );
 
         for (const range of sortedRanges) {
-          const children: SidebarCategory[] = cats
+          const children: CategoryEntry[] = cats
             .filter(
               (c) => Number(c.id) >= range.min && Number(c.id) <= range.max
             )
@@ -348,7 +348,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
           }
         }
 
-        const uncategorized: SidebarCategory[] = cats
+        const uncategorized: CategoryEntry[] = cats
           .filter((c) => c.title.toLowerCase() === "uncategorized")
           .map((c) => ({
             id: c.id!,
@@ -363,24 +363,24 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
       dispatch({ type: "setCategories", categories: result });
       await refreshReadStats(mode, result);
 
-      const savedIdx = sidebarIndices[mode] || 0;
+      const savedIdx = categoriesIndices[mode] || 0;
       dispatch({
         type: "setActiveIndex",
         activeIndex: Math.min(savedIdx, result.length - 1),
       });
       dispatch({ type: "setScrollOffset", scrollOffset: 0 });
-      dispatch({ type: "setView", view: "sidebar" });
+      dispatch({ type: "setView", view: "categories" });
     } finally {
       dispatch({ type: "setLoading", loading: false });
     }
   };
 
   const handleSelectCategory = async (
-    category: SidebarEntry | undefined,
+    category: CategoriesEntry | undefined,
     unreadOnlyOverride?: boolean
   ) => {
-    if (!category || isSidebarHeader(category)) return;
-    const cat = category as SidebarCategory;
+    if (!category || isCategoriesHeader(category)) return;
+    const cat = category as CategoryEntry;
     dispatch({ type: "setSelectedCategory", selectedCategory: cat });
     dispatch({ type: "setLoading", loading: true });
     try {
@@ -509,7 +509,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     const listLength =
       view === "start"
         ? MODE_ITEMS.length
-        : view === "sidebar"
+        : view === "categories"
           ? categories.length
           : items.length;
 
@@ -519,19 +519,19 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     let next = activeIndex + delta;
     next = Math.max(0, Math.min(listLength - 1, next));
 
-    // 2. Sidebar-specific jump logic (skip headers)
-    if (view === "sidebar") {
+    // 2. Categories-specific jump logic (skip headers)
+    if (view === "categories") {
       const step = delta > 0 ? 1 : -1;
       while (
         next >= 0 &&
         next < listLength &&
-        isSidebarHeader(categories[next])
+        isCategoriesHeader(categories[next])
       ) {
         next += step;
       }
-      if (next < 0 || next >= listLength || isSidebarHeader(categories[next])) {
+      if (next < 0 || next >= listLength || isCategoriesHeader(categories[next])) {
         // Fallback to first non-header
-        const first = categories.findIndex((c) => !isSidebarHeader(c));
+        const first = categories.findIndex((c) => !isCategoriesHeader(c));
         next = first !== -1 ? first : activeIndex;
       }
     }
@@ -560,8 +560,8 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     }
 
     // 4. Persist index
-    if (view === "sidebar") {
-      dispatch({ type: "setSidebarIndex", key: groupingMode, index: next });
+    if (view === "categories") {
+      dispatch({ type: "setCategoriesIndex", key: groupingMode, index: next });
     }
     if (view === "items") {
       dispatch({
@@ -584,16 +584,16 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     }
 
     if (view === "items") {
-      dispatch({ type: "setView", view: "sidebar" });
+      dispatch({ type: "setView", view: "categories" });
       dispatch({ type: "setScrollOffset", scrollOffset: 0 });
       dispatch({
         type: "setActiveIndex",
-        activeIndex: sidebarIndices[groupingMode] || 0,
+        activeIndex: categoriesIndices[groupingMode] || 0,
       });
       return;
     }
 
-    if (view === "sidebar") {
+    if (view === "categories") {
       dispatch({ type: "setView", view: "start" });
       dispatch({ type: "setScrollOffset", scrollOffset: 0 });
       dispatch({ type: "setActiveIndex", activeIndex: 0 });
@@ -609,7 +609,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
       return;
     }
 
-    if (view === "sidebar") {
+    if (view === "categories") {
       const category = categories[activeIndex];
       if (category) {
         handleSelectCategory(category);
@@ -626,7 +626,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
   };
 
   const handleReload = () => {
-    if (view === "sidebar") {
+    if (view === "categories") {
       handleSelectMode(groupingMode);
       return;
     }

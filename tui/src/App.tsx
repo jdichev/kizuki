@@ -5,7 +5,8 @@ import type { UseTuiNavigationResult } from "./types/index.js";
 import { Header } from "./components/Header.js";
 import { Footer } from "./components/Footer.js";
 import { SectionHeader } from "./components/SectionHeader.js";
-import { SidebarView } from "./components/SidebarView.js";
+import { CategoriesView } from "./components/CategoriesView.js";
+import { StartView } from "./components/StartView.js";
 import { ItemsView } from "./components/ItemsView.js";
 import { ReaderView } from "./components/ReaderView.js";
 import { ConfirmationDialog } from "./components/ConfirmationDialog.js";
@@ -77,27 +78,14 @@ export default function App() {
             )}
 
             {view === "start" && (
-              <Box flexDirection="column">
-                <SectionHeader
-                  title="Choose Browsing Mode"
-                  terminalWidth={terminalWidth}
-                />
-                {MODE_ITEMS.map((m, i) => (
-                  <Text
-                    key={m.value}
-                    backgroundColor={i === activeIndex ? "white" : undefined}
-                    color={i === activeIndex ? "black" : undefined}
-                  >
-                    {`${i === activeIndex ? "▶" : " "} ${m.title}`.padEnd(
-                      terminalWidth - 4
-                    )}
-                  </Text>
-                ))}
-              </Box>
+              <StartView
+                activeIndex={activeIndex}
+                terminalWidth={terminalWidth}
+              />
             )}
 
-            {view === "sidebar" && (
-              <SidebarView
+            {view === "categories" && (
+              <CategoriesView
                 groupingMode={groupingMode}
                 categories={categories}
                 activeIndex={activeIndex}
