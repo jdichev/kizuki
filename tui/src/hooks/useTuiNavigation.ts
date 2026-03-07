@@ -38,6 +38,7 @@ interface NavigationState {
   readerSummaryError: string | null;
   readerSummaryPending: boolean;
   unreadOnly: boolean;
+  bookmarkedOnly: boolean;
 }
 
 type NavigationAction =
@@ -61,7 +62,8 @@ type NavigationAction =
   | { type: "setReaderSummaryLoading"; readerSummaryLoading: boolean }
   | { type: "setReaderSummaryError"; readerSummaryError: string | null }
   | { type: "setReaderSummaryPending"; readerSummaryPending: boolean }
-  | { type: "setUnreadOnly"; unreadOnly: boolean };
+  | { type: "setUnreadOnly"; unreadOnly: boolean }
+  | { type: "setBookmarkedOnly"; bookmarkedOnly: boolean };
 
 function navigationReducer(
   state: NavigationState,
@@ -123,6 +125,8 @@ function navigationReducer(
       return { ...state, readerSummaryPending: action.readerSummaryPending };
     case "setUnreadOnly":
       return { ...state, unreadOnly: action.unreadOnly };
+    case "setBookmarkedOnly":
+      return { ...state, bookmarkedOnly: action.bookmarkedOnly };
     default:
       return state;
   }
@@ -160,6 +164,7 @@ type TuiStateController = {
   readerSummaryError: string | null;
   readerSummaryPending: boolean;
   unreadOnly: boolean;
+  bookmarkedOnly: boolean;
   dispatch: React.Dispatch<NavigationAction>;
   setView: (nextView: View) => void;
   handleMarkAllRead: () => void;
@@ -168,6 +173,8 @@ type TuiStateController = {
   handleForwardNavigation: () => void;
   handleReload: () => void;
   handleToggleUnreadOnly: () => void;
+  handleToggleBookmarkedOnly: () => void;
+  toggleItemBookmark: (item: Item) => void;
 };
 
 function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
@@ -194,6 +201,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     readerSummaryError: null,
     readerSummaryPending: false,
     unreadOnly: false,
+    bookmarkedOnly: false,
   });
 
   const {
@@ -219,6 +227,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     readerSummaryError,
     readerSummaryPending,
     unreadOnly,
+    bookmarkedOnly,
   } = state;
 
   const contentHeight = terminalHeight - 4;
@@ -236,6 +245,77 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
       });
     }
   }, [activeIndex, scrollOffset, listVisibleHeight, view]);
+
+  const handleSummarize = async (itemOverride?: Item) => {
+    const targetItem = itemOverride || selectedItem;
+
+    // Only skip if manually triggered (no override) and not in reader view
+    if (!itemOverride && view !== "reader") {
+      return;
+    }
+
+    if (!targetItem) return;
+
+    // Skip if summary already exists
+    if (targetItem.summary) return;
+
+    const currentContent =
+      readerLatestContent ||
+      targetItem.latest_content ||
+      targetItem.content ||
+      "";
+
+    dispatch({ type: "setReaderSummaryLoading", readerSummaryLoading: true });
+    dispatch({ type: "setReaderSummaryError", readerSummaryError: null });
+
+    try {
+      const summaryData = await ds.summarize(
+        currentContent,
+        targetItem.url,
+        "markdown"
+      );
+
+      if (summaryData.skipped) {
+        throw new Error(
+          summaryData.message ||
+            summaryData.reason ||
+            "Summarization skipped by server prerequisites"
+        );
+      }
+
+      const summary = summaryData.summary || "";
+
+      if (!summary) {
+        throw new Error("Failed to generate summary");
+      }
+
+      dispatch({ type: "setReaderSummary", readerSummary: summary });
+
+      // Update selectedItem with summary
+      const updatedSelectedItem: Item = {
+        ...targetItem,
+        summary: summary,
+      };
+      dispatch({ type: "setSelectedItem", selectedItem: updatedSelectedItem });
+
+      // Update items list
+      dispatch({
+        type: "setItems",
+        items: items.map((item) =>
+          item.id === targetItem.id ? { ...item, summary: summary } : item
+        ),
+      });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Failed to summarize article";
+      dispatch({ type: "setReaderSummaryError", readerSummaryError: message });
+    } finally {
+      dispatch({
+        type: "setReaderSummaryLoading",
+        readerSummaryLoading: false,
+      });
+    }
+  };
 
   // Auto-summarize effect
   useEffect(() => {
@@ -403,7 +483,8 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
 
   const handleSelectCategory = async (
     category: CategoriesEntry | undefined,
-    unreadOnlyOverride?: boolean
+    unreadOnlyOverride?: boolean,
+    bookmarkedOnlyOverride?: boolean
   ) => {
     if (!category || isCategoriesHeader(category)) return;
     const cat = category as CategoryEntry;
@@ -419,7 +500,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
       } = {
         size: 100,
         unreadOnly: unreadOnlyOverride ?? unreadOnly,
-        bookmarkedOnly: false,
+        bookmarkedOnly: bookmarkedOnlyOverride ?? bookmarkedOnly,
       };
       if (cat.id !== -1) {
         if (groupingMode === "feed-categories") {
@@ -485,6 +566,32 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     }
   };
 
+  const toggleItemBookmark = async (item: Item) => {
+    if (!item) return;
+    try {
+      const result = await ds.toggleItemBookmark(item);
+      const newBookmarked = result.bookmarked;
+
+      // Update items list
+      dispatch({
+        type: "setItems",
+        items: items.map((i) =>
+          i.id === item.id ? { ...i, bookmarked: newBookmarked } : i
+        ),
+      });
+
+      // Update selected item if it's the one being bookmarked
+      if (selectedItem && selectedItem.id === item.id) {
+        dispatch({
+          type: "setSelectedItem",
+          selectedItem: { ...selectedItem, bookmarked: newBookmarked },
+        });
+      }
+    } catch (e) {
+      // ignore
+    }
+  };
+
   const handleMarkAllRead = async () => {
     if (!selectedCategory) return;
     dispatch({ type: "setLoading", loading: true });
@@ -509,7 +616,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
       const refreshedItems = await ds.getItems({
         size: 100,
         unreadOnly: unreadOnly,
-        bookmarkedOnly: false,
+        bookmarkedOnly: bookmarkedOnly,
         selectedFeedCategory:
           groupingMode === "feed-categories"
             ? ({
@@ -675,175 +782,34 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
   const handleToggleUnreadOnly = () => {
     const nextUnreadOnly = !unreadOnly;
     dispatch({ type: "setUnreadOnly", unreadOnly: nextUnreadOnly });
+    if (nextUnreadOnly) {
+      dispatch({ type: "setBookmarkedOnly", bookmarkedOnly: false });
+    }
 
     // If we are in items view, we need to refresh the list
     if (view === "items") {
-      handleSelectCategory(selectedCategory || undefined, nextUnreadOnly);
+      handleSelectCategory(
+        selectedCategory || undefined,
+        nextUnreadOnly,
+        nextUnreadOnly ? false : bookmarkedOnly
+      );
     }
   };
 
-  const handleRetrieveLatestContent = async (itemOverride?: Item) => {
-    const targetItem = itemOverride || selectedItem;
-
-    if (!targetItem?.url) {
-      return;
+  const handleToggleBookmarkedOnly = () => {
+    const nextBookmarkedOnly = !bookmarkedOnly;
+    dispatch({ type: "setBookmarkedOnly", bookmarkedOnly: nextBookmarkedOnly });
+    if (nextBookmarkedOnly) {
+      dispatch({ type: "setUnreadOnly", unreadOnly: false });
     }
 
-    // Only skip if manually triggered and not in reader view
-    if (itemOverride === undefined && view !== "reader") {
-      return;
-    }
-
-    // Manual trigger uses forceRefresh, auto-open fetch (with itemOverride) uses cache first
-    const shouldForceRefresh = itemOverride === undefined;
-
-    dispatch({ type: "setReaderLatestLoading", readerLatestLoading: true });
-    dispatch({ type: "setReaderLatestError", readerLatestError: null });
-
-    try {
-      const data = await ds.retrieveLatestContent(
-        targetItem.url,
-        "markdown",
-        shouldForceRefresh
+    // If we are in items view, we need to refresh the list
+    if (view === "items") {
+      handleSelectCategory(
+        selectedCategory || undefined,
+        nextBookmarkedOnly ? false : unreadOnly,
+        nextBookmarkedOnly
       );
-
-      // Handle skipped URLs
-      if ((data as any).skipped) {
-        dispatch({
-          type: "setReaderLatestLoading",
-          readerLatestLoading: false,
-        });
-        return;
-      }
-
-      const latestContent = data.markdown || "";
-
-      if (!latestContent.trim()) {
-        dispatch({
-          type: "setReaderLatestError",
-          readerLatestError: "No latest content returned",
-        });
-        return;
-      }
-
-      const latestWordCount = latestContent
-        .trim()
-        .split(/\s+/)
-        .filter(Boolean).length;
-
-      const updatedSelectedItem: Item = {
-        ...targetItem,
-        latest_content: latestContent,
-        latestContentWordCount: latestWordCount,
-      };
-
-      if (
-        !selectedItem ||
-        selectedItem.id === targetItem.id ||
-        (itemOverride && itemOverride.id === targetItem.id)
-      ) {
-        dispatch({
-          type: "setSelectedItem",
-          selectedItem: updatedSelectedItem,
-        });
-      }
-
-      dispatch({
-        type: "setReaderLatestContent",
-        readerLatestContent: latestContent,
-      });
-
-      dispatch({
-        type: "setItems",
-        items: items.map((item) =>
-          item.id === targetItem.id
-            ? {
-                ...item,
-                latest_content: latestContent,
-                latestContentWordCount: latestWordCount,
-              }
-            : item
-        ),
-      });
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Failed to retrieve latest content";
-      dispatch({ type: "setReaderLatestError", readerLatestError: message });
-    } finally {
-      dispatch({ type: "setReaderLatestLoading", readerLatestLoading: false });
-    }
-  };
-
-  const handleSummarize = async (itemOverride?: Item) => {
-    const targetItem = itemOverride || selectedItem;
-
-    // Only skip if manually triggered (no override) and not in reader view
-    if (!itemOverride && view !== "reader") {
-      return;
-    }
-
-    if (!targetItem) return;
-
-    // Skip if summary already exists
-    if (targetItem.summary) return;
-
-    const currentContent =
-      readerLatestContent ||
-      targetItem.latest_content ||
-      targetItem.content ||
-      "";
-
-    dispatch({ type: "setReaderSummaryLoading", readerSummaryLoading: true });
-    dispatch({ type: "setReaderSummaryError", readerSummaryError: null });
-
-    try {
-      const summaryData = await ds.summarize(
-        currentContent,
-        targetItem.url,
-        "markdown"
-      );
-
-      if (summaryData.skipped) {
-        throw new Error(
-          summaryData.message ||
-            summaryData.reason ||
-            "Summarization skipped by server prerequisites"
-        );
-      }
-
-      const summary = summaryData.summary || "";
-
-      if (!summary) {
-        throw new Error("Failed to generate summary");
-      }
-
-      dispatch({ type: "setReaderSummary", readerSummary: summary });
-
-      // Update selectedItem with summary
-      const updatedSelectedItem: Item = {
-        ...targetItem,
-        summary: summary,
-      };
-      dispatch({ type: "setSelectedItem", selectedItem: updatedSelectedItem });
-
-      // Update items list
-      dispatch({
-        type: "setItems",
-        items: items.map((item) =>
-          item.id === targetItem.id ? { ...item, summary: summary } : item
-        ),
-      });
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Failed to summarize article";
-      dispatch({ type: "setReaderSummaryError", readerSummaryError: message });
-    } finally {
-      dispatch({
-        type: "setReaderSummaryLoading",
-        readerSummaryLoading: false,
-      });
     }
   };
 
@@ -874,6 +840,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     readerSummaryError,
     readerSummaryPending,
     unreadOnly,
+    bookmarkedOnly,
     dispatch,
     setView,
     handleMarkAllRead,
@@ -882,6 +849,8 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     handleForwardNavigation,
     handleReload,
     handleToggleUnreadOnly,
+    handleToggleBookmarkedOnly,
+    toggleItemBookmark,
   };
 }
 
@@ -897,7 +866,12 @@ function useTuiInput(
     handleForwardNavigation,
     handleReload,
     handleToggleUnreadOnly,
+    handleToggleBookmarkedOnly,
+    toggleItemBookmark,
     listVisibleHeight,
+    items,
+    activeIndex,
+    selectedItem,
   }: Pick<
     TuiStateController,
     | "view"
@@ -908,15 +882,39 @@ function useTuiInput(
     | "handleForwardNavigation"
     | "handleReload"
     | "handleToggleUnreadOnly"
+    | "handleToggleBookmarkedOnly"
+    | "toggleItemBookmark"
     | "listVisibleHeight"
+    | "items"
+    | "activeIndex"
+    | "selectedItem"
   >
 ) {
   useInput((input, key) => {
     const normalizedInput = input.toLowerCase();
     const isUnreadOnlyShortcut = view === "items" && normalizedInput === "e";
+    const isBookmarkedOnlyShortcut = view === "items" && normalizedInput === "b";
+    const isBookmarkShortcut = (view === "items" || view === "reader") && normalizedInput === "f";
 
     if (isUnreadOnlyShortcut) {
       handleToggleUnreadOnly();
+      return;
+    }
+
+    if (isBookmarkedOnlyShortcut) {
+      handleToggleBookmarkedOnly();
+      return;
+    }
+
+    if (isBookmarkShortcut) {
+      if (view === "items") {
+        const item = items[activeIndex];
+        if (item) {
+          toggleItemBookmark(item);
+        }
+      } else if (view === "reader" && selectedItem) {
+        toggleItemBookmark(selectedItem);
+      }
       return;
     }
 
@@ -1023,7 +1021,12 @@ export function useTuiNavigation() {
     handleForwardNavigation: state.handleForwardNavigation,
     handleReload: state.handleReload,
     handleToggleUnreadOnly: state.handleToggleUnreadOnly,
+    handleToggleBookmarkedOnly: state.handleToggleBookmarkedOnly,
+    toggleItemBookmark: state.toggleItemBookmark,
     listVisibleHeight: state.listVisibleHeight,
+    items: state.items,
+    activeIndex: state.activeIndex,
+    selectedItem: state.selectedItem,
   });
 
   const result: UseTuiNavigationResult = {
@@ -1049,7 +1052,11 @@ export function useTuiNavigation() {
     readerSummaryError: state.readerSummaryError,
     readerSummaryPending: state.readerSummaryPending,
     unreadOnly: state.unreadOnly,
+    bookmarkedOnly: state.bookmarkedOnly,
     setView: state.setView,
+    toggleItemBookmark: state.toggleItemBookmark,
+    handleToggleBookmarkedOnly: state.handleToggleBookmarkedOnly,
+    handleToggleUnreadOnly: state.handleToggleUnreadOnly,
   };
 
   return result;

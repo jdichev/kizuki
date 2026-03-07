@@ -38,6 +38,7 @@ export default function App() {
     readerSummaryError,
     readerSummaryPending,
     unreadOnly,
+    bookmarkedOnly,
   } = navigation;
 
   const renderBreadcrumbs = () => {
@@ -104,6 +105,7 @@ export default function App() {
                 visibleHeight={listVisibleHeight}
                 terminalWidth={terminalWidth}
                 unreadOnly={unreadOnly}
+                bookmarkedOnly={bookmarkedOnly}
               />
             )}
 

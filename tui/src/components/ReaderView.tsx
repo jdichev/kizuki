@@ -67,9 +67,16 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
   return (
     <Box flexDirection="column" width="100%" height={contentHeight}>
       <Box paddingX={1} flexDirection="column">
-        <Text bold color="yellow">
-          {decode(item.title)}
-        </Text>
+        <Box flexDirection="row" justifyContent="space-between">
+          <Text bold color="yellow">
+            {decode(item.title)}
+          </Text>
+          {item.bookmarked === 1 && (
+            <Text bold color="magenta">
+              [BOOKMARKED]
+            </Text>
+          )}
+        </Box>
         <Box justifyContent="space-between">
           <Text dimColor>
             {item.feedTitle} │ {dateStr}

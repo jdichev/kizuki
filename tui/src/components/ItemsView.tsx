@@ -14,6 +14,7 @@ interface ItemsViewProps {
   visibleHeight: number;
   terminalWidth: number;
   unreadOnly: boolean;
+  bookmarkedOnly: boolean;
 }
 
 export const ItemsView: React.FC<ItemsViewProps> = ({
@@ -24,10 +25,13 @@ export const ItemsView: React.FC<ItemsViewProps> = ({
   visibleHeight,
   terminalWidth,
   unreadOnly,
+  bookmarkedOnly,
 }) => (
   <Box flexDirection="column" width="100%">
     <SectionHeader
-      title={`${unreadOnly ? "[UNREAD ONLY] " : ""}Articles: ${title}`}
+      title={`${unreadOnly ? "[UNREAD ONLY] " : ""}${
+        bookmarkedOnly ? "[BOOKMARKED ONLY] " : ""
+      }Articles: ${title}`}
       terminalWidth={terminalWidth}
     />
     <Box flexDirection="row">
@@ -46,7 +50,7 @@ export const ItemsView: React.FC<ItemsViewProps> = ({
               const dateWidth = 18;
               const wordsWidth = 8;
               const titleWidth =
-                terminalWidth - feedWidth - dateWidth - wordsWidth - 14;
+                terminalWidth - feedWidth - dateWidth - wordsWidth - 18;
 
               const isVideo =
                 item.url?.includes("youtube.com") ||
@@ -55,7 +59,9 @@ export const ItemsView: React.FC<ItemsViewProps> = ({
                 ? "vid"
                 : `${item.latestContentWordCount || 0}w`;
 
-              const row = `${item.read ? " " : "*"} ${visualTruncate(
+              const bookmarkLabel = item.bookmarked ? "[B]" : "   ";
+
+              const row = `${item.read ? " " : "*"} ${bookmarkLabel} ${visualTruncate(
                 decode(item.title),
                 titleWidth
               )} │ ${visualTruncate(item.feedTitle || "", feedWidth)} │ ${visualTruncate(

@@ -122,5 +122,9 @@ export interface UseTuiNavigationResult {
   readerSummaryError: string | null;
   readerSummaryPending: boolean;
   unreadOnly: boolean;
+  bookmarkedOnly: boolean;
   setView: (view: View) => void;
+  toggleItemBookmark: (item: Item) => void;
+  handleToggleBookmarkedOnly: () => void;
+  handleToggleUnreadOnly: () => void;
 }

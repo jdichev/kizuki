@@ -16,9 +16,9 @@ export const Footer: React.FC<FooterProps> = ({ terminalWidth, view }) => {
     } else if (view === "categories") {
       keys = "WASD/Arrows: Select Category | Enter: Open | R: Reload | Esc: Exit";
     } else if (view === "items") {
-      keys = "WASD/Arrows: Select Item | Enter: Open | E: Toggle Unread | Q: Mark All Read | R: Reload | Esc: Exit";
+      keys = "WASD/Arrows: Select Item | Enter: Open | E: Toggle Unread | B: Toggle Bookmarked | F: Bookmark | Q: Mark All Read | R: Reload | Esc: Exit";
     } else if (view === "reader") {
-      keys = "WASD/Arrows: Scroll | A: Back | Esc: Exit";
+      keys = "WASD/Arrows: Scroll | F: Bookmark | A: Back | Esc: Exit";
     }
 
     return keys;
