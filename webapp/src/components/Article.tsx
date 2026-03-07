@@ -241,7 +241,7 @@ export default function Article({
       }
 
       // Use HTML version if available, otherwise use plain summary
-      setSummary(data.html || data.summary);
+      setSummary(data.html || data.summary || null);
     } catch (error: any) {
       console.error("Error summarizing article:", error);
       setSummaryError(error.message || "Failed to summarize article");
