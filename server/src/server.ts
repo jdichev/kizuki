@@ -285,6 +285,7 @@ app.get("/items", async (req: Request, res: Response) => {
     : undefined;
 
   const searchQuery = req.query.q ? String(req.query.q) : "";
+  const format = req.query.format ? String(req.query.format) : "markdown";
 
   let selectedFeed;
   let selectedFeedCategory;
@@ -318,6 +319,15 @@ app.get("/items", async (req: Request, res: Response) => {
     selectedItemCategoryIds: selectedItemCategoryIdArray,
     order: "published",
   });
+
+  if (format === "html") {
+    items.forEach((item) => {
+      if (item.summary) {
+        item.summary = renderMarkdownToHtml(item.summary);
+      }
+    });
+  }
+
   res.json(items);
 });
 
@@ -327,17 +337,31 @@ app.get("/items/search", async (req: Request, res: Response) => {
     typeof req.query.size === "string"
       ? parseInt(req.query.size, 10)
       : undefined;
+  const format = req.query.format ? String(req.query.format) : "markdown";
 
   const items = await dataModel.searchItems({
     query,
     size,
   });
 
+  if (format === "html") {
+    items.forEach((item) => {
+      if (item.summary) {
+        item.summary = renderMarkdownToHtml(item.summary);
+      }
+    });
+  }
+
   res.json(items);
 });
 
 app.get("/items/:itemId", async (req: Request, res: Response) => {
   const item = await dataModel.getItemById(parseInt(req.params.itemId));
+  const format = req.query.format ? String(req.query.format) : "markdown";
+
+  if (item && format === "html" && item.summary) {
+    item.summary = renderMarkdownToHtml(item.summary);
+  }
 
   res.json(item);
 });

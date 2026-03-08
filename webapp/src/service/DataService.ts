@@ -198,6 +198,8 @@ export default class DataService {
       query.set("icids", JSON.stringify(params.selectedItemCategoryIds));
     }
 
+    query.set("format", "html");
+
     const queryString = query.toString();
 
     const response = await fetch(
@@ -222,6 +224,7 @@ export default class DataService {
     const query = new URLSearchParams();
     query.set("q", queryText);
     query.set("size", `${size}`);
+    query.set("format", "html");
 
     const response = await fetch(
       `${this.makeUrl("/items/search")}?${query.toString()}`
@@ -252,7 +255,7 @@ export default class DataService {
     return new Promise((resolve, reject) => {
       this.itemPromiseReject = reject;
 
-      this.itemsTimeout = window.setTimeout(async () => {
+      this.itemTimeout = window.setTimeout(async () => {
         const res = await this.getItem(itemId);
         resolve(res);
       }, 350);
@@ -260,7 +263,9 @@ export default class DataService {
   }
 
   public async getItem(itemId: number | undefined): Promise<Item | undefined> {
-    const response = await fetch(this.makeUrl(`/items/${itemId}`));
+    const response = await fetch(
+      this.makeUrl(`/items/${itemId}?format=html`)
+    );
     const item = await response.json();
 
     if (!item) {

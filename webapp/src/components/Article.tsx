@@ -99,8 +99,12 @@ export default function Article({
   const [isBookmarking, setIsBookmarking] = useState(false);
   const [areExternalImagesAllowed, setAreExternalImagesAllowed] =
     useState(false);
+  const currentArticleIdRef = useRef<number | string | undefined>(undefined);
 
   useEffect(() => {
+    const articleId = article?.id || article?.url;
+    currentArticleIdRef.current = articleId;
+
     setVideoId(undefined);
     setVideoKind(null);
     setSummary(article?.summary || null);
@@ -225,12 +229,17 @@ export default function Article({
 
   const handleSummarize = async () => {
     if (!article) return;
+    const articleIdAtStart = article.id || article.url;
 
     setIsLoadingSummary(true);
     setSummaryError(null);
 
     try {
       const data = await ds.summarize(article.content, article.url, "html");
+
+      if (currentArticleIdRef.current !== articleIdAtStart) {
+        return;
+      }
 
       if (data.skipped) {
         throw new Error(
@@ -243,15 +252,21 @@ export default function Article({
       // Use HTML version if available, otherwise use plain summary
       setSummary(data.html || data.summary || null);
     } catch (error: any) {
+      if (currentArticleIdRef.current !== articleIdAtStart) {
+        return;
+      }
       console.error("Error summarizing article:", error);
       setSummaryError(error.message || "Failed to summarize article");
     } finally {
-      setIsLoadingSummary(false);
+      if (currentArticleIdRef.current === articleIdAtStart) {
+        setIsLoadingSummary(false);
+      }
     }
   };
 
   const handleRetrieveLatest = async () => {
     if (!article || !article.url) return;
+    const articleIdAtStart = article.id || article.url;
 
     setIsLoadingContent(true);
     setRetrieveError(null);
@@ -266,6 +281,10 @@ export default function Article({
         body: JSON.stringify({ url: article.url, format: "html" }),
       });
 
+      if (currentArticleIdRef.current !== articleIdAtStart) {
+        return;
+      }
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || "Failed to retrieve article");
@@ -275,26 +294,42 @@ export default function Article({
       // Use HTML version if available, otherwise use markdown
       setRetrievedContent(data.html || data.markdown);
     } catch (error: any) {
+      if (currentArticleIdRef.current !== articleIdAtStart) {
+        return;
+      }
       console.error("Error retrieving article:", error);
       setRetrieveError(error.message || "Failed to retrieve article");
     } finally {
-      setIsLoadingContent(false);
+      if (currentArticleIdRef.current === articleIdAtStart) {
+        setIsLoadingContent(false);
+      }
     }
   };
 
   const handleBookmark = async () => {
     if (!article) return;
+    const articleIdAtStart = article.id || article.url;
 
     setIsBookmarking(true);
 
     try {
       const result = await ds.toggleItemBookmark(article);
+
+      if (currentArticleIdRef.current !== articleIdAtStart) {
+        return;
+      }
+
       // Update the article with the new bookmark status
       article.bookmarked = result.bookmarked;
     } catch (error: any) {
+      if (currentArticleIdRef.current !== articleIdAtStart) {
+        return;
+      }
       console.error("Error bookmarking article:", error);
     } finally {
-      setIsBookmarking(false);
+      if (currentArticleIdRef.current === articleIdAtStart) {
+        setIsBookmarking(false);
+      }
     }
   };
 

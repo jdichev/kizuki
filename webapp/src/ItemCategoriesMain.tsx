@@ -53,6 +53,7 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
     useState<ItemCategory>();
   const [article, setArticle] = useState<Item>();
   const [selectedItem, setSelectedItem] = useState<Item>();
+  const selectedItemIdRef = useRef<number | undefined>(undefined);
   const [activeNav, setActiveNav] = useState<string>("categories");
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -446,7 +447,10 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
     async (e: Event | undefined, item: Item) => {
       e?.preventDefault();
 
+      const itemId = item.id;
       setSelectedItem(item);
+      selectedItemIdRef.current = itemId;
+
       setActiveNav("items");
       document.getElementById(`item-${item.id}`)?.focus();
 
@@ -467,14 +471,20 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
           console.error(reason);
         });
 
-        await updateItemCategoryReadStats();
+        if (selectedItemIdRef.current === itemId) {
+          await updateItemCategoryReadStats();
+        }
       }
 
       if (article?.id !== item.id) {
         setArticle({ ...item, content: "Loading..." });
       }
+
       const newArticle = await ds.getItemDeferred(item.id);
-      setArticle(newArticle);
+
+      if (selectedItemIdRef.current === itemId) {
+        setArticle(newArticle);
+      }
     },
     [article, updateItemCategoryReadStats]
   );

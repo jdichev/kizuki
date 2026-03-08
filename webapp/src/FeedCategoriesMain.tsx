@@ -57,6 +57,7 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
   const [article, setArticle] = useState<Item>();
 
   const [selectedItem, setSelectedItem] = useState<Item>();
+  const selectedItemIdRef = useRef<number | undefined>(undefined);
 
   const [categoryFeeds, setCategoryFeeds] = useState<{
     [key: string]: Feed[];
@@ -542,7 +543,9 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
     async (e: Event | undefined, item: Item) => {
       e?.preventDefault();
 
+      const itemId = item.id;
       setSelectedItem(item);
+      selectedItemIdRef.current = itemId;
 
       setActiveNav("items");
 
@@ -567,16 +570,21 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
           console.error(reason);
         });
 
-        await updateFeedCategoryReadStats();
-
-        updateFeedReadStats();
+        if (selectedItemIdRef.current === itemId) {
+          await updateFeedCategoryReadStats();
+          updateFeedReadStats();
+        }
       }
 
       if (article?.id !== item.id) {
         setArticle({ ...item, content: "Loading..." });
       }
+
       const newArticle = await ds.getItemDeferred(item.id);
-      setArticle(newArticle);
+
+      if (selectedItemIdRef.current === itemId) {
+        setArticle(newArticle);
+      }
     },
     [article, updateFeedCategoryReadStats, updateFeedReadStats]
   );
