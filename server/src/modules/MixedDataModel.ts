@@ -1138,19 +1138,48 @@ export default class DataService {
       // Create a mapping of category titles to IDs
       const allCategories = await this.getFeedCategories();
       allCategories.forEach((category) => {
-        categoryTitleToIdMap.set(category.title, category.id ?? 0);
+        categoryTitleToIdMap.set(category.title.trim(), category.id ?? 0);
       });
     }
+
+    const resolveDesiredCategoryId = (feed: Feed): number | undefined => {
+      if (targetCategoryId !== undefined) {
+        return targetCategoryId;
+      }
+
+      const categoryTitle = String(feed.categoryTitle || "").trim();
+      if (!categoryTitle) {
+        return undefined;
+      }
+
+      return categoryTitleToIdMap.get(categoryTitle);
+    };
 
     pino.debug({ feeds: opmlData.feeds }, "OPML Feeds");
     for (const feed of opmlData.feeds) {
       const feedUrl = String(feed.feedUrl || "").trim();
+      const desiredCategoryId = resolveDesiredCategoryId(feed);
 
-      if (
-        !feedUrl ||
-        existingFeedUrls.has(feedUrl) ||
-        opmlSeenFeedUrls.has(feedUrl)
-      ) {
+      if (!feedUrl || opmlSeenFeedUrls.has(feedUrl)) {
+        processedFeeds += 1;
+        if (onProgress) {
+          onProgress({ processedFeeds, totalFeeds });
+        }
+        continue;
+      }
+
+      if (existingFeedUrls.has(feedUrl)) {
+        if (desiredCategoryId !== undefined) {
+          const existingFeed = await this.getFeedByUrl(feedUrl);
+          if (
+            existingFeed &&
+            existingFeed.id !== undefined &&
+            existingFeed.feedCategoryId !== desiredCategoryId
+          ) {
+            await this.assignFeedToCategory(existingFeed.id, desiredCategoryId);
+          }
+        }
+
         processedFeeds += 1;
         if (onProgress) {
           onProgress({ processedFeeds, totalFeeds });
@@ -1164,12 +1193,8 @@ export default class DataService {
       const feedRes = await feedFinder.checkFeed(feedUrl);
       if (feedRes.length) {
         const feedToInsert = feedRes[0];
-        if (targetCategoryId !== undefined) {
-          feedToInsert.feedCategoryId = targetCategoryId;
-        } else if (feed.categoryTitle) {
-          // Use the category ID mapping to set the feedCategoryId directly
-          feedToInsert.feedCategoryId =
-            categoryTitleToIdMap.get(feed.categoryTitle) || 0;
+        if (desiredCategoryId !== undefined) {
+          feedToInsert.feedCategoryId = desiredCategoryId;
         }
         await this.insertFeed(feedToInsert);
         existingFeedUrls.add(feedUrl);
@@ -1651,6 +1676,25 @@ export default class DataService {
 
     try {
       this.database.prepare(query).run(itemCategoryId, itemId);
+      return true;
+    } catch (error) {
+      pino.error(error);
+      return false;
+    }
+  }
+
+  public async assignFeedToCategory(
+    feedId: number,
+    feedCategoryId: number
+  ): Promise<boolean> {
+    const query = `
+      UPDATE feeds
+      SET feedCategoryId = ?
+      WHERE id = ?
+    `;
+
+    try {
+      this.database.prepare(query).run(feedCategoryId, feedId);
       return true;
     } catch (error) {
       pino.error(error);
