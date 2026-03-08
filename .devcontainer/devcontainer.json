@@ -12,11 +12,7 @@
 
   "customizations": {
     "vscode": {
-      "extensions": [
-        "esbenp.prettier-vscode",
-        "google.geminicodeassist",
-        "google.gemini-cli-vscode-ide-companion"
-      ],
+      "extensions": ["esbenp.prettier-vscode", "google.geminicodeassist"],
       "settings": {
         "editor.defaultFormatter": "esbenp.prettier-vscode",
         "editor.formatOnSave": true
@@ -26,6 +22,11 @@
 
   // Use 'forwardPorts' to make a list of ports inside the container available locally.
   // "forwardPorts": [],
+
+  // Persist local app data (including SQLite DB in ~/.forest) across rebuilds.
+  "mounts": [
+    "source=${localWorkspaceFolderBasename}-forest-db,target=/home/node/.forest,type=volume"
+  ],
 
   // Use 'postCreateCommand' to run commands after the container is created.
   "postCreateCommand": "npm install -g @google/gemini-cli"
