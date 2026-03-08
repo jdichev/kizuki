@@ -31,7 +31,8 @@ Examples:
 - **Manual Operations Only:** NEVER stage, commit, or push changes automatically.
 - **Two-Turn Protocol:**
   1.  **Turn 1 (Proposal):** Present `git status` and a proposed commit message derived from the actual code diff. Stop and wait for user approval.
-  2.  **Turn 2 (Execution):** Only after receiving explicit confirmation (e.g., "Commit", "Push", "Go ahead"), proceed with the requested actions.
+  2.  **Turn 2 (Execution):** Only after receiving explicit confirmation (e.g., "Commit", "Push", "Go ahead") in the **current turn**, proceed with the requested actions.
+- **NO CARRY-OVER PERMISSION:** An authorization to push or commit only applies to the specific changes proposed in that turn. You must NEVER assume permission to commit subsequent changes based on a previous turn's approval.
 - **Transparency:** Always verify and display the outcome of git operations (e.g., via `git status`) immediately after execution.
 - **No Force Pushing:** Never force push to a remote repository unless explicitly directed to do so by the user.
 
