@@ -31,6 +31,19 @@ A modern desktop feed reader built with Electron and TypeScript, featuring intel
 
 Should follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
 
+### PR Checklist
+
+Validation directives for agents and contributors are documented in
+[AGENTS.md](AGENTS.md). Use this quick checklist before opening or merging a PR:
+
+- Reproduce the reported issue from the same working directory.
+- Keep the fix minimal and document any behavior changes explicitly.
+- Run server gate: `cd /workspaces/forest/server && npm run build && npm test`.
+- Run webapp gate: `cd /workspaces/forest/webapp && npm run build && npm test`.
+- Run tui gate: `cd /workspaces/forest/tui && npm run build`.
+- Run root gate: `cd /workspaces/forest && npm run test`.
+- Confirm no diagnostics remain in edited files.
+
 [![CI](https://github.com/jdichev/forest/actions/workflows/main.yml/badge.svg)](https://github.com/jdichev/forest/actions/workflows/main.yml)
 
 ## License

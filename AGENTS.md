@@ -45,3 +45,38 @@ Examples:
 
 - **Credentials:** NEVER log, print, or commit secrets, API keys, or sensitive credentials.
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
+
+## Validation Directives
+
+These directives are intended to reduce regressions and avoid redundant or conflicting behavior across `server`, `webapp`, and `tui`.
+
+### Workflow
+
+- **Reproduce First:** Run the same command that failed, from the same working directory, before making edits.
+- **Minimal Surface Fixes:** Prefer focused changes that address root cause without unrelated refactors.
+- **No Silent Behavior Drift:** If behavior changes (e.g., auto vs manual summarization), document it explicitly and update tests accordingly.
+
+### Required Verification Gates
+
+- **Server Gate:** `cd /workspaces/forest/server && npm run build && npm test`
+- **Webapp Gate:** `cd /workspaces/forest/webapp && npm run build && npm test`
+- **TUI Gate:** `cd /workspaces/forest/tui && npm run build`
+- **Root Gate:** `cd /workspaces/forest && npm run test`
+- **Edited Files Gate:** Ensure no diagnostics remain in changed files before finalizing.
+
+### Async and UI Safety
+
+- **Guard In-Flight Actions:** Keyboard shortcuts and action handlers must not fire duplicate requests while the same operation is already running.
+- **Ignore Stale Responses:** Async UI updates must verify the response still matches the currently selected item/view before mutating state.
+- **Input-Aware Shortcuts:** Global shortcuts must not trigger while typing in inputs, textareas, selects, or contenteditable elements.
+
+### API Robustness
+
+- **Deduplicate Expensive Requests:** Endpoints that invoke AI/network-heavy work should join identical in-flight requests when possible.
+- **Throttle Bursts:** Apply short cooldown/rate limits for repeated identical requests and return actionable retry metadata.
+- **Decision Logging:** Log branch decisions (cache hit, dedupe join, skip reason, throttle) with structured context.
+
+### Cross-Surface Consistency
+
+- **Parity Rule:** For features implemented in both `webapp` and `tui`, verify both paths after shared logic changes.
+- **Configuration Precedence:** When multiple levels exist (e.g., feed override vs category default), enforce and test precedence explicitly.
