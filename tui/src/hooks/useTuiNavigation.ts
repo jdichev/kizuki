@@ -175,6 +175,7 @@ type TuiStateController = {
   handleToggleUnreadOnly: () => void;
   handleToggleBookmarkedOnly: () => void;
   toggleItemBookmark: (item: Item) => void;
+  handleSummarize: (itemOverride?: Item) => Promise<void>;
 };
 
 function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
@@ -810,6 +811,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     handleToggleUnreadOnly,
     handleToggleBookmarkedOnly,
     toggleItemBookmark,
+    handleSummarize,
   };
 }
 
