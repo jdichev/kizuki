@@ -31,7 +31,7 @@ interface Category {
   title: string;
   text?: string;
   expanded?: boolean;
-  autoSummarize?: number;
+  autoSummarize?: number | null;
 }
 
 // Alias for backwards compatibility

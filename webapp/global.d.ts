@@ -22,7 +22,7 @@ interface FeedCategory {
   title: string;
   text?: string;
   expanded?: boolean;
-  autoSummarize?: number;
+  autoSummarize?: number | null;
 }
 
 interface FeedReadStat {

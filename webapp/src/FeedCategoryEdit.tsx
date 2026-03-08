@@ -16,7 +16,7 @@ export default function FeedCategoryEdit() {
     register,
     handleSubmit,
     setValue,
-    formState: { errors },
+    formState: { errors, dirtyFields },
   } = useForm();
 
   const [formFeedCategoryData, setFormFeedCategoryData] =
@@ -25,8 +25,7 @@ export default function FeedCategoryEdit() {
   useEffect(() => {
     const loadFormFeedCategoryData = async () => {
       if (isNew) {
-        setFormFeedCategoryData({ title: "", text: "", autoSummarize: 1 });
-        setValue("autoSummarize", true);
+        setFormFeedCategoryData({ title: "", text: "", autoSummarize: null });
       } else {
         const categoryIdNum = parseInt(categoryId || "0", 10);
         const feedCategories = await ds.getFeedCategories();
@@ -38,7 +37,7 @@ export default function FeedCategoryEdit() {
           setFormFeedCategoryData(feedCategory);
           setValue("title", feedCategory.title);
           setValue("text", feedCategory.text);
-          setValue("autoSummarize", Boolean(feedCategory.autoSummarize ?? 1));
+          setValue("autoSummarize", Boolean(feedCategory.autoSummarize));
         }
       }
     };
@@ -50,11 +49,17 @@ export default function FeedCategoryEdit() {
     async (data: FieldValues) => {
       const existingTitle = formFeedCategoryData?.title || "";
       const existingText = formFeedCategoryData?.text || "";
+      const resolvedAutoSummarize = dirtyFields.autoSummarize
+        ? data.autoSummarize
+          ? 1
+          : 0
+        : (formFeedCategoryData?.autoSummarize ?? null);
+
       const feedCategory: FeedCategory = {
         id: isNew ? undefined : parseInt(categoryId || "0", 10),
         title: isUncategorized ? existingTitle : data.title,
         text: isUncategorized ? existingText : data.text,
-        autoSummarize: data.autoSummarize ? 1 : 0,
+        autoSummarize: resolvedAutoSummarize,
       };
 
       if (isNew) {
@@ -65,7 +70,14 @@ export default function FeedCategoryEdit() {
 
       navigate("/feed-categories/list");
     },
-    [navigate, categoryId, isNew, isUncategorized, formFeedCategoryData]
+    [
+      navigate,
+      categoryId,
+      isNew,
+      isUncategorized,
+      formFeedCategoryData,
+      dirtyFields.autoSummarize,
+    ]
   );
 
   return (

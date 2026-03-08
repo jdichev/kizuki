@@ -20,7 +20,7 @@ export interface FeedCategory {
   title: string;
   text?: string;
   expanded?: boolean;
-  autoSummarize?: number;
+  autoSummarize?: number | null;
 }
 
 export interface FeedReadStat {
@@ -128,5 +128,4 @@ export interface UseTuiNavigationResult {
   handleToggleBookmarkedOnly: () => void;
   handleToggleUnreadOnly: () => void;
   handleSummarize: (itemOverride?: Item) => Promise<void>;
-  };
-
+}

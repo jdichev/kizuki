@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS "feed_categories" (
 	"id"	INTEGER NOT NULL UNIQUE,
 	"title"	TEXT NOT NULL,
 	"text"	TEXT,
-  "autoSummarize"	INTEGER NOT NULL DEFAULT 1,
+  "autoSummarize"	INTEGER,
 	PRIMARY KEY("id" AUTOINCREMENT)
 );
 CREATE TABLE IF NOT EXISTS "feeds" (
@@ -283,7 +283,7 @@ export default class DataService {
 
     // Migration: Add feed category level auto summarization setting
     const addFeedCategoryAutoSummarizeColumn = `
-      ALTER TABLE feed_categories ADD COLUMN autoSummarize INTEGER NOT NULL DEFAULT 1;
+      ALTER TABLE feed_categories ADD COLUMN autoSummarize INTEGER;
     `;
 
     // Migration: Add feed level override for auto summarization (NULL means inherit)
@@ -430,6 +430,65 @@ export default class DataService {
     }
 
     try {
+      const feedCategoryColumns = this.database
+        .prepare("PRAGMA table_info(feed_categories)")
+        .all() as {
+        name: string;
+        notnull: number;
+      }[];
+
+      const autoSummarizeColumn = feedCategoryColumns.find(
+        (column) => column.name === "autoSummarize"
+      );
+
+      if (autoSummarizeColumn && Number(autoSummarizeColumn.notnull) === 1) {
+        // Rebuild feed_categories to remove NOT NULL from autoSummarize.
+        this.database.exec(`
+          CREATE TABLE IF NOT EXISTS feed_categories_new (
+            id INTEGER NOT NULL UNIQUE,
+            title TEXT NOT NULL,
+            text TEXT,
+            autoSummarize INTEGER,
+            PRIMARY KEY(id AUTOINCREMENT)
+          );
+
+          INSERT INTO feed_categories_new (id, title, text, autoSummarize)
+          SELECT id, title, text, NULL
+          FROM feed_categories;
+
+          DROP TABLE feed_categories;
+          ALTER TABLE feed_categories_new RENAME TO feed_categories;
+        `);
+
+        pino.info(
+          "Rebuilt feed_categories table to allow nullable autoSummarize"
+        );
+      }
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        pino.warn(
+          { error: error.message },
+          "Failed to normalize feed_categories.autoSummarize schema"
+        );
+      }
+    }
+
+    try {
+      // Normalize defaults for existing databases so inheritance starts unset.
+      this.database.exec(`
+        UPDATE feed_categories SET autoSummarize = NULL;
+        UPDATE feeds SET autoSummarize = NULL;
+      `);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        pino.warn(
+          { error: error.message },
+          "Failed to clear legacy autoSummarize defaults"
+        );
+      }
+    }
+
+    try {
       const createMetaTable = `
         CREATE TABLE IF NOT EXISTS app_meta (
           key TEXT PRIMARY KEY,
@@ -529,7 +588,7 @@ export default class DataService {
         feeds.feedType,
         feeds.feedCategoryId,
         feeds.autoSummarize,
-        COALESCE(feeds.autoSummarize, feed_categories.autoSummarize, 1) AS effectiveAutoSummarize,
+        COALESCE(feeds.autoSummarize, feed_categories.autoSummarize, 0) AS effectiveAutoSummarize,
         feeds.error,
         feeds.updateFrequency,
         feed_categories.title as categoryTitle,
@@ -921,7 +980,12 @@ export default class DataService {
         .run(
           feedCategory.title,
           feedCategory.text,
-          Number(feedCategory.autoSummarize ?? 1) ? 1 : 0
+          feedCategory.autoSummarize === null ||
+            feedCategory.autoSummarize === undefined
+            ? null
+            : Number(feedCategory.autoSummarize)
+              ? 1
+              : 0
         );
       return true;
     } catch (error) {
@@ -953,7 +1017,12 @@ export default class DataService {
         .run(
           feedCategory.title,
           feedCategory.text,
-          Number(feedCategory.autoSummarize ?? 1) ? 1 : 0,
+          feedCategory.autoSummarize === null ||
+            feedCategory.autoSummarize === undefined
+            ? null
+            : Number(feedCategory.autoSummarize)
+              ? 1
+              : 0,
           feedCategory.id
         );
       return true;
@@ -1485,7 +1554,7 @@ export default class DataService {
         items.feed_id AS feedId,
         feeds.title AS feedTitle,
         feeds.feedCategoryId,
-        COALESCE(feeds.autoSummarize, feed_categories.autoSummarize, 1) AS effectiveAutoSummarize,
+        COALESCE(feeds.autoSummarize, feed_categories.autoSummarize, 0) AS effectiveAutoSummarize,
         item_categories.title AS categoryTitle
       FROM
         items
@@ -1619,7 +1688,7 @@ export default class DataService {
         items.feed_id AS feedId,
         feeds.title AS feedTitle,
         feeds.feedCategoryId,
-        COALESCE(feeds.autoSummarize, feed_categories.autoSummarize, 1) AS effectiveAutoSummarize
+        COALESCE(feeds.autoSummarize, feed_categories.autoSummarize, 0) AS effectiveAutoSummarize
       FROM
         items
       __SEARCH_JOIN_PLACEHOLDER__
