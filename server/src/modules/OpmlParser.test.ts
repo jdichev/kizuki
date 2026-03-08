@@ -123,5 +123,27 @@ describe("OpmlParser", () => {
       expect(techFeeds).toHaveLength(2);
       expect(designFeeds).toHaveLength(1);
     });
+
+    it("should use outline text when category title is missing", () => {
+      const textOnlyCategoryOpml = `<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+  <head>
+    <title>Text only category</title>
+  </head>
+  <body>
+    <outline text="YT channels" type="category">
+      <outline text="Some Feed" xmlUrl="https://example.com/feed.xml" htmlUrl="https://example.com" type="rss" />
+    </outline>
+  </body>
+</opml>`;
+
+      const result = opmlParser.load(textOnlyCategoryOpml);
+
+      expect(result.categories[0]).toEqual({
+        title: "YT channels",
+        text: "YT channels",
+      });
+      expect(result.feeds[0].categoryTitle).toBe("YT channels");
+    });
   });
 });

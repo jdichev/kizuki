@@ -1112,9 +1112,15 @@ export default class DataService {
       await Promise.all(
         opmlData.categories.map(
           async (feedCategory: { text?: string; title?: string }) => {
-            if (!feedCategory.title && !feedCategory.text) {
+            const rawTitle = (feedCategory.title || "").trim();
+            const rawText = (feedCategory.text || "").trim();
+
+            if (!rawTitle && !rawText) {
               return;
             }
+
+            const normalizedTitle = rawTitle || rawText || "NO_TITLE";
+            const normalizedText = rawText || rawTitle || "NO_TEXT";
 
             pino.debug(
               { feedCategory },
@@ -1122,8 +1128,8 @@ export default class DataService {
             );
 
             await this.insertFeedCategory({
-              title: feedCategory.title ?? "NO_TITLE",
-              text: feedCategory.text ?? "NO_TEXT",
+              title: normalizedTitle,
+              text: normalizedText,
             });
           }
         )

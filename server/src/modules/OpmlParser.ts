@@ -1,5 +1,9 @@
 import * as parser from "txml";
 
+function getOutlineLabel(attributes: Record<string, string | undefined>) {
+  return (attributes.title || attributes.text || "").trim();
+}
+
 const opmlParser = {
   load(opmlString: string) {
     const xlmContent = parser.parse(opmlString);
@@ -8,9 +12,11 @@ const opmlParser = {
 
     // @ts-ignore
     const categories = startNode.map((node) => {
+      const categoryTitle = getOutlineLabel(node.attributes);
+
       return {
-        title: node.attributes.title,
-        text: node.attributes.text,
+        title: categoryTitle,
+        text: node.attributes.text || categoryTitle,
       };
     });
 
@@ -18,11 +24,13 @@ const opmlParser = {
 
     // @ts-ignore
     startNode.forEach((node) => {
+      const categoryTitle = getOutlineLabel(node.attributes);
+
       // @ts-ignore
       node.children.forEach((feedEl) => {
         feeds.push({
-          categoryTitle: node.attributes.title,
-          title: feedEl.attributes.title,
+          categoryTitle,
+          title: getOutlineLabel(feedEl.attributes),
           url: feedEl.attributes.htmlUrl,
           feedUrl: feedEl.attributes.xmlUrl,
           feedType: feedEl.attributes.type,
