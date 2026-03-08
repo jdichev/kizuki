@@ -163,38 +163,7 @@ export default function Article({
     }
   }, [article]);
 
-  useEffect(() => {
-    if (!article) {
-      return;
-    }
-
-    const autoSummarizeEnabled = Boolean(
-      Number(article.effectiveAutoSummarize ?? 1)
-    );
-
-    if (!autoSummarizeEnabled) {
-      return;
-    }
-
-    if (article.summary || summary || isLoadingSummary || summaryError) {
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      void handleSummarize();
-    }, 900);
-
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [
-    article?.id,
-    article?.summary,
-    article?.effectiveAutoSummarize,
-    summary,
-    isLoadingSummary,
-    summaryError,
-  ]);
+  // Automatic summarization removed - summarization is now manual only.
 
   // Load YouTube IFrame API
   useEffect(() => {

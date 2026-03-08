@@ -126,6 +126,8 @@ export default class DataService {
     if (params.selectedItemCategoryIds?.length)
       query.set("icids", JSON.stringify(params.selectedItemCategoryIds));
 
+    query.set("format", "markdown");
+
     const response = await fetch(
       `${this.makeUrl("/items")}?${query.toString()}`
     );
@@ -138,7 +140,9 @@ export default class DataService {
 
   public async getItem(itemId: number | undefined): Promise<Item | undefined> {
     if (itemId === undefined) return undefined;
-    const response = await fetch(this.makeUrl(`/items/${itemId}`));
+    const response = await fetch(
+      this.makeUrl(`/items/${itemId}?format=markdown`)
+    );
     const item = await response.json();
 
     if (!item) {

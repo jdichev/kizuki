@@ -123,8 +123,10 @@ export interface UseTuiNavigationResult {
   readerSummaryPending: boolean;
   unreadOnly: boolean;
   bookmarkedOnly: boolean;
-  setView: (view: View) => void;
+  setView: (nextView: View) => void;
   toggleItemBookmark: (item: Item) => void;
   handleToggleBookmarkedOnly: () => void;
   handleToggleUnreadOnly: () => void;
-}
+  handleSummarize: (itemOverride?: Item) => Promise<void>;
+  };
+

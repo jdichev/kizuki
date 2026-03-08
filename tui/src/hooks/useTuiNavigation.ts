@@ -317,48 +317,7 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
     }
   };
 
-  // Auto-summarize effect
-  useEffect(() => {
-    let timer: NodeJS.Timeout | null = null;
-    const autoSummarizeEnabled = Boolean(
-      selectedItem && Number(selectedItem.effectiveAutoSummarize ?? 1)
-    );
-
-    if (
-      view === "reader" &&
-      selectedItem &&
-      autoSummarizeEnabled &&
-      !selectedItem.summary &&
-      !readerSummary
-    ) {
-      dispatch({ type: "setReaderSummaryPending", readerSummaryPending: true });
-
-      timer = setTimeout(() => {
-        dispatch({
-          type: "setReaderSummaryPending",
-          readerSummaryPending: false,
-        });
-        handleSummarize(selectedItem);
-      }, 1000);
-    } else {
-      dispatch({
-        type: "setReaderSummaryPending",
-        readerSummaryPending: false,
-      });
-    }
-
-    return () => {
-      if (timer) {
-        clearTimeout(timer);
-      }
-    };
-  }, [
-    view,
-    selectedItem?.id,
-    selectedItem?.effectiveAutoSummarize,
-    !!selectedItem?.summary,
-    !!readerSummary,
-  ]);
+  // Auto-summarize effect removed - summarization is now manual only.
 
   useEffect(() => {
     const onResize = () => {
@@ -868,6 +827,7 @@ function useTuiInput(
     handleToggleUnreadOnly,
     handleToggleBookmarkedOnly,
     toggleItemBookmark,
+    handleSummarize,
     listVisibleHeight,
     items,
     activeIndex,
@@ -884,6 +844,7 @@ function useTuiInput(
     | "handleToggleUnreadOnly"
     | "handleToggleBookmarkedOnly"
     | "toggleItemBookmark"
+    | "handleSummarize"
     | "listVisibleHeight"
     | "items"
     | "activeIndex"
@@ -895,6 +856,7 @@ function useTuiInput(
     const isUnreadOnlyShortcut = view === "items" && normalizedInput === "e";
     const isBookmarkedOnlyShortcut = view === "items" && normalizedInput === "b";
     const isBookmarkShortcut = (view === "items" || view === "reader") && normalizedInput === "f";
+    const isSummarizeShortcut = view === "reader" && normalizedInput === "o";
 
     if (isUnreadOnlyShortcut) {
       handleToggleUnreadOnly();
@@ -914,6 +876,13 @@ function useTuiInput(
         }
       } else if (view === "reader" && selectedItem) {
         toggleItemBookmark(selectedItem);
+      }
+      return;
+    }
+
+    if (isSummarizeShortcut) {
+      if (selectedItem) {
+        handleSummarize(selectedItem);
       }
       return;
     }
@@ -1023,6 +992,7 @@ export function useTuiNavigation() {
     handleToggleUnreadOnly: state.handleToggleUnreadOnly,
     handleToggleBookmarkedOnly: state.handleToggleBookmarkedOnly,
     toggleItemBookmark: state.toggleItemBookmark,
+    handleSummarize: state.handleSummarize,
     listVisibleHeight: state.listVisibleHeight,
     items: state.items,
     activeIndex: state.activeIndex,
@@ -1057,6 +1027,7 @@ export function useTuiNavigation() {
     toggleItemBookmark: state.toggleItemBookmark,
     handleToggleBookmarkedOnly: state.handleToggleBookmarkedOnly,
     handleToggleUnreadOnly: state.handleToggleUnreadOnly,
+    handleSummarize: state.handleSummarize,
   };
 
   return result;
