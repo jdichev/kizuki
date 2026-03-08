@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactDOM from "react-dom";
 /* eslint-disable react/no-danger */
 import FormattedDate from "./FormattedDate";
@@ -196,8 +196,8 @@ export default function Article({
     }
   };
 
-  const handleSummarize = async () => {
-    if (!article) return;
+  const handleSummarize = useCallback(async () => {
+    if (!article || isLoadingSummary) return;
     const articleIdAtStart = article.id || article.url;
 
     setIsLoadingSummary(true);
@@ -220,6 +220,35 @@ export default function Article({
 
       // Use HTML version if available, otherwise use plain summary
       setSummary(data.html || data.summary || null);
+
+      // Refresh latest content info after summarization in case the server
+      // updated/backfilled latest_content while preparing summary content.
+      if (article.url) {
+        try {
+          const latestUrl = `${serverConfig.protocol}//${serverConfig.hostname}:${serverConfig.port}/api/retrieve-latest`;
+          const latestResponse = await fetch(latestUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ url: article.url, format: "html" }),
+          });
+
+          if (
+            latestResponse.ok &&
+            currentArticleIdRef.current === articleIdAtStart
+          ) {
+            const latestData = await latestResponse.json();
+            if (!latestData?.skipped) {
+              setRetrievedContent(
+                latestData.html || latestData.markdown || null
+              );
+            }
+          }
+        } catch {
+          // Non-fatal: summarization succeeded even if latest-content refresh fails.
+        }
+      }
     } catch (error: any) {
       if (currentArticleIdRef.current !== articleIdAtStart) {
         return;
@@ -231,9 +260,9 @@ export default function Article({
         setIsLoadingSummary(false);
       }
     }
-  };
+  }, [article, isLoadingSummary]);
 
-  const handleRetrieveLatest = async () => {
+  const handleRetrieveLatest = useCallback(async () => {
     if (!article || !article.url) return;
     const articleIdAtStart = article.id || article.url;
 
@@ -273,9 +302,9 @@ export default function Article({
         setIsLoadingContent(false);
       }
     }
-  };
+  }, [article]);
 
-  const handleBookmark = async () => {
+  const handleBookmark = useCallback(async () => {
     if (!article) return;
     const articleIdAtStart = article.id || article.url;
 
@@ -300,7 +329,7 @@ export default function Article({
         setIsBookmarking(false);
       }
     }
-  };
+  }, [article]);
 
   const handleToggleExternalImages = () => {
     setAreExternalImagesAllowed((previous) => !previous);
@@ -341,24 +370,41 @@ export default function Article({
   // Keyboard shortcut handler
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
-      // Only handle if video is present and we're not typing in an input/textarea
+      const target = event.target as HTMLElement | null;
+      const isEditingTarget =
+        target instanceof HTMLElement &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable);
+
+      if (isEditingTarget) {
+        return;
+      }
+
+      // 'o' to summarize, with protections against repeats and modified shortcuts.
       if (
-        videoId &&
-        playerRef.current &&
-        event.target instanceof HTMLElement &&
-        event.target.tagName !== "INPUT" &&
-        event.target.tagName !== "TEXTAREA"
+        !event.repeat &&
+        (event.key === "o" || event.key === "O") &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey &&
+        !isLoadingSummary
       ) {
-        // Space to play/pause
-        if (event.code === "Space") {
-          event.preventDefault();
-          const playerState = playerRef.current.getPlayerState();
-          // 1 = playing, 2 = paused
-          if (playerState === 1) {
-            playerRef.current.pauseVideo();
-          } else {
-            playerRef.current.playVideo();
-          }
+        event.preventDefault();
+        void handleSummarize();
+        return;
+      }
+
+      // Space to play/pause (only if video is present).
+      if (videoId && playerRef.current && event.code === "Space") {
+        event.preventDefault();
+        const playerState = playerRef.current.getPlayerState();
+        // 1 = playing, 2 = paused
+        if (playerState === 1) {
+          playerRef.current.pauseVideo();
+        } else {
+          playerRef.current.playVideo();
         }
       }
     };
@@ -367,7 +413,7 @@ export default function Article({
     return () => {
       document.removeEventListener("keydown", handleKeyPress);
     };
-  }, [videoId]);
+  }, [videoId, isLoadingSummary, handleSummarize]);
 
   if (article) {
     return (

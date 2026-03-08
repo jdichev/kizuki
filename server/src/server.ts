@@ -35,6 +35,10 @@ const serviceUsageManager = GoogleServiceUsageManager.getInstance();
 
 const markdownRenderer = new MarkdownIt();
 const SUMMARY_MIN_WORD_COUNT = 240;
+const SUMMARY_REQUEST_MIN_INTERVAL_MS = 1500;
+
+const summarizeInFlightRequests = new Map<string, Promise<string>>();
+const summarizeLastRequestAt = new Map<string, number>();
 
 const renderMarkdownToHtml = (content: string) => {
   return markdownRenderer.render(content);
@@ -231,6 +235,21 @@ const opmlImportJobs = new Map<string, OpmlImportJob>();
 
 const makeOpmlImportJobId = () => {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
+const buildSummarizeRequestKey = (params: {
+  url?: string;
+  resolvedContent: string;
+}) => {
+  if (params.url) {
+    return `url:${params.url}`;
+  }
+
+  const contentFingerprint = params.resolvedContent
+    .slice(0, 120)
+    .replace(/\s+/g, " ")
+    .trim();
+  return `content:${params.resolvedContent.length}:${contentFingerprint}`;
 };
 
 app.use(cors());
@@ -992,7 +1011,45 @@ app.post("/api/summarize", jsonParser, async (req: Request, res: Response) => {
         },
         "Summarizing article content"
       );
-      summary = await aiService.summarizeArticle(resolvedContent.content);
+
+      const requestKey = buildSummarizeRequestKey({
+        url,
+        resolvedContent: resolvedContent.content,
+      });
+
+      const inFlightRequest = summarizeInFlightRequests.get(requestKey);
+
+      if (inFlightRequest) {
+        pino.info({ requestKey }, "Joining in-flight summarize request");
+        summary = await inFlightRequest;
+      } else {
+        const now = Date.now();
+        const lastRequestAt = summarizeLastRequestAt.get(requestKey) || 0;
+        const elapsed = now - lastRequestAt;
+
+        if (elapsed < SUMMARY_REQUEST_MIN_INTERVAL_MS) {
+          const retryAfterMs = SUMMARY_REQUEST_MIN_INTERVAL_MS - elapsed;
+          return res.status(429).json({
+            error: "Too many summarize requests",
+            message: `Please wait ${retryAfterMs}ms before trying again`,
+            retryAfterMs,
+          });
+        }
+
+        summarizeLastRequestAt.set(requestKey, now);
+
+        const summarizePromise = aiService.summarizeArticle(
+          resolvedContent.content
+        );
+
+        summarizeInFlightRequests.set(requestKey, summarizePromise);
+
+        try {
+          summary = await summarizePromise;
+        } finally {
+          summarizeInFlightRequests.delete(requestKey);
+        }
+      }
 
       // Save summary to database if URL is provided
       if (url) {

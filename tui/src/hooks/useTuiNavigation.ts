@@ -306,6 +306,49 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
           item.id === targetItem.id ? { ...item, summary: summary } : item
         ),
       });
+
+      // Refresh latest content info after summarization in case server-side
+      // summarization path updated latest_content while resolving content.
+      try {
+        const refreshedItem = await ds.getItem(targetItem.id);
+        if (refreshedItem?.latest_content) {
+          const refreshedLatestContent = refreshedItem.latest_content;
+          const refreshedWordCount =
+            refreshedItem.latestContentWordCount ||
+            refreshedLatestContent.trim().split(/\s+/).filter(Boolean).length;
+
+          dispatch({
+            type: "setReaderLatestContent",
+            readerLatestContent: refreshedLatestContent,
+          });
+
+          dispatch({
+            type: "setSelectedItem",
+            selectedItem: {
+              ...refreshedItem,
+              summary,
+              latest_content: refreshedLatestContent,
+              latestContentWordCount: refreshedWordCount,
+            },
+          });
+
+          dispatch({
+            type: "setItems",
+            items: items.map((item) =>
+              item.id === targetItem.id
+                ? {
+                    ...item,
+                    summary,
+                    latest_content: refreshedLatestContent,
+                    latestContentWordCount: refreshedWordCount,
+                  }
+                : item
+            ),
+          });
+        }
+      } catch {
+        // Non-fatal: summary has already been saved in UI.
+      }
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : "Failed to summarize article";
@@ -856,8 +899,10 @@ function useTuiInput(
   useInput((input, key) => {
     const normalizedInput = input.toLowerCase();
     const isUnreadOnlyShortcut = view === "items" && normalizedInput === "e";
-    const isBookmarkedOnlyShortcut = view === "items" && normalizedInput === "b";
-    const isBookmarkShortcut = (view === "items" || view === "reader") && normalizedInput === "f";
+    const isBookmarkedOnlyShortcut =
+      view === "items" && normalizedInput === "b";
+    const isBookmarkShortcut =
+      (view === "items" || view === "reader") && normalizedInput === "f";
     const isSummarizeShortcut = view === "reader" && normalizedInput === "o";
 
     if (isUnreadOnlyShortcut) {
