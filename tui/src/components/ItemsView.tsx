@@ -63,8 +63,9 @@ export const ItemsView: React.FC<ItemsViewProps> = ({
 
               const row = `${item.read ? " " : "*"} ${bookmarkLabel} ${visualTruncate(
                 decode(item.title),
-                titleWidth
-              )} │ ${visualTruncate(item.feedTitle || "", feedWidth)} │ ${visualTruncate(
+                titleWidth,
+                true
+              )} │ ${visualTruncate(item.feedTitle || "", feedWidth, true)} │ ${visualTruncate(
                 wordsLabel,
                 wordsWidth - 1
               )} │ ${dateTimeStr}`;

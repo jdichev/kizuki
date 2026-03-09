@@ -14,7 +14,7 @@ export const Header: React.FC<HeaderProps> = ({
   <Box height={1} width="100%">
     <Text backgroundColor="magenta" color="white">
       {` `}
-      {visualTruncate(` ${breadcrumbs}`, terminalWidth - 3)}
+      {visualTruncate(` ${breadcrumbs}`, terminalWidth - 3, true)}
     </Text>
   </Box>
 );

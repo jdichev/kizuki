@@ -5,19 +5,32 @@ import { markedTerminal } from "marked-terminal";
 
 const HTML_TAG_RE = /<\/?[a-z][a-z0-9-]*(?:\s[^>]*)?>/i;
 
-export function visualTruncate(str: string, width: number): string {
+export function visualTruncate(
+  str: string,
+  width: number,
+  ellipsis: boolean = false
+): string {
   const normalized = str.replace(/\s+/g, " ").trim();
-  if (stringWidth(normalized) <= width)
-    return normalized + " ".repeat(width - stringWidth(normalized));
+  const fullWidth = stringWidth(normalized);
+  if (fullWidth <= width)
+    return normalized + " ".repeat(width - fullWidth);
+
+  const targetWidth = ellipsis ? Math.max(0, width - 3) : width;
   const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
   let result = "",
     w = 0;
   for (const { segment } of segmenter.segment(normalized)) {
     const sw = stringWidth(segment);
-    if (w + sw > width) break;
+    if (w + sw > targetWidth) break;
     result += segment;
     w += sw;
   }
+
+  if (ellipsis && fullWidth > width) {
+    result += "...";
+    w += 3;
+  }
+
   return result + " ".repeat(Math.max(0, width - w));
 }
 

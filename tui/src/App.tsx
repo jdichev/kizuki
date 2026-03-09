@@ -53,10 +53,7 @@ export default function App() {
     )
       parts.push(selectedCategory.title.toUpperCase());
     if (selectedItem && view === "reader") {
-      const t = selectedItem.title;
-      parts.push(
-        t.substring(0, 30).toUpperCase() + (t.length > 30 ? "..." : "")
-      );
+      parts.push(selectedItem.title.toUpperCase());
     }
     return parts.join(" › ");
   };

@@ -59,7 +59,7 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
                 : "";
 
             const titleWidth = terminalWidth - 27;
-            const row = `  ${idStr} │ ${visualTruncate(cat.title, titleWidth)} │ ${unreadStr.padStart(
+            const row = `  ${idStr} │ ${visualTruncate(cat.title, titleWidth, true)} │ ${unreadStr.padStart(
               6
             )}`;
 
