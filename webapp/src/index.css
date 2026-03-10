@@ -2,7 +2,7 @@
   :root {
     --frame-border-color: #dedede;
     --sidebar-focus-bg: #d6ebff;
-    --header-bg: #e2e1de;
+    --header-bg: #faf6ee;
     --sidebar-bg: #f3f3f3;
     --sidebar-selected-bg: #ececec;
     --sidebar-selected-active-bg: #ffe4c8;
@@ -32,7 +32,7 @@
   :root {
     --frame-border-color: #333;
     --sidebar-focus-bg: #2568a7;
-    --header-bg: #252526;
+    --header-bg: #272727;
     --sidebar-bg: #2d2d2d;
     --sidebar-selected-bg: #60696e;
     --sidebar-selected-active-bg: #094771;
