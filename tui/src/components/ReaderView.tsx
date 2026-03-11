@@ -48,20 +48,26 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
   const displayContent = renderMarkdown(displayContentRaw, paneWidth);
   const summaryContent = currentSummaryRaw ? renderMarkdown(currentSummaryRaw, paneWidth) : "";
 
-  const visibleHeight = Math.max(1, contentHeight - 4); // Adjusted for footer
+  const headerHeight = item.url ? 3 : 2;
+  const visibleHeight = Math.max(1, contentHeight - headerHeight - 2); // Adjusted for header, margin, and footer
 
   const contentLines = displayContent.split("\n");
   const summaryLines = summaryContent.split("\n");
 
   const maxLines = Math.max(contentLines.length, summaryLines.length);
 
+  // Reserve space for "Retrieving..." message if showing
+  const contentHeaderHeight = (latestLoading && !latestContent && !item.latest_content) ? 2 : 0;
+  // Reserve space for "Summary" label
+  const summaryHeaderHeight = 1;
+
   const visibleContentLines = contentLines.slice(
     scrollOffset,
-    scrollOffset + visibleHeight
+    scrollOffset + (visibleHeight - contentHeaderHeight)
   );
   const visibleSummaryLines = summaryLines.slice(
     scrollOffset,
-    scrollOffset + visibleHeight
+    scrollOffset + (visibleHeight - summaryHeaderHeight)
   );
 
   return (
@@ -84,7 +90,7 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
         </Box>
         {item.url && (
           <Text dimColor>
-            URL: <Text color="cyan" underline>{terminalLink(item.url, item.url)}</Text>
+            URL: <Text color="blue" underline>{terminalLink(item.url, item.url)}</Text>
           </Text>
         )}
       </Box>
@@ -94,7 +100,7 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
         <Box flexDirection="column" width={paneWidth}>
           {latestLoading && !latestContent && !item.latest_content && (
             <Box marginBottom={1}>
-              <Text color="cyan" italic>
+              <Text color="blue" italic>
                 Automatically retrieving latest content...
               </Text>
             </Box>
@@ -114,7 +120,7 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
                 <Text color="gray" italic>[AI Summary will start in 1s...]</Text>
               )}
               {latestLoading && !currentSummaryRaw && (
-                <Text color="cyan" bold>[RETRIEVING LATEST...]</Text>
+                <Text color="blue" bold>[RETRIEVING LATEST...]</Text>
               )}
               {summaryLoading && !latestLoading && !currentSummaryRaw && (
                 <Text color="green" bold>[SUMMARIZING...]</Text>
