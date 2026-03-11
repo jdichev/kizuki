@@ -245,7 +245,25 @@ export default class DataService {
         `Database initialized in mode ${tempInstance ? "temp" : "not-temp"}`
       );
     } catch (err) {
-      pino.error({ err }, "Database opening or initialization error");
+      const nativeModuleVersionMismatch =
+        err instanceof Error &&
+        (err as NodeJS.ErrnoException).code === "ERR_DLOPEN_FAILED" &&
+        err.message.includes("NODE_MODULE_VERSION");
+
+      if (nativeModuleVersionMismatch) {
+        pino.error(
+          {
+            err,
+            currentNodeVersion: process.version,
+            rebuildCommand: "cd server && npm rebuild better-sqlite3",
+          },
+          "Database native module ABI mismatch. Rebuild better-sqlite3 or reinstall server dependencies for the current Node.js version"
+        );
+      } else {
+        pino.error({ err }, "Database opening or initialization error");
+      }
+
+      throw err;
     }
   }
 
