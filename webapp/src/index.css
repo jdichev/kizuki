@@ -187,7 +187,7 @@ a:hover {
   z-index: 10;
   user-select: none;
   transition: background 0.2s ease-out;
-  background: rgba(128, 128, 128, 0.07);
+  /* background: rgba(128, 128, 128, 0.07); */
 }
 
 #sidebar-divider:hover {
@@ -417,7 +417,7 @@ a:hover {
 #main-sidebar[data-activenav="true"] li.feed-selected button:hover,
 #main-sidebar[data-activenav="true"] li.feedcategory-selected button,
 #main-sidebar[data-activenav="true"] li.feedcategory-selected button:hover {
-  box-shadow: 0 0 1px var(--link-color) inset;
+  /* box-shadow: 0 0 1px var(--link-color) inset; */
   background: var(--sidebar-selected-active-bg);
 }
 
@@ -606,7 +606,7 @@ table.feeds-table {
 
 #content-panel {
   padding: 8px 24px 16px 16px;
-  box-shadow: inset 1px 0 rgba(128, 128, 128, 0.1);
+  /* box-shadow: inset 1px 0 rgba(128, 128, 128, 0.1); */
 }
 
 #content-panel img,
