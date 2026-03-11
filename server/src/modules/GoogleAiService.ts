@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import SettingsManager from "./SettingsManager";
+import type { SettingsChangeEvent } from "./SettingsManager";
 
 const pino = pinoLib({
   level: process.env.LOG_LEVEL || "info",
@@ -66,6 +67,11 @@ export default class GoogleAiService {
     this.loadRateLimitCache();
     this.loadUsageMetrics();
     this.initializeClient();
+    this.settingsManager.addChangeListener((event: SettingsChangeEvent) => {
+      if (event.key === "GEMINI_API_KEY") {
+        this.refreshClient();
+      }
+    });
   }
 
   /**

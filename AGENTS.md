@@ -40,6 +40,9 @@ Examples:
 
 - **Separation of Concerns:** Keep data access logic in `DataService` (MixedDataModel), business logic in modules, and API handling in `server.ts`.
 - **Native Modules:** Be aware that some helpers (like `fetch-feed` and `fetch-links`) use Rust-based native modules via N-API.
+- **Settings Reload Pattern:** `SettingsManager` emits setting-change events; modules should subscribe and refresh only for keys they actually use.
+- **AI Key Scope:** `GoogleAiService` should react to `GEMINI_API_KEY` changes for summarize/categorization flows.
+- **Service Usage Scope:** `GoogleServiceUsageManager` should react to `GOOGLE_APPLICATION_CREDENTIALS` changes for Google Cloud service metrics only.
 
 ## Security & System Integrity
 

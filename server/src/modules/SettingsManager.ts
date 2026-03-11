@@ -16,6 +16,7 @@ const pino = pinoLib({
 export default class SettingsManager {
   private static instance: SettingsManager;
   private settings: { [key: string]: string };
+  private listeners = new Set<(event: SettingsChangeEvent) => void>();
   private settingsFilePath: string;
 
   // Default settings
@@ -86,6 +87,20 @@ export default class SettingsManager {
   }
 
   /**
+   * Subscribe to setting changes.
+   * @param listener - Callback invoked when a setting changes
+   * @returns Unsubscribe function
+   */
+  public addChangeListener(
+    listener: (event: SettingsChangeEvent) => void
+  ): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  /**
    * Sets a setting value and persists to disk.
    * @param key - The setting key
    * @param value - The setting value (must be a string)
@@ -95,8 +110,16 @@ export default class SettingsManager {
       pino.warn(`Setting value for key "${key}" must be a string`);
       return;
     }
+
+    const previousValue = this.settings[key];
     this.settings[key] = value;
     this.saveSettings();
+    this.notifyChange({
+      key,
+      value,
+      previousValue,
+      operation: "set",
+    });
   }
 
   /**
@@ -105,6 +128,8 @@ export default class SettingsManager {
    * @param key - The setting key to delete
    */
   public deleteSetting(key: string): void {
+    const previousValue = this.settings[key];
+
     if (key in SettingsManager.DEFAULT_SETTINGS) {
       // Reset to default
       this.settings[key] = SettingsManager.DEFAULT_SETTINGS[key];
@@ -114,7 +139,25 @@ export default class SettingsManager {
       delete this.settings[key];
       pino.debug(`Setting "${key}" deleted`);
     }
+
     this.saveSettings();
+
+    this.notifyChange({
+      key,
+      value: this.settings[key],
+      previousValue,
+      operation: "delete",
+    });
+  }
+
+  private notifyChange(event: SettingsChangeEvent): void {
+    for (const listener of this.listeners) {
+      try {
+        listener(event);
+      } catch (error) {
+        pino.warn({ error, key: event.key }, "Settings listener failed");
+      }
+    }
   }
 
   /**
@@ -131,3 +174,10 @@ export default class SettingsManager {
     }
   }
 }
+
+export type SettingsChangeEvent = {
+  key: string;
+  value: string | undefined;
+  previousValue: string | undefined;
+  operation: "set" | "delete";
+};

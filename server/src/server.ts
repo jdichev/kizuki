@@ -44,6 +44,16 @@ const renderMarkdownToHtml = (content: string) => {
   return markdownRenderer.render(content);
 };
 
+const setNoStoreCacheHeaders = (res: Response) => {
+  res.setHeader(
+    "Cache-Control",
+    "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
+  );
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  res.setHeader("Surrogate-Control", "no-store");
+};
+
 type LatestContentResolution = {
   markdown: string | null;
   fromCache: boolean;
@@ -955,6 +965,8 @@ app.delete("/settings/:key", (req: Request, res: Response) => {
 
 app.post("/api/summarize", jsonParser, async (req: Request, res: Response) => {
   try {
+    setNoStoreCacheHeaders(res);
+
     const { content, format, url, forceRefreshLatest } = req.body as {
       content?: string;
       format?: "markdown" | "html";
@@ -1090,6 +1102,8 @@ app.post(
   jsonParser,
   async (req: Request, res: Response) => {
     try {
+      setNoStoreCacheHeaders(res);
+
       const { url, format, forceRefresh } = req.body as {
         url?: string;
         format?: "markdown" | "html";

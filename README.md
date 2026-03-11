@@ -29,6 +29,14 @@ A modern desktop feed reader built with Electron and TypeScript, featuring intel
 
 ## Development
 
+### Settings Reload Behavior
+
+- Settings are managed by `SettingsManager`, which emits change events when keys are set or deleted.
+- Runtime modules subscribe to these events and refresh only when relevant keys change.
+- `GoogleAiService` refreshes on `GEMINI_API_KEY` changes (used for summaries/categorization).
+- `GoogleServiceUsageManager` refreshes on `GOOGLE_APPLICATION_CREDENTIALS` changes (used for Google Cloud service usage metrics).
+- This keeps reloads targeted and avoids stale in-memory configuration after updating Settings.
+
 Should follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
 
 ### PR Checklist

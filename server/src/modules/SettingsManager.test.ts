@@ -99,4 +99,30 @@ describe("SettingsManager", () => {
 
     expect(instanceA).toBe(instanceB);
   });
+
+  it("notifies listeners on setting update", () => {
+    const manager = SettingsManager.getInstance();
+    const listener = jest.fn();
+    manager.addChangeListener(listener);
+
+    manager.setSetting("GEMINI_API_KEY", "abc");
+
+    expect(listener).toHaveBeenCalledWith({
+      key: "GEMINI_API_KEY",
+      value: "abc",
+      previousValue: undefined,
+      operation: "set",
+    });
+  });
+
+  it("supports listener unsubscribe", () => {
+    const manager = SettingsManager.getInstance();
+    const listener = jest.fn();
+    const unsubscribe = manager.addChangeListener(listener);
+
+    unsubscribe();
+    manager.setSetting("GEMINI_API_KEY", "abc");
+
+    expect(listener).not.toHaveBeenCalled();
+  });
 });

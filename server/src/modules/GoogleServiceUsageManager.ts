@@ -1,6 +1,7 @@
 import { ServiceUsageClient } from "@google-cloud/service-usage";
 import pinoLib from "pino";
 import SettingsManager from "./SettingsManager";
+import type { SettingsChangeEvent } from "./SettingsManager";
 
 const pino = pinoLib({
   level: process.env.LOG_LEVEL || "info",
@@ -20,6 +21,11 @@ export default class GoogleServiceUsageManager {
   private constructor() {
     this.settingsManager = SettingsManager.getInstance();
     this.initializeServiceUsageClient();
+    this.settingsManager.addChangeListener((event: SettingsChangeEvent) => {
+      if (event.key === "GOOGLE_APPLICATION_CREDENTIALS") {
+        this.refresh();
+      }
+    });
   }
 
   /**
