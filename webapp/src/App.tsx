@@ -5,6 +5,7 @@ import {
   Route,
   NavLink,
   useLocation,
+  useNavigate,
 } from "react-router-dom";
 
 import Home from "./Home";
@@ -29,6 +30,27 @@ import {
   type SidebarMenuVisibilityDetail,
 } from "./utils/sidebarMenuVisibility";
 
+const SIDE_MENU_ITEMS = [
+  { path: "/feeds/read", iconClass: "bi bi-layout-text-sidebar-reverse" },
+  { path: "/feeds/items", iconClass: "bi bi-collection" },
+  { path: "/feeds/list", iconClass: "bi bi-rss-fill" },
+  { path: "/feeds/add", iconClass: "bi bi-plus-square-fill" },
+  { path: "/settings", iconClass: "bi bi-gear-fill" },
+] as const;
+
+function isTypingTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return (
+    target.tagName === "INPUT" ||
+    target.tagName === "TEXTAREA" ||
+    target.tagName === "SELECT" ||
+    target.isContentEditable
+  );
+}
+
 export default function App() {
   return (
     <Router>
@@ -39,6 +61,7 @@ export default function App() {
 
 function AppLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
   const navMenu = useRef<HTMLDivElement>(null);
   const navOptions = useRef<HTMLDivElement>(null);
   const sidebarMenuFocusedBeforeClick = useRef(false);
@@ -47,6 +70,7 @@ function AppLayout() {
     useState(false);
   const [isSidebarMenuTemporarilyShown, setSidebarMenuTemporarilyShown] =
     useState(false);
+  const [showAltNavHints, setShowAltNavHints] = useState(false);
   const dividerRef = useSidebarDivider();
 
   const isSidebarMenuHidden =
@@ -127,6 +151,39 @@ function AppLayout() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      const altDigitMatch = event.code.match(/^(?:Digit|Numpad)([1-5])$/);
+      const isAltDigitShortcut =
+        event.altKey &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.shiftKey &&
+        !!altDigitMatch;
+
+      if (event.key === "Alt" || event.altKey) {
+        setShowAltNavHints(true);
+      }
+
+      if (isAltDigitShortcut) {
+        if (isTypingTarget(event.target)) {
+          return;
+        }
+
+        const shortcutNumber = Number(altDigitMatch?.[1]);
+        const targetIndex = shortcutNumber - 1;
+        const targetItem = SIDE_MENU_ITEMS[targetIndex];
+
+        if (!targetItem) {
+          return;
+        }
+
+        event.preventDefault();
+        sidebarMenuFocusedBeforeClick.current = false;
+        setSidebarMenuExplicitlyHidden(false);
+        setSidebarMenuTemporarilyShown(false);
+        navigate(targetItem.path);
+        return;
+      }
+
       const isToggleShortcut =
         event.code === "KeyB" &&
         (event.metaKey || event.ctrlKey) &&
@@ -146,12 +203,26 @@ function AppLayout() {
       toggleSidebarMenu();
     };
 
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (event.key === "Alt") {
+        setShowAltNavHints(false);
+      }
+    };
+
+    const handleWindowBlur = () => {
+      setShowAltNavHints(false);
+    };
+
     window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    window.addEventListener("blur", handleWindowBlur);
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("blur", handleWindowBlur);
     };
-  }, [toggleSidebarMenu]);
+  }, [navigate, toggleSidebarMenu]);
 
   const onSideMenuClick = useCallback(
     (e: React.MouseEvent<HTMLAnchorElement>, targetPath: string) => {
@@ -195,51 +266,21 @@ function AppLayout() {
         <div id="top-nav-options" ref={navOptions}></div>
       </div>
 
-      <div id="main-nav">
-        <NavLink
-          to="/feeds/read"
-          className="text-decoration-none"
-          onMouseDown={onSideMenuMouseDown}
-          onClick={(e) => onSideMenuClick(e, "/feeds/read")}
-        >
-          <i className="bi bi-layout-text-sidebar-reverse"></i>
-        </NavLink>
-
-        <NavLink
-          to="/feeds/items"
-          className="text-decoration-none"
-          onMouseDown={onSideMenuMouseDown}
-          onClick={(e) => onSideMenuClick(e, "/feeds/items")}
-        >
-          <i className="bi bi-collection"></i>
-        </NavLink>
-
-        <NavLink
-          to="/feeds/list"
-          className="text-decoration-none"
-          onMouseDown={onSideMenuMouseDown}
-          onClick={(e) => onSideMenuClick(e, "/feeds/list")}
-        >
-          <i className="bi bi-rss-fill"></i>
-        </NavLink>
-
-        <NavLink
-          to="/feeds/add"
-          className="text-decoration-none"
-          onMouseDown={onSideMenuMouseDown}
-          onClick={(e) => onSideMenuClick(e, "/feeds/add")}
-        >
-          <i className="bi bi-plus-square-fill"></i>
-        </NavLink>
-
-        <NavLink
-          to="/settings"
-          className="text-decoration-none"
-          onMouseDown={onSideMenuMouseDown}
-          onClick={(e) => onSideMenuClick(e, "/settings")}
-        >
-          <i className="bi bi-gear-fill"></i>
-        </NavLink>
+      <div id="main-nav" className={showAltNavHints ? "show-shortcuts" : ""}>
+        {SIDE_MENU_ITEMS.map((item, index) => (
+          <NavLink
+            key={item.path}
+            to={item.path}
+            className="text-decoration-none"
+            onMouseDown={onSideMenuMouseDown}
+            onClick={(e) => onSideMenuClick(e, item.path)}
+          >
+            <i className={item.iconClass}></i>
+            <span className="main-nav-shortcut-hint" aria-hidden="true">
+              {index + 1}
+            </span>
+          </NavLink>
+        ))}
       </div>
 
       <div id="sidebar-divider" ref={dividerRef} />

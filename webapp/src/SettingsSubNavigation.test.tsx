@@ -72,3 +72,19 @@ test("app routes to feed categories list management view", async () => {
 
   await screen.findByText("FeedCategoryListView");
 });
+
+test("app navigates to first main nav item on Alt+1", async () => {
+  window.location.hash = "#/settings";
+
+  render(<App />);
+
+  await screen.findByText("SettingsView");
+
+  fireEvent.keyDown(window, {
+    altKey: true,
+    code: "Digit1",
+    key: "¡",
+  });
+
+  await screen.findByText("FeedCategoriesMainView");
+});

@@ -286,6 +286,7 @@ a:hover {
 #main-nav a {
   color: var(--side-menu-fg);
   display: block;
+  position: relative;
   width: var(--side-menu-width);
   height: var(--side-menu-width);
   line-height: var(--side-menu-width);
@@ -303,6 +304,26 @@ a:hover {
 #main-nav a:hover {
   color: var(--button-color-highlight);
   opacity: 1;
+}
+
+.main-nav-shortcut-hint {
+  display: none;
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  min-width: 14px;
+  height: 14px;
+  line-height: 14px;
+  border-radius: 999px;
+  text-align: center;
+  font-size: 0.65rem;
+  font-weight: 600;
+  background: var(--highlight-color);
+  color: var(--main-bg);
+}
+
+#main-nav.show-shortcuts .main-nav-shortcut-hint {
+  display: inline-block;
 }
 
 #welcome-content {
