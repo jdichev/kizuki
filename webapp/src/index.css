@@ -34,12 +34,12 @@
     --sidebar-focus-bg: #2568a7;
     --header-bg: #272727;
     --sidebar-bg: #2d2d2d;
-    --sidebar-selected-bg: #60696e;
-    --sidebar-selected-active-bg: #094771;
+    /* --sidebar-selected-bg: #1c1e20; */
+    --sidebar-selected-active-bg: #363f45;
     --sidebar-fg: #cccccc;
     --items-list-bg: #313131;
-    --items-list-selected-bg: #60696e;
-    --items-list-selected-active-bg: #063453;
+    /* --items-list-selected-bg: #1c1e20; */
+    --items-list-selected-active-bg: #363f45;
     --main-bg: #272727;
     --main-color: #c2c2c1;
     --main-color-visited: #dbd4c5;
@@ -542,7 +542,7 @@ table.feeds-table {
 
 #list-panel[data-activenav="true"] .table .selected-item td,
 #list-panel[data-activenav="true"] .table .selected-item td:hover {
-  box-shadow: 0 0 1px var(--link-color) inset;
+  /* box-shadow: 0 0 1px var(--link-color) inset; */
   background: var(--items-list-selected-active-bg);
 }
 
@@ -626,7 +626,7 @@ table.feeds-table {
 }
 
 #content-panel {
-  padding: 8px 24px 16px 16px;
+  padding: 8px 24px 16px;
   /* box-shadow: inset 1px 0 rgba(128, 128, 128, 0.1); */
 }
 
