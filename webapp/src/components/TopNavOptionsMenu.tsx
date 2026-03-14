@@ -4,20 +4,24 @@ interface TopNavOptionsMenuProps {
   onSummarize: () => void;
   onRetrieveLatest: () => void;
   onBookmark: () => void;
+  onToggleSpeech: () => void;
   isLoadingSummary: boolean;
   isLoadingContent: boolean;
   isBookmarking: boolean;
   isBookmarked: boolean;
+  isSpeaking: boolean;
 }
 
 export default function TopNavOptionsMenu({
   onSummarize,
   onRetrieveLatest,
   onBookmark,
+  onToggleSpeech,
   isLoadingSummary,
   isLoadingContent,
   isBookmarking,
   isBookmarked,
+  isSpeaking,
 }: TopNavOptionsMenuProps) {
   return (
     <div className="top-nav-icon-buttons">
@@ -71,6 +75,17 @@ export default function TopNavOptionsMenu({
                 : "bi bi-bookmark"
           }
         />
+      </button>
+
+      <button
+        type="button"
+        className="top-nav-icon-btn"
+        title={isSpeaking ? "Stop reading (P)" : "Read article (P)"}
+        onClick={onToggleSpeech}
+        aria-label={isSpeaking ? "Stop reading" : "Read article"}
+        aria-pressed={isSpeaking}
+      >
+        <i className={isSpeaking ? "bi bi-stop-fill" : "bi bi-volume-up"} />
       </button>
     </div>
   );

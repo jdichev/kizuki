@@ -5,6 +5,7 @@ import FormattedDate from "./FormattedDate";
 import serverConfig from "../config/serverConfig";
 import DataService from "../service/DataService";
 import TopNavOptionsMenu from "./TopNavOptionsMenu";
+import { useSpeech } from "../hooks/useSpeech";
 
 const ds = DataService.getInstance();
 
@@ -100,6 +101,15 @@ export default function Article({
   const [areExternalImagesAllowed, setAreExternalImagesAllowed] =
     useState(false);
   const currentArticleIdRef = useRef<number | string | undefined>(undefined);
+  const {
+    isSpeaking: ttsIsSpeaking,
+    speak: ttsSpeak,
+    stop: ttsStop,
+  } = useSpeech();
+
+  useEffect(() => {
+    ttsStop();
+  }, [article?.id, article?.url, ttsStop]);
 
   useEffect(() => {
     const articleId = article?.id || article?.url;
@@ -367,6 +377,18 @@ export default function Article({
     [article?.content]
   );
 
+  const handleToggleSpeech = useCallback(() => {
+    if (ttsIsSpeaking) {
+      ttsStop();
+      return;
+    }
+    if (!article) {
+      return;
+    }
+    const contentHtml = retrievedContent || article.content || "";
+    ttsSpeak([article.title, contentHtml]);
+  }, [article, retrievedContent, ttsIsSpeaking, ttsStop, ttsSpeak]);
+
   // Keyboard shortcut handler
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
@@ -396,6 +418,19 @@ export default function Article({
         return;
       }
 
+      // 'p'/'P' to toggle text-to-speech.
+      if (
+        !event.repeat &&
+        (event.key === "p" || event.key === "P") &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey
+      ) {
+        event.preventDefault();
+        handleToggleSpeech();
+        return;
+      }
+
       // Space to play/pause (only if video is present).
       if (videoId && playerRef.current && event.code === "Space") {
         event.preventDefault();
@@ -413,7 +448,7 @@ export default function Article({
     return () => {
       document.removeEventListener("keydown", handleKeyPress);
     };
-  }, [videoId, isLoadingSummary, handleSummarize]);
+  }, [videoId, isLoadingSummary, handleSummarize, handleToggleSpeech]);
 
   if (article) {
     return (
@@ -424,10 +459,12 @@ export default function Article({
               onSummarize={handleSummarize}
               onRetrieveLatest={handleRetrieveLatest}
               onBookmark={handleBookmark}
+              onToggleSpeech={handleToggleSpeech}
               isLoadingSummary={isLoadingSummary}
               isLoadingContent={isLoadingContent}
               isBookmarking={isBookmarking}
               isBookmarked={article?.bookmarked === 1}
+              isSpeaking={ttsIsSpeaking}
             />,
             topOptions.current
           )}

@@ -15,3 +15,4 @@ export { useUrlSync } from "./useUrlSync";
 export { useKeyboardNavigation } from "./useKeyboardNavigation";
 export { useCategoryItems } from "./useCategoryItems";
 export { useCategoryReadStats } from "./useCategoryReadStats";
+export { useSpeech } from "./useSpeech";
