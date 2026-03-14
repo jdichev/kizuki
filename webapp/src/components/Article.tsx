@@ -418,19 +418,6 @@ export default function Article({
         return;
       }
 
-      // 'p'/'P' to toggle text-to-speech.
-      if (
-        !event.repeat &&
-        (event.key === "p" || event.key === "P") &&
-        !event.ctrlKey &&
-        !event.metaKey &&
-        !event.altKey
-      ) {
-        event.preventDefault();
-        handleToggleSpeech();
-        return;
-      }
-
       // Space to play/pause (only if video is present).
       if (videoId && playerRef.current && event.code === "Space") {
         event.preventDefault();
@@ -448,7 +435,7 @@ export default function Article({
     return () => {
       document.removeEventListener("keydown", handleKeyPress);
     };
-  }, [videoId, isLoadingSummary, handleSummarize, handleToggleSpeech]);
+  }, [videoId, isLoadingSummary, handleSummarize]);
 
   if (article) {
     return (

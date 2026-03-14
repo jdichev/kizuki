@@ -80,7 +80,7 @@ export default function TopNavOptionsMenu({
       <button
         type="button"
         className="top-nav-icon-btn"
-        title={isSpeaking ? "Stop reading (P)" : "Read article (P)"}
+        title={isSpeaking ? "Stop reading" : "Read article"}
         onClick={onToggleSpeech}
         aria-label={isSpeaking ? "Stop reading" : "Read article"}
         aria-pressed={isSpeaking}
