@@ -78,12 +78,19 @@ const retrieveLatestMarkdown = async (
   const cachedMarkdown = await dataModel.getItemLatestContent(url);
 
   if (!forceRefresh && cachedMarkdown) {
-    pino.info({ url }, "Latest content retrieved from cache");
-    return {
-      markdown: cachedMarkdown,
-      fromCache: true,
-      skipped: false,
-    };
+    const wordCount = countWordLikeTokens(cachedMarkdown);
+    if (wordCount >= SUMMARY_MIN_WORD_COUNT) {
+      pino.info({ url }, "Latest content retrieved from cache");
+      return {
+        markdown: cachedMarkdown,
+        fromCache: true,
+        skipped: false,
+      };
+    }
+    pino.info(
+      { url, wordCount },
+      "Cached latest content too short; forcing latest content refresh"
+    );
   }
 
   pino.info(
@@ -177,35 +184,8 @@ const resolveSummaryContent = async (params: {
     };
   }
 
-  let latestContent = latestResult.markdown || "";
-  let latestWordCount = countWordLikeTokens(latestContent);
-
-  // If cached latest content is still too short, force one network refresh
-  // before deciding that summarization should be skipped.
-  if (
-    latestWordCount < SUMMARY_MIN_WORD_COUNT &&
-    latestResult.fromCache &&
-    !params.forceRefreshLatest
-  ) {
-    pino.info(
-      { url: params.url, cachedWordCount: latestWordCount },
-      "Cached latest content too short; forcing latest content refresh for summarization"
-    );
-
-    latestResult = await retrieveLatestMarkdown(params.url, true);
-
-    if (latestResult.skipped) {
-      return {
-        skipped: true,
-        reason:
-          latestResult.reason ||
-          "Latest content retrieval is not available for this URL",
-      };
-    }
-
-    latestContent = latestResult.markdown || "";
-    latestWordCount = countWordLikeTokens(latestContent);
-  }
+  const latestContent = latestResult.markdown || "";
+  const latestWordCount = countWordLikeTokens(latestContent);
 
   if (latestWordCount < SUMMARY_MIN_WORD_COUNT) {
     if (providedWordCount > latestWordCount && providedWordCount > 0) {
