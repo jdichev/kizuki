@@ -7,6 +7,8 @@ import { decode } from "entities";
 import { Scrollbar } from "./Scrollbar.js";
 import { useTheme } from "../hooks/ThemeContext.js";
 
+const VIDEO_LABEL = process.env.TERM === "dumb" ? "V" : "▶";
+
 interface ItemsViewProps {
   title: string;
   items: any[];
@@ -60,7 +62,7 @@ export const ItemsView: React.FC<ItemsViewProps> = ({
                   item.url?.includes("youtube.com") ||
                   item.url?.includes("youtu.be");
                 const wordsLabel = isVideo
-                  ? "vid"
+                  ? VIDEO_LABEL
                   : `${item.latestContentWordCount || 0}w`;
 
                 const bookmarkLabel = item.bookmarked ? "[B]" : "   ";
