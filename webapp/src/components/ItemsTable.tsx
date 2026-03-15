@@ -35,9 +35,11 @@ export default function ItemsTable({
                     <FormattedDate pubDate={item.published} />
                     ,&nbsp;
                     {item.url?.includes("youtube.com") ||
-                    item.url?.includes("youtu.be")
-                      ? "vid"
-                      : `${item.latestContentWordCount || 0} words`}
+                    item.url?.includes("youtu.be") ? (
+                      <i className="bi bi-youtube" />
+                    ) : (
+                      `${item.latestContentWordCount || 0} words`
+                    )}
                   </small>
                 </a>
               </td>
