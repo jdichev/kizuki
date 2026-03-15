@@ -34,11 +34,11 @@
     --sidebar-focus-bg: #2568a7;
     --header-bg: #272727;
     --sidebar-bg: #2d2d2d;
-    /* --sidebar-selected-bg: #1c1e20; */
+    --sidebar-selected-bg: #1c1e20;
     --sidebar-selected-active-bg: #363f45;
     --sidebar-fg: #cccccc;
     --items-list-bg: #313131;
-    /* --items-list-selected-bg: #1c1e20; */
+    --items-list-selected-bg: #1c1e20;
     --items-list-selected-active-bg: #363f45;
     --main-bg: #272727;
     --main-color: #c2c2c1;
