@@ -74,7 +74,7 @@ export interface Item {
   summary?: string;
 }
 
-// TUI Specific Navigation Types
+export * from "./theme.js";
 export type View =
   | "help"
   | "start"

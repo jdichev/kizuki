@@ -1,5 +1,5 @@
-import React from "react";
-import { Box, Text } from "ink";
+import React, { useState, useEffect } from "react";
+import { Box, Text, useInput } from "ink";
 import { useTuiNavigation } from "./hooks/useTuiNavigation.js";
 import type { UseTuiNavigationResult } from "./types/index.js";
 import { Header } from "./components/Header.js";
@@ -12,9 +12,37 @@ import { ReaderView } from "./components/ReaderView.js";
 import { ConfirmationDialog } from "./components/ConfirmationDialog.js";
 import { HelpDialog } from "./components/HelpDialog.js";
 import { MODE_ITEMS } from "./constants/config.js";
+import { useTheme } from "./hooks/ThemeContext.js";
 
 export default function App() {
   const navigation: UseTuiNavigationResult = useTuiNavigation();
+  const { theme, setTheme, availableThemes } = useTheme();
+  const [themeMessage, setThemeMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (themeMessage) {
+      const timer = setTimeout(() => {
+        setThemeMessage(null);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [themeMessage]);
+
+  useInput((input) => {
+    if (input.toLowerCase() === "t") {
+      const currentIndex = availableThemes.findIndex(
+        (t) => t.name === theme.name
+      );
+      const nextIndex = (currentIndex + 1) % availableThemes.length;
+      const nextTheme = availableThemes[nextIndex];
+      setTheme(nextTheme);
+      setThemeMessage(
+        `Theme changed to: ${nextTheme.name} (${nextIndex + 1}/${availableThemes.length})`
+      );
+    }
+  });
+
   const {
     terminalHeight,
     terminalWidth,
@@ -143,6 +171,17 @@ export default function App() {
           </>
         )}
       </Box>
+
+      {themeMessage && (
+        <Box paddingX={1} justifyContent="center">
+          <Text
+            backgroundColor={theme.colors.headerBg}
+            color={theme.colors.headerFg}
+          >
+            {` ${themeMessage} `}
+          </Text>
+        </Box>
+      )}
 
       <Footer terminalWidth={terminalWidth} view={view} />
     </Box>

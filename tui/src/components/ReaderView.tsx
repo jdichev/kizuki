@@ -4,6 +4,7 @@ import { decode } from "entities";
 import { formatDateTime } from "../utils/date.js";
 import { cleanContent, renderMarkdown, terminalLink } from "../utils/text.js";
 import { Item } from "../types/index.js";
+import { useTheme } from "../hooks/ThemeContext.js";
 
 interface ReaderViewProps {
   item: Item;
@@ -34,6 +35,7 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
   summaryError,
   summaryPending,
 }) => {
+  const { theme } = useTheme();
   const { dateStr } = formatDateTime(item.published);
 
   // If summary is available or any relevant loading/pending/error state exists, show the right pane
@@ -74,11 +76,11 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
     <Box flexDirection="column" width="100%" height={contentHeight}>
       <Box paddingX={1} flexDirection="column">
         <Box flexDirection="row" justifyContent="space-between">
-          <Text bold color="yellow">
+          <Text bold color={theme.colors.readerTitleFg}>
             {decode(item.title)}
           </Text>
           {item.bookmarked === 1 && (
-            <Text bold color="magenta">
+            <Text bold color={theme.colors.readerBookmarkFg}>
               [BOOKMARKED]
             </Text>
           )}
@@ -90,7 +92,7 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
         </Box>
         {item.url && (
           <Text dimColor>
-            URL: <Text color="blue" underline>{terminalLink(item.url, item.url)}</Text>
+            URL: <Text color={theme.colors.readerLinkFg} underline>{terminalLink(item.url, item.url)}</Text>
           </Text>
         )}
       </Box>
@@ -100,7 +102,7 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
         <Box flexDirection="column" width={paneWidth}>
           {latestLoading && !latestContent && !item.latest_content && (
             <Box marginBottom={1}>
-              <Text color="blue" italic>
+              <Text color={theme.colors.readerStatusFg} italic>
                 Automatically retrieving latest content...
               </Text>
             </Box>
@@ -115,18 +117,18 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
               <Text dimColor>│</Text>
             </Box>
             <Box flexDirection="column" width={paneWidth}>
-              <Text bold color="green">Summary</Text>
+              <Text bold color={theme.colors.readerSummaryLabelFg}>Summary</Text>
               {summaryPending && !currentSummaryRaw && (
                 <Text color="gray" italic>[AI Summary will start in 1s...]</Text>
               )}
               {latestLoading && !currentSummaryRaw && (
-                <Text color="blue" bold>[RETRIEVING LATEST...]</Text>
+                <Text color={theme.colors.readerStatusFg} bold>[RETRIEVING LATEST...]</Text>
               )}
               {summaryLoading && !latestLoading && !currentSummaryRaw && (
-                <Text color="green" bold>[SUMMARIZING...]</Text>
+                <Text color={theme.colors.readerSummaryLabelFg} bold>[SUMMARIZING...]</Text>
               )}
               {!summaryPending && !latestLoading && !summaryLoading && !currentSummaryRaw && summaryError && (
-                <Text color="red">⚠ {summaryError}</Text>
+                <Text color={theme.colors.readerErrorFg}>⚠ {summaryError}</Text>
               )}
               {currentSummaryRaw && (
                 <Text>{visibleSummaryLines.join("\n")}</Text>

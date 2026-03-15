@@ -1,5 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
+import { useTheme } from "../hooks/ThemeContext.js";
 
 interface ScrollbarProps {
   scrollOffset: number;
@@ -12,6 +13,7 @@ export const Scrollbar: React.FC<ScrollbarProps> = ({
   visibleHeight,
   totalItems,
 }) => {
+  const { theme } = useTheme();
   if (totalItems <= visibleHeight || totalItems === 0) {
     return null;
   }
@@ -31,7 +33,11 @@ export const Scrollbar: React.FC<ScrollbarProps> = ({
   for (let i = 0; i < visibleHeight; i++) {
     const isHandle = i >= handlePos && i < handlePos + handleHeight;
     lines.push(
-      <Text key={i} color={isHandle ? "white" : "gray"} dimColor={!isHandle}>
+      <Text
+        key={i}
+        color={isHandle ? theme.colors.scrollbarFg : theme.colors.scrollbarBg}
+        dimColor={!isHandle}
+      >
         {isHandle ? "█" : "│"}
       </Text>
     );
