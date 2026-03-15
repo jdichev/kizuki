@@ -6,6 +6,7 @@ import pinoLib from "pino";
 import { MediumFeedResolver } from "../helpers/MediumFeedResolver";
 import { SubstackFeedResolver } from "../helpers/SubstackFeedResolver";
 import { YouTubeFeedResolver } from "../helpers/YouTubeFeedResolver";
+import GoogleAiService from "./GoogleAiService";
 
 const pino = pinoLib({
   level: process.env.LOG_LEVEL || "info",
@@ -93,25 +94,30 @@ export default class FeedFinder {
   }
 
   public async checkFeed(url: string, depth = 0): Promise<Feed[]> {
+    const cleanedInput = url.trim();
+    if (!cleanedInput) {
+      return [];
+    }
+
     let resUrl: URL;
 
     // Check if URL is absolute by attempting to parse it
     let isAbsoluteUrl = false;
     try {
-      new URL(url);
+      new URL(cleanedInput);
       isAbsoluteUrl = true;
     } catch {
       isAbsoluteUrl = false;
     }
 
     if (!isAbsoluteUrl) {
-      if (!isValidDomain(url)) {
-        return Promise.resolve([]);
+      if (!isValidDomain(cleanedInput)) {
+        return this.discoverFeedsWithAi(cleanedInput);
       }
       resUrl = new URL("http://placeholder");
-      resUrl.host = url;
+      resUrl.host = cleanedInput;
     } else {
-      resUrl = new URL(url);
+      resUrl = new URL(cleanedInput);
     }
 
     const isFeedResponse = await FeedFinder.isFeedResponse(resUrl.href);
@@ -144,6 +150,62 @@ export default class FeedFinder {
     }
 
     return Promise.resolve([]);
+  }
+
+  private async discoverFeedsWithAi(query: string): Promise<Feed[]> {
+    const aiService = GoogleAiService.getInstance();
+
+    if (!aiService.isConfigured()) {
+      pino.debug(
+        { query },
+        "AI service not configured, skipping feed discovery"
+      );
+      return [];
+    }
+
+    try {
+      const candidates = await aiService.discoverFeedsFromQuery(query, 5);
+      if (candidates.length === 0) {
+        return [];
+      }
+
+      const discovered: Feed[] = [];
+      const seen = new Set<string>();
+
+      for (const candidate of candidates) {
+        if (!candidate.feedUrl || seen.has(candidate.feedUrl)) {
+          continue;
+        }
+
+        seen.add(candidate.feedUrl);
+        const checked = await this.checkFeed(candidate.feedUrl, this.maxDepth);
+        if (checked.length > 0) {
+          discovered.push(...checked);
+          continue;
+        }
+
+        if (candidate.url) {
+          const checkedFromSite = await this.checkFeed(
+            candidate.url,
+            this.maxDepth
+          );
+          discovered.push(...checkedFromSite);
+        }
+      }
+
+      const occurrenceArr: string[] = [];
+      return discovered.filter((feedDataItem) => {
+        if (occurrenceArr.includes(feedDataItem.feedUrl)) {
+          return false;
+        }
+
+        occurrenceArr.push(feedDataItem.feedUrl);
+        return true;
+      });
+    } catch (error) {
+      pino.warn({ error, query }, "AI feed discovery failed");
+      return [];
+    }
   }
 
   private async searchForFeeds(url: string, depth: number): Promise<Feed[]> {

@@ -122,7 +122,7 @@ export default function FeedAdd() {
 
               <div>
                 <label htmlFor="feedUrlInitial" className="form-label">
-                  Enter site or feed URL
+                  Enter site URL, feed URL, or blogger/site name
                 </label>
 
                 <input
@@ -133,7 +133,12 @@ export default function FeedAdd() {
                   {...register("feedUrlInitial")}
                 />
 
-                {initialFormError && <p>Feed not found</p>}
+                {initialFormError && (
+                  <p>
+                    Feed not found. Try a direct URL or a more specific
+                    blogger/site name.
+                  </p>
+                )}
               </div>
 
               <button
@@ -151,6 +156,11 @@ export default function FeedAdd() {
 
             <div>
               {formFeedData.map((feedData, i) => {
+                const feedUrl = (feedData.feedUrl || "").trim();
+                const siteUrl = (feedData.url || "").trim();
+                const hasSiteUrl = siteUrl.length > 0;
+                const isDifferentTarget = hasSiteUrl && siteUrl !== feedUrl;
+
                 return (
                   <form
                     key={feedData.feedUrl}
@@ -158,6 +168,30 @@ export default function FeedAdd() {
                   >
                     <div>
                       <h1>{feedData.title}</h1>
+                      <div
+                        className="text-muted"
+                        style={{ wordBreak: "break-all" }}
+                      >
+                        <strong>Feed URL:</strong> {feedUrl}
+                      </div>
+                      <div
+                        className="text-muted"
+                        style={{ wordBreak: "break-all" }}
+                      >
+                        <strong>Site URL:</strong>{" "}
+                        {hasSiteUrl ? siteUrl : "(not available)"}
+                      </div>
+                      {isDifferentTarget && (
+                        <div className="text-warning-emphasis">
+                          Subscribing to a different feed target than the site
+                          URL.
+                        </div>
+                      )}
+                      {!isDifferentTarget && hasSiteUrl && (
+                        <div className="text-muted">
+                          Feed URL and site URL are the same.
+                        </div>
+                      )}
                       <div>
                         <input
                           type="hidden"

@@ -781,4 +781,213 @@ export default class GoogleAiService {
 
     return groups;
   }
+
+  /**
+   * Build a concise prompt to discover feed URLs from a natural language query.
+   */
+  public buildFeedDiscoveryPrompt(query: string, maxResults = 5): string {
+    const cleanQuery = query.trim();
+    const safeMaxResults = Math.max(1, Math.min(10, maxResults));
+
+    return [
+      "Find RSS/Atom feeds for this query:",
+      cleanQuery,
+      `Return at most ${safeMaxResults} results as JSON only.`,
+      'Format: {"feeds":[{"title":"...","feedUrl":"https://...","url":"https://..."}]}',
+      "If the query is a person name, also check whether they publish on Medium or Substack and include those feed URLs when relevant.",
+      "Rules: include only likely valid feed URLs, use absolute https URLs when possible, no markdown, no prose.",
+    ].join("\n");
+  }
+
+  /**
+   * Parse AI response with feed candidates.
+   * Supports strict JSON as primary format and a line-based fallback:
+   * "https://feed.url | Title" or "Title | https://feed.url"
+   */
+  public parseFeedDiscoveryResponse(
+    aiResponse: string
+  ): Array<{ title: string; feedUrl: string; url?: string }> {
+    if (!aiResponse || aiResponse.trim() === "") {
+      return [];
+    }
+
+    const normalized = aiResponse.trim();
+    const parsedJson = this.parseFeedDiscoveryJson(normalized);
+    if (parsedJson.length > 0) {
+      return parsedJson;
+    }
+
+    return this.parseFeedDiscoveryLines(normalized);
+  }
+
+  /**
+   * Discover feed candidates from a plain text query.
+   */
+  public async discoverFeedsFromQuery(
+    query: string,
+    maxResults = 5
+  ): Promise<Array<{ title: string; feedUrl: string; url?: string }>> {
+    if (!query || query.trim() === "") {
+      return [];
+    }
+
+    const prompt = this.buildFeedDiscoveryPrompt(query, maxResults);
+    const aiResponse = await this.generateContent(prompt);
+    const parsed = this.parseFeedDiscoveryResponse(aiResponse);
+
+    const deduped: Array<{ title: string; feedUrl: string; url?: string }> = [];
+    const seen = new Set<string>();
+
+    for (const candidate of parsed) {
+      const key = candidate.feedUrl.toLowerCase();
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      deduped.push(candidate);
+      if (deduped.length >= Math.max(1, Math.min(10, maxResults))) {
+        break;
+      }
+    }
+
+    return deduped;
+  }
+
+  private parseFeedDiscoveryJson(
+    aiResponse: string
+  ): Array<{ title: string; feedUrl: string; url?: string }> {
+    const direct = this.tryParseFeedJson(aiResponse);
+    if (direct.length > 0) {
+      return direct;
+    }
+
+    const codeBlockMatch = aiResponse.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    if (!codeBlockMatch) {
+      return [];
+    }
+
+    return this.tryParseFeedJson(codeBlockMatch[1]);
+  }
+
+  private tryParseFeedJson(
+    jsonText: string
+  ): Array<{ title: string; feedUrl: string; url?: string }> {
+    try {
+      const parsed = JSON.parse(jsonText);
+      const list = Array.isArray(parsed)
+        ? parsed
+        : Array.isArray(parsed?.feeds)
+          ? parsed.feeds
+          : [];
+
+      const mapped: Array<{
+        title: string;
+        feedUrl: string;
+        url?: string;
+      } | null> = (list as any[]).map((entry: any) => {
+        const feedUrl =
+          typeof entry?.feedUrl === "string"
+            ? entry.feedUrl.trim()
+            : typeof entry?.xmlUrl === "string"
+              ? entry.xmlUrl.trim()
+              : "";
+        const title =
+          typeof entry?.title === "string"
+            ? entry.title.trim()
+            : typeof entry?.name === "string"
+              ? entry.name.trim()
+              : "";
+        const url =
+          typeof entry?.url === "string"
+            ? entry.url.trim()
+            : typeof entry?.siteUrl === "string"
+              ? entry.siteUrl.trim()
+              : undefined;
+
+        if (!this.isHttpUrl(feedUrl)) {
+          return null;
+        }
+
+        if (this.isHttpUrl(url)) {
+          return {
+            title: title || feedUrl,
+            feedUrl,
+            url,
+          };
+        }
+
+        return {
+          title: title || feedUrl,
+          feedUrl,
+        };
+      });
+
+      return mapped.filter(
+        (entry): entry is { title: string; feedUrl: string; url?: string } => {
+          return entry !== null;
+        }
+      );
+    } catch {
+      return [];
+    }
+  }
+
+  private parseFeedDiscoveryLines(
+    aiResponse: string
+  ): Array<{ title: string; feedUrl: string; url?: string }> {
+    const lines = aiResponse.split("\n");
+    const results: Array<{ title: string; feedUrl: string; url?: string }> = [];
+
+    for (const rawLine of lines) {
+      const line = rawLine.replace(/^[-*\d.)\s]+/, "").trim();
+
+      if (!line) {
+        continue;
+      }
+
+      const parts = line
+        .split("|")
+        .map((part) => part.trim())
+        .filter(Boolean);
+
+      if (parts.length < 2) {
+        continue;
+      }
+
+      const first = parts[0];
+      const second = parts[1];
+      const firstIsUrl = this.isHttpUrl(first);
+      const secondIsUrl = this.isHttpUrl(second);
+
+      if (firstIsUrl && !secondIsUrl) {
+        results.push({
+          title: second,
+          feedUrl: first,
+        });
+        continue;
+      }
+
+      if (!firstIsUrl && secondIsUrl) {
+        results.push({
+          title: first,
+          feedUrl: second,
+        });
+      }
+    }
+
+    return results;
+  }
+
+  private isHttpUrl(value?: string): boolean {
+    if (!value) {
+      return false;
+    }
+
+    try {
+      const parsed = new URL(value);
+      return parsed.protocol === "http:" || parsed.protocol === "https:";
+    } catch {
+      return false;
+    }
+  }
 }

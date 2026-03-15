@@ -194,6 +194,89 @@ describe("GoogleAiService", () => {
     });
   });
 
+  describe("feed discovery", () => {
+    beforeEach(() => {
+      settingsManager.setSetting("GEMINI_API_KEY", "test-api-key");
+      aiService.refreshClient();
+    });
+
+    it("should parse feed discovery JSON response", () => {
+      const parsed = aiService.parseFeedDiscoveryResponse(
+        JSON.stringify({
+          feeds: [
+            {
+              title: "Kizuki Blog",
+              feedUrl: "https://example.com/feed.xml",
+              url: "https://example.com",
+            },
+          ],
+        })
+      );
+
+      expect(parsed).toEqual([
+        {
+          title: "Kizuki Blog",
+          feedUrl: "https://example.com/feed.xml",
+          url: "https://example.com",
+        },
+      ]);
+    });
+
+    it("should parse feed discovery line response", () => {
+      const parsed = aiService.parseFeedDiscoveryResponse(
+        "Kizuki Blog | https://example.com/rss\nhttps://another.com/feed.xml | Another Blog"
+      );
+
+      expect(parsed).toEqual([
+        {
+          title: "Kizuki Blog",
+          feedUrl: "https://example.com/rss",
+        },
+        {
+          title: "Another Blog",
+          feedUrl: "https://another.com/feed.xml",
+        },
+      ]);
+    });
+
+    it("should build concise feed discovery prompt", () => {
+      const prompt = aiService.buildFeedDiscoveryPrompt("daring fireball", 3);
+
+      expect(prompt).toContain("Find RSS/Atom feeds for this query:");
+      expect(prompt).toContain("daring fireball");
+      expect(prompt).toContain("Return at most 3 results as JSON only.");
+      expect(prompt).toContain("Medium or Substack");
+    });
+
+    it("should discover and dedupe feeds from AI response", async () => {
+      mockGenerateContent.mockResolvedValue({
+        text: JSON.stringify({
+          feeds: [
+            {
+              title: "Kizuki Blog",
+              feedUrl: "https://example.com/feed.xml",
+              url: "https://example.com",
+            },
+            {
+              title: "Kizuki Blog Duplicate",
+              feedUrl: "https://example.com/feed.xml",
+            },
+          ],
+        }),
+      });
+
+      const result = await aiService.discoverFeedsFromQuery("kizuki blog", 5);
+
+      expect(result).toEqual([
+        {
+          title: "Kizuki Blog",
+          feedUrl: "https://example.com/feed.xml",
+          url: "https://example.com",
+        },
+      ]);
+    });
+  });
+
   describe("singleton pattern", () => {
     it("should return the same instance", () => {
       const instance1 = GoogleAiService.getInstance();
