@@ -101,11 +101,30 @@ export default function Article({
   const [areExternalImagesAllowed, setAreExternalImagesAllowed] =
     useState(false);
   const currentArticleIdRef = useRef<number | string | undefined>(undefined);
+  const summaryRef = useRef<HTMLDivElement>(null);
+  const shouldScrollToSummaryRef = useRef<boolean>(false);
   const {
     isSpeaking: ttsIsSpeaking,
     speak: ttsSpeak,
     stop: ttsStop,
   } = useSpeech();
+
+  useEffect(() => {
+    // Scroll to summary when it becomes available, but only if user triggered it
+    const articleId = article?.id || article?.url;
+    if (
+      shouldScrollToSummaryRef.current &&
+      summary &&
+      summaryRef.current &&
+      currentArticleIdRef.current === articleId
+    ) {
+      summaryRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+      shouldScrollToSummaryRef.current = false;
+    }
+  }, [summary, article?.id, article?.url]);
 
   useEffect(() => {
     ttsStop();
@@ -114,6 +133,7 @@ export default function Article({
   useEffect(() => {
     const articleId = article?.id || article?.url;
     currentArticleIdRef.current = articleId;
+    shouldScrollToSummaryRef.current = false;
 
     setVideoId(undefined);
     setVideoKind(null);
@@ -210,6 +230,7 @@ export default function Article({
     if (!article || isLoadingSummary) return;
     const articleIdAtStart = article.id || article.url;
 
+    shouldScrollToSummaryRef.current = true;
     setIsLoadingSummary(true);
     setSummaryError(null);
 
@@ -547,7 +568,7 @@ export default function Article({
             )}
 
             {(isLoadingSummary || summary) && (
-              <div className="text-summary">
+              <div ref={summaryRef} className="text-summary">
                 {summary && <h4>Summary</h4>}
                 {summary && (
                   <div
