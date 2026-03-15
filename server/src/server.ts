@@ -11,7 +11,10 @@ import SettingsManager from "./modules/SettingsManager";
 import GoogleAiService from "./modules/GoogleAiService";
 import GoogleServiceUsageManager from "./modules/GoogleServiceUsageManager";
 import projectConfig from "forestconfig";
-import { convertArticleToMarkdown } from "./modules/ArticleToMarkdown";
+import {
+  appendLatestContentSourceUrl,
+  convertArticleToMarkdown,
+} from "./modules/ArticleToMarkdown";
 import {
   shouldFetchLatestContent,
   isBetterContent,
@@ -75,7 +78,10 @@ const retrieveLatestMarkdown = async (
     };
   }
 
-  const cachedMarkdown = await dataModel.getItemLatestContent(url);
+  const cachedMarkdownRaw = await dataModel.getItemLatestContent(url);
+  const cachedMarkdown = cachedMarkdownRaw
+    ? appendLatestContentSourceUrl(cachedMarkdownRaw, url)
+    : null;
 
   if (!forceRefresh && cachedMarkdown) {
     const wordCount = countWordLikeTokens(cachedMarkdown);
@@ -99,7 +105,10 @@ const retrieveLatestMarkdown = async (
   );
 
   try {
-    const newMarkdown = await convertArticleToMarkdown(url);
+    const newMarkdown = appendLatestContentSourceUrl(
+      await convertArticleToMarkdown(url),
+      url
+    );
 
     if (isBetterContent(newMarkdown, cachedMarkdown)) {
       await dataModel.updateItemLatestContent(url, newMarkdown);

@@ -9,6 +9,8 @@ interface ConvertArticleOptions {
   timeout?: number;
 }
 
+const SOURCE_URL_FOOTER_LABEL = "Source URL:";
+
 // Cache for robots.txt files to avoid repeated fetches
 const robotsTxtCache = new Map<
   string,
@@ -201,6 +203,7 @@ export async function convertArticleToMarkdown(
 
   // Fetch the article
   let html: string;
+  let sourceUrl = url;
   try {
     const response = await axios.get(url, {
       timeout: timeout,
@@ -229,6 +232,7 @@ export async function convertArticleToMarkdown(
     }
 
     html = response.data;
+    sourceUrl = getFinalResponseUrl(response, url);
   } catch (error) {
     const axiosError = error as AxiosError;
     if (axiosError.code === "ECONNABORTED") {
@@ -277,11 +281,50 @@ export async function convertArticleToMarkdown(
       markdown = header + markdown;
     }
 
-    return markdown;
+    return appendLatestContentSourceUrl(markdown, sourceUrl);
   } finally {
     // Close the JSDOM window to prevent memory leaks
     dom.window.close();
   }
+}
+
+export function appendLatestContentSourceUrl(
+  markdown: string,
+  sourceUrl: string
+): string {
+  const trimmedMarkdown = markdown.trim();
+  const normalizedSourceUrl = sourceUrl.trim();
+
+  if (!trimmedMarkdown || !normalizedSourceUrl) {
+    return trimmedMarkdown;
+  }
+
+  const footerPattern = new RegExp(
+    `(^|\\n)${SOURCE_URL_FOOTER_LABEL}\\s+https?:\\/\\/\\S+\\s*$`,
+    "i"
+  );
+
+  if (footerPattern.test(trimmedMarkdown)) {
+    return trimmedMarkdown;
+  }
+
+  return `${trimmedMarkdown}\n\n---\n\n${SOURCE_URL_FOOTER_LABEL} ${normalizedSourceUrl}`;
+}
+
+function getFinalResponseUrl(response: any, fallbackUrl: string): string {
+  const candidateUrls = [
+    response?.request?.res?.responseUrl,
+    response?.request?.responseURL,
+    response?.config?.url,
+  ];
+
+  for (const candidate of candidateUrls) {
+    if (typeof candidate === "string" && candidate.trim() !== "") {
+      return candidate.trim();
+    }
+  }
+
+  return fallbackUrl;
 }
 
 /**
