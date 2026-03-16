@@ -25,6 +25,13 @@
     --weak-color: #898989;
     --highlight-color: #e3c470;
     --heading-color: #412203;
+    --status-bar-bg: color-mix(in oklab, var(--header-bg) 82%, #007acc 18%);
+    --status-bar-fg: color-mix(in oklab, var(--main-color) 88%, #007acc 12%);
+    --status-bar-hover-bg: color-mix(
+      in oklab,
+      var(--header-bg) 72%,
+      #007acc 28%
+    );
   }
 }
 
@@ -55,11 +62,19 @@
     --weak-color: #585858;
     --highlight-color: #e3c470;
     --heading-color: #eee;
+    --status-bar-bg: color-mix(in oklab, var(--header-bg) 78%, #007acc 22%);
+    --status-bar-fg: color-mix(in oklab, var(--main-color) 90%, #6fb8ef 10%);
+    --status-bar-hover-bg: color-mix(
+      in oklab,
+      var(--header-bg) 66%,
+      #007acc 34%
+    );
   }
 }
 
 :root {
   --header-height: 26px;
+  --status-bar-height: 24px;
   --sidebar-width: 12fr;
   --side-menu-width: 50px;
   --sidebar-min-width: 160px;
@@ -131,7 +146,9 @@ a:hover {
   grid-template-columns: var(--side-menu-width) var(--sidebar-width) var(
       --main-column-size
     );
-  grid-template-rows: var(--header-height) calc(100vh - var(--header-height));
+  grid-template-rows: var(--header-height) calc(
+      100vh - var(--header-height) - var(--status-bar-height)
+    ) var(--status-bar-height);
 }
 
 #wrapper.main-sidebar-hidden {
@@ -182,7 +199,7 @@ a:hover {
   left: var(--sidebar-divider-pos);
   top: var(--header-height);
   width: 2px;
-  height: calc(100vh - var(--header-height));
+  height: calc(100vh - var(--header-height) - var(--status-bar-height));
   cursor: col-resize;
   z-index: 10;
   user-select: none;
@@ -324,6 +341,43 @@ a:hover {
 
 #main-nav.show-shortcuts .main-nav-shortcut-hint {
   display: inline-block;
+}
+
+#app-status-bar {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  display: flex;
+  justify-content: space-between;
+  align-items: stretch;
+  height: var(--status-bar-height);
+  background: var(--status-bar-bg);
+  color: var(--status-bar-fg);
+  font-size: 0.76rem;
+  line-height: 1;
+  user-select: none;
+}
+
+.status-bar-section {
+  display: inline-flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.status-bar-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0 0.55rem;
+  height: 100%;
+  white-space: nowrap;
+}
+
+.status-bar-item i {
+  font-size: 0.72rem;
+}
+
+#app-status-bar .status-bar-item:hover {
+  background: var(--status-bar-hover-bg);
 }
 
 #welcome-content {

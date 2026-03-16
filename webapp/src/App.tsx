@@ -38,6 +38,70 @@ const SIDE_MENU_ITEMS = [
   { path: "/settings", iconClass: "bi bi-gear-fill" },
 ] as const;
 
+function getStatusLabel(pathname: string) {
+  if (pathname === "/") {
+    return "Home";
+  }
+
+  if (pathname.startsWith("/feeds/read")) {
+    return "Feed Categories";
+  }
+
+  if (pathname.startsWith("/feeds/items")) {
+    return "Items categorized by AI";
+  }
+
+  if (pathname.startsWith("/feeds/list")) {
+    return "Feeds List";
+  }
+
+  if (pathname.startsWith("/feeds/add")) {
+    return "Add Feed";
+  }
+
+  if (pathname.startsWith("/feeds/opml")) {
+    return "OPML Import / Export";
+  }
+
+  if (pathname.startsWith("/feeds/edit")) {
+    return "Edit Feed";
+  }
+
+  if (pathname.startsWith("/item-categories/list")) {
+    return "Item Categories";
+  }
+
+  if (pathname.startsWith("/item-categories/edit")) {
+    return "Edit Item Category";
+  }
+
+  if (pathname.startsWith("/item-categories/new")) {
+    return "New Item Category";
+  }
+
+  if (pathname.startsWith("/feed-categories/list")) {
+    return "Feed Categories";
+  }
+
+  if (pathname.startsWith("/feed-categories/edit")) {
+    return "Edit Feed Category";
+  }
+
+  if (pathname.startsWith("/feed-categories/new")) {
+    return "New Feed Category";
+  }
+
+  if (pathname.startsWith("/items/search")) {
+    return "Search Items";
+  }
+
+  if (pathname.startsWith("/settings")) {
+    return "Settings";
+  }
+
+  return "Ready";
+}
+
 function isTypingTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) {
     return false;
@@ -72,6 +136,7 @@ function AppLayout() {
     useState(false);
   const [showAltNavHints, setShowAltNavHints] = useState(false);
   const dividerRef = useSidebarDivider();
+  const statusLabel = getStatusLabel(location.pathname);
 
   const isSidebarMenuHidden =
     isSidebarMenuExplicitlyHidden && !isSidebarMenuTemporarilyShown;
@@ -332,6 +397,26 @@ function AppLayout() {
 
         <Route path="/settings" element={<Settings />} />
       </Routes>
+
+      <footer id="app-status-bar" role="status" aria-live="polite">
+        <div className="status-bar-section status-bar-left">
+          <span className="status-bar-item">
+            <i className="bi bi-rss-fill" aria-hidden="true"></i>
+            Kizuki
+          </span>
+          <span className="status-bar-item">
+            <i className="bi bi-hash" aria-hidden="true"></i>
+            {statusLabel}
+          </span>
+        </div>
+
+        <div className="status-bar-section status-bar-right">
+          <span className="status-bar-item">
+            <i className="bi bi-shield-check" aria-hidden="true"></i>
+            Ready
+          </span>
+        </div>
+      </footer>
     </div>
   );
 }
