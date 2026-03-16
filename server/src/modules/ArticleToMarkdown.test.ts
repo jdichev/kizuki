@@ -68,10 +68,10 @@ describe("ArticleToMarkdown", () => {
 
       expect(markdown).toContain("# Example");
       expect(markdown).toContain("Hello world from the article body.");
-      expect(markdown).toContain(
-        "Source URL: https://final.example.com/story"
-      );
-      expect(markdown.trim().endsWith("Source URL: https://final.example.com/story")).toBe(true);
+      expect(markdown).toContain("Source URL: https://final.example.com/story");
+      expect(
+        markdown.trim().endsWith("Source URL: https://final.example.com/story")
+      ).toBe(true);
     });
   });
 });

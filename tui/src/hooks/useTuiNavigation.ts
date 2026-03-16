@@ -290,6 +290,13 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
         throw new Error("Failed to generate summary");
       }
 
+      if (summaryData.latestContentError) {
+        dispatch({
+          type: "setReaderLatestError",
+          readerLatestError: summaryData.latestContentError,
+        });
+      }
+
       dispatch({ type: "setReaderSummary", readerSummary: summary });
 
       // Update selectedItem with summary
@@ -311,16 +318,21 @@ function useTuiState(stdout: NodeJS.WriteStream): TuiStateController {
       // summarization path updated latest_content while resolving content.
       try {
         const refreshedItem = await ds.getItem(targetItem.id);
-        if (refreshedItem?.latest_content) {
+        if (refreshedItem) {
           const refreshedLatestContent = refreshedItem.latest_content;
           const refreshedWordCount =
             refreshedItem.latestContentWordCount ||
-            refreshedLatestContent.trim().split(/\s+/).filter(Boolean).length;
+            (refreshedLatestContent
+              ? refreshedLatestContent.trim().split(/\s+/).filter(Boolean)
+                  .length
+              : 0);
 
-          dispatch({
-            type: "setReaderLatestContent",
-            readerLatestContent: refreshedLatestContent,
-          });
+          if (refreshedLatestContent) {
+            dispatch({
+              type: "setReaderLatestContent",
+              readerLatestContent: refreshedLatestContent,
+            });
+          }
 
           dispatch({
             type: "setSelectedItem",

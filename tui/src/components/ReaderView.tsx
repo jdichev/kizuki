@@ -40,15 +40,24 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
 
   // If summary is available or any relevant loading/pending/error state exists, show the right pane
   const currentSummaryRaw = summary || item.summary || "";
-  const showSummaryPane = Boolean(currentSummaryRaw) || summaryLoading || summaryPending || latestLoading || summaryError;
+  const showSummaryPane =
+    Boolean(currentSummaryRaw) ||
+    summaryLoading ||
+    summaryPending ||
+    latestLoading ||
+    summaryError ||
+    latestError;
 
   // Always use 50% of terminal width for consistent layout
   const paneWidth = Math.floor(terminalWidth / 2) - 2;
 
   // Prioritize the retrieved latest content
-  const displayContentRaw = latestContent || item.latest_content || item.content || "";
+  const displayContentRaw =
+    latestContent || item.latest_content || item.content || "";
   const displayContent = renderMarkdown(displayContentRaw, paneWidth);
-  const summaryContent = currentSummaryRaw ? renderMarkdown(currentSummaryRaw, paneWidth) : "";
+  const summaryContent = currentSummaryRaw
+    ? renderMarkdown(currentSummaryRaw, paneWidth)
+    : "";
 
   const headerHeight = item.url ? 3 : 2;
   const visibleHeight = Math.max(1, contentHeight - headerHeight - 2); // Adjusted for header, margin, and footer
@@ -59,7 +68,8 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
   const maxLines = Math.max(contentLines.length, summaryLines.length);
 
   // Reserve space for "Retrieving..." message if showing
-  const contentHeaderHeight = (latestLoading && !latestContent && !item.latest_content) ? 2 : 0;
+  const contentHeaderHeight =
+    latestLoading && !latestContent && !item.latest_content ? 2 : 0;
   // Reserve space for "Summary" label
   const summaryHeaderHeight = 1;
 
@@ -92,12 +102,20 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
         </Box>
         {item.url && (
           <Text dimColor>
-            URL: <Text color={theme.colors.readerLinkFg} underline>{terminalLink(item.url, item.url)}</Text>
+            URL:{" "}
+            <Text color={theme.colors.readerLinkFg} underline>
+              {terminalLink(item.url, item.url)}
+            </Text>
           </Text>
         )}
       </Box>
 
-      <Box marginTop={1} height={visibleHeight} paddingX={1} flexDirection="row">
+      <Box
+        marginTop={1}
+        height={visibleHeight}
+        paddingX={1}
+        flexDirection="row"
+      >
         {/* Main Content Pane */}
         <Box flexDirection="column" width={paneWidth}>
           {latestLoading && !latestContent && !item.latest_content && (
@@ -105,6 +123,11 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
               <Text color={theme.colors.readerStatusFg} italic>
                 Automatically retrieving latest content...
               </Text>
+            </Box>
+          )}
+          {latestError && (
+            <Box marginBottom={1}>
+              <Text color={theme.colors.readerErrorFg}>⚠ {latestError}</Text>
             </Box>
           )}
           <Text>{visibleContentLines.join("\n")}</Text>

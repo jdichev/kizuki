@@ -62,6 +62,7 @@ type LatestContentResolution = {
   fromCache: boolean;
   skipped: boolean;
   reason?: string;
+  error?: string;
 };
 
 const retrieveLatestMarkdown = async (
@@ -133,15 +134,23 @@ const retrieveLatestMarkdown = async (
       skipped: false,
     };
   } catch (fetchError: unknown) {
+    const errorMessage =
+      (fetchError as Error).message || String(fetchError);
     if (cachedMarkdown) {
       return {
         markdown: cachedMarkdown,
         fromCache: true,
         skipped: false,
+        error: errorMessage,
       };
     }
 
-    throw fetchError;
+    return {
+      markdown: null,
+      fromCache: false,
+      skipped: false,
+      error: errorMessage,
+    };
   }
 };
 
@@ -150,6 +159,7 @@ type SummaryContentResolution = {
   wordCount: number;
   usedLatestContent: boolean;
   latestContentFromCache: boolean;
+  latestContentError?: string;
 };
 
 const resolveSummaryContent = async (params: {
@@ -196,6 +206,13 @@ const resolveSummaryContent = async (params: {
   const latestContent = latestResult.markdown || "";
   const latestWordCount = countWordLikeTokens(latestContent);
 
+  if (latestResult.error && latestWordCount < SUMMARY_MIN_WORD_COUNT) {
+    return {
+      skipped: true,
+      reason: `Failed to retrieve latest content: ${latestResult.error}`,
+    };
+  }
+
   if (latestWordCount < SUMMARY_MIN_WORD_COUNT) {
     if (providedWordCount > latestWordCount && providedWordCount > 0) {
       return {
@@ -215,6 +232,7 @@ const resolveSummaryContent = async (params: {
     wordCount: latestWordCount,
     usedLatestContent: true,
     latestContentFromCache: latestResult.fromCache,
+    latestContentError: latestResult.error,
   };
 };
 
@@ -991,6 +1009,8 @@ app.post("/api/summarize", jsonParser, async (req: Request, res: Response) => {
     }
 
     // Generate summary if not cached
+    let latestContentError: string | undefined = undefined;
+
     if (!summary) {
       const resolvedContent = await resolveSummaryContent({
         url,
@@ -1009,11 +1029,14 @@ app.post("/api/summarize", jsonParser, async (req: Request, res: Response) => {
         });
       }
 
+      latestContentError = resolvedContent.latestContentError;
+
       pino.info(
         {
           contentLength: resolvedContent.content.length,
           wordCount: resolvedContent.wordCount,
           usedLatestContent: resolvedContent.usedLatestContent,
+          latestContentError,
         },
         "Summarizing article content"
       );
@@ -1073,6 +1096,7 @@ app.post("/api/summarize", jsonParser, async (req: Request, res: Response) => {
       html: format === "html" ? responseContent : undefined,
       fromCache,
       skipped: false,
+      latestContentError,
     });
   } catch (error: unknown) {
     pino.error(
@@ -1135,6 +1159,7 @@ app.post(
         html: format === "html" ? content : undefined,
         fromCache,
         skipped: false,
+        error: latestResult.error,
       });
     } catch (error: unknown) {
       pino.error(

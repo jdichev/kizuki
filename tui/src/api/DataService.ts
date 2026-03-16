@@ -210,7 +210,14 @@ export default class DataService {
     url: string,
     format: "markdown" | "html" = "markdown",
     forceRefresh = false
-  ): Promise<{ markdown?: string | null; html?: string; fromCache?: boolean }> {
+  ): Promise<{
+    markdown?: string | null;
+    html?: string;
+    fromCache?: boolean;
+    skipped?: boolean;
+    reason?: string;
+    error?: string;
+  }> {
     const response = await fetch(this.makeUrl("/api/retrieve-latest"), {
       method: "POST",
       headers: {
@@ -246,6 +253,7 @@ export default class DataService {
     skipped?: boolean;
     reason?: string;
     message?: string;
+    latestContentError?: string;
   }> {
     const response = await fetch(this.makeUrl("/api/summarize"), {
       method: "POST",

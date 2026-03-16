@@ -233,7 +233,7 @@ export default function Article({
     shouldScrollToSummaryRef.current = true;
     setIsLoadingSummary(true);
     setSummaryError(null);
-
+    setRetrieveError(null);
     try {
       const data = await ds.summarize(article.content, article.url, "html");
 
@@ -251,6 +251,10 @@ export default function Article({
 
       // Use HTML version if available, otherwise use plain summary
       setSummary(data.html || data.summary || null);
+
+      if (data.latestContentError) {
+        setRetrieveError(data.latestContentError);
+      }
 
       // Refresh latest content info after summarization in case the server
       // updated/backfilled latest_content while preparing summary content.
@@ -274,6 +278,9 @@ export default function Article({
               setRetrievedContent(
                 latestData.html || latestData.markdown || null
               );
+              if (latestData.error) {
+                setRetrieveError(latestData.error);
+              }
             }
           }
         } catch {
@@ -322,6 +329,9 @@ export default function Article({
       const data = await response.json();
       // Use HTML version if available, otherwise use markdown
       setRetrievedContent(data.html || data.markdown);
+      if (data.error) {
+        setRetrieveError(data.error);
+      }
     } catch (error: any) {
       if (currentArticleIdRef.current !== articleIdAtStart) {
         return;

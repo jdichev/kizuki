@@ -698,6 +698,7 @@ export default class DataService {
     skipped?: boolean;
     reason?: string;
     message?: string;
+    latestContentError?: string;
   }> {
     const response = await fetch(this.makeUrl("/api/summarize"), {
       method: "POST",
