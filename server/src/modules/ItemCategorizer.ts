@@ -65,7 +65,10 @@ export default class ItemCategorizer {
   ${preparedItems}
   `;
 
-    const aiResponse = await aiService.generateContent(finalPrompt);
+    const aiResponse = await aiService.generateContent(
+      finalPrompt,
+      aiService.getBackupModel()
+    );
     pino.trace({ aiResponse }, "AI response for grouping items");
 
     const groups = aiService.parseAiGroupsResponse(aiResponse, items);

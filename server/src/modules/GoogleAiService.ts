@@ -610,6 +610,13 @@ export default class GoogleAiService {
   }
 
   /**
+   * Get the backup model (gemma)
+   */
+  public getBackupModel(): string {
+    return GoogleAiService.BACKUP_MODEL;
+  }
+
+  /**
    * Summarize article content in up to 350 words
    * @param htmlContent The HTML content to summarize
    * @returns A plain text summary (abstract) of the content
