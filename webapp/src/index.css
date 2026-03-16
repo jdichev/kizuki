@@ -25,6 +25,26 @@
     --weak-color: #898989;
     --highlight-color: #e3c470;
     --heading-color: #412203;
+    --table-row-border: color-mix(
+      in oklab,
+      var(--frame-border-color) 88%,
+      transparent
+    );
+    --table-row-hover-bg: color-mix(
+      in oklab,
+      var(--btn-bg-color) 55%,
+      transparent
+    );
+    --table-row-selected-bg: color-mix(
+      in oklab,
+      var(--items-list-selected-bg) 55%,
+      transparent
+    );
+    --table-row-selected-active-bg: color-mix(
+      in oklab,
+      var(--items-list-selected-active-bg) 58%,
+      transparent
+    );
     --status-bar-bg: color-mix(in oklab, var(--header-bg) 82%, #007acc 18%);
     --status-bar-fg: color-mix(in oklab, var(--main-color) 88%, #007acc 12%);
     --status-bar-hover-bg: color-mix(
@@ -62,6 +82,26 @@
     --weak-color: #585858;
     --highlight-color: #e3c470;
     --heading-color: #eee;
+    --table-row-border: color-mix(
+      in oklab,
+      var(--frame-border-color) 90%,
+      transparent
+    );
+    --table-row-hover-bg: color-mix(
+      in oklab,
+      var(--btn-bg-color) 45%,
+      transparent
+    );
+    --table-row-selected-bg: color-mix(
+      in oklab,
+      var(--items-list-selected-bg) 52%,
+      transparent
+    );
+    --table-row-selected-active-bg: color-mix(
+      in oklab,
+      var(--items-list-selected-active-bg) 56%,
+      transparent
+    );
     --status-bar-bg: color-mix(in oklab, var(--header-bg) 78%, #007acc 22%);
     --status-bar-fg: color-mix(in oklab, var(--main-color) 90%, #6fb8ef 10%);
     --status-bar-hover-bg: color-mix(
@@ -146,9 +186,11 @@ a:hover {
   grid-template-columns: var(--side-menu-width) var(--sidebar-width) var(
       --main-column-size
     );
-  grid-template-rows: var(--header-height) calc(
+  grid-template-rows:
+    var(--header-height) calc(
       100vh - var(--header-height) - var(--status-bar-height)
-    ) var(--status-bar-height);
+    )
+    var(--status-bar-height);
 }
 
 #wrapper.main-sidebar-hidden {
@@ -591,18 +633,20 @@ table.feeds-table {
 }
 
 #list-panel .table td {
-  transition: 0.15s padding ease-out;
+  transition:
+    0.15s padding ease-out,
+    background-color 0.12s ease-out;
 }
 
 #list-panel[data-activenav="true"] .table .selected-item td,
 #list-panel[data-activenav="true"] .table .selected-item td:hover {
   /* box-shadow: 0 0 1px var(--link-color) inset; */
-  background: var(--items-list-selected-active-bg);
+  background: var(--table-row-selected-active-bg);
 }
 
 #list-panel .table .selected-item td,
 #list-panel .table .selected-item td:hover {
-  background-color: var(--items-list-selected-bg);
+  background-color: var(--table-row-selected-bg);
 }
 
 #list-panel .table .selected-item td .item-list-title {
@@ -610,12 +654,12 @@ table.feeds-table {
 }
 
 #list-panel .table td:hover {
-  background-color: var(--btn-bg-color);
+  background-color: var(--table-row-hover-bg);
   cursor: pointer;
 }
 
 #list-panel .table > :not(caption) > * > * {
-  border-bottom-width: 0px;
+  border-bottom: 1px solid var(--table-row-border);
   padding: 0;
 }
 
@@ -830,7 +874,21 @@ button.btn {
 }
 
 .table-striped > tbody > tr:nth-of-type(odd) {
-  background-color: var(--table-row-odd);
+  background-color: transparent;
+}
+
+.table > :not(caption) > * > * {
+  border-bottom: 1px solid var(--table-row-border);
+}
+
+.table > tbody > tr > td,
+.table > tbody > tr > th {
+  transition: background-color 0.12s ease-out;
+}
+
+.table > tbody > tr:hover > td,
+.table > tbody > tr:hover > th {
+  background-color: var(--table-row-hover-bg);
 }
 
 .table-sm > tbody > tr > td,
