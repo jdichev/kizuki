@@ -1,3 +1,5 @@
+@charset "UTF-8";
+
 @media (prefers-color-scheme: light) {
   :root {
     --frame-border-color: #dedede;
@@ -286,7 +288,7 @@ a:hover {
 }
 
 #top-nav-brand a::before {
-  content: " ▲ ";
+  content: " \0025B2 ";
   letter-spacing: 0.2rem;
 }
 
@@ -676,12 +678,13 @@ table.feeds-table {
 }
 
 #list-panel .item-list-details::before {
-  content: "○ ";
+  content: "\0025CB ";
   color: var(--weak-color);
+  padding-right: 0.25rem;
 }
 
 #list-panel .item-unread .item-list-details::before {
-  content: "● ";
+  content: "\0025CF ";
   color: var(--link-highlight-color);
 }
 
@@ -829,7 +832,7 @@ table.feeds-table {
 }
 
 #content-options li::marker {
-  content: "♥  ";
+  content: "\002665  ";
 }
 
 .btn {
