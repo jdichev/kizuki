@@ -26,8 +26,10 @@ import {
   SIDEBAR_MENU_HIDE_REQUEST_EVENT,
   SIDEBAR_MENU_VISIBILITY_EVENT,
   SIDEBAR_VISIBILITY_MODE,
+  READING_VIEW_VISIBILITY_EVENT,
   type SidebarMenuHideRequestDetail,
   type SidebarMenuVisibilityDetail,
+  type ReadingViewVisibilityDetail,
 } from "./utils/sidebarMenuVisibility";
 
 const SIDE_MENU_ITEMS = [
@@ -134,6 +136,7 @@ function AppLayout() {
     useState(false);
   const [isSidebarMenuTemporarilyShown, setSidebarMenuTemporarilyShown] =
     useState(false);
+  const [isReading, setIsReading] = useState(false);
   const [showAltNavHints, setShowAltNavHints] = useState(false);
   const dividerRef = useSidebarDivider();
   const statusLabel = getStatusLabel(location.pathname);
@@ -148,7 +151,29 @@ function AppLayout() {
   useEffect(() => {
     setSidebarMenuExplicitlyHidden(false);
     setSidebarMenuTemporarilyShown(false);
+    setIsReading(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    const handleReadingViewVisibility = (event: Event) => {
+      const customEvent = event as CustomEvent<ReadingViewVisibilityDetail>;
+      if (typeof customEvent.detail?.isReading === "boolean") {
+        setIsReading(customEvent.detail.isReading);
+      }
+    };
+
+    window.addEventListener(
+      READING_VIEW_VISIBILITY_EVENT,
+      handleReadingViewVisibility as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        READING_VIEW_VISIBILITY_EVENT,
+        handleReadingViewVisibility as EventListener
+      );
+    };
+  }, []);
 
   useEffect(() => {
     const handleSidebarMenuVisibility = (event: Event) => {
@@ -317,7 +342,7 @@ function AppLayout() {
       id="wrapper"
       className={`${twoColLayout ? "two-columns" : ""} ${
         isSidebarMenuHidden ? "main-sidebar-hidden" : ""
-      }`.trim()}
+      } ${isReading ? "is-reading" : ""}`.trim()}
     >
       <div id="top-nav-home"></div>
 

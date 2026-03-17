@@ -85,6 +85,7 @@ export default function Article({
   selectedItemCategory,
   selectedParentCategory,
   topOptions,
+  onBack,
 }: ArticleProps) {
   const [videoId, setVideoId] = useState<String>();
   const [videoKind, setVideoKind] = useState<"standard" | "short" | null>(null);
@@ -487,7 +488,24 @@ export default function Article({
             topOptions.current
           )}
         <article>
-          <h1 id="title" dangerouslySetInnerHTML={{ __html: article.title }} />
+          <div className="article-header">
+            <h1
+              id="title"
+              dangerouslySetInnerHTML={{ __html: article.title }}
+            />
+
+            {onBack && (
+              <div className="portrait-back-nav">
+                <button
+                  type="button"
+                  className="btn btn-link text-decoration-none"
+                  onClick={onBack}
+                >
+                  <i className="bi bi-x-lg" aria-hidden="true" /> Close
+                </button>
+              </div>
+            )}
+          </div>
 
           {hasExternalImagesInArticle && (
             <div

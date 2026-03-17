@@ -89,6 +89,7 @@ interface ArticleProps {
   selectedItemCategory?: ItemCategory;
   selectedParentCategory?: ParentCategory;
   topOptions?: React.RefObject<HTMLDivElement | null>;
+  onBack?: () => void;
 }
 
 interface ItemsTableProps {

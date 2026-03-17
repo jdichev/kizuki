@@ -96,3 +96,14 @@ test("renders video article", async () => {
   ).toBeTruthy();
   expect(screen.queryByText("External images blocked for privacy")).toBeNull();
 });
+
+test('renders "Close" button when onBack is provided', () => {
+  const onBack = jest.fn();
+  render(<Article article={textArticle} onBack={onBack} />);
+
+  const closeButton = screen.getByRole("button", { name: /close/i });
+  expect(closeButton).toBeTruthy();
+
+  fireEvent.click(closeButton);
+  expect(onBack).toHaveBeenCalledTimes(1);
+});

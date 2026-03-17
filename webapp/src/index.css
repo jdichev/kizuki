@@ -982,3 +982,61 @@ form div {
   outline: 2px solid var(--link-color);
   outline-offset: 2px;
 }
+
+.portrait-back-nav {
+  display: none;
+}
+
+.article-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+@media (max-width: 1024px) {
+  #wrapper {
+    grid-template-columns: var(--side-menu-width) 250px 1fr;
+  }
+
+  #wrapper.main-sidebar-hidden {
+    grid-template-columns: var(--side-menu-width) 0 1fr;
+  }
+
+  #main-content {
+    grid-template-columns: 1fr;
+  }
+
+  #content-panel {
+    display: none;
+  }
+
+  #sidebar-divider {
+    display: none;
+  }
+
+  #main-sidebar {
+    width: 100%;
+    border-right: 1px solid var(--frame-border-color);
+  }
+
+  .portrait-back-nav {
+    display: block;
+  }
+
+  #wrapper.is-reading #main-nav,
+  #wrapper.is-reading #main-sidebar,
+  #wrapper.is-reading #sidebar-divider,
+  #wrapper.is-reading #list-panel {
+    display: none !important;
+  }
+
+  #wrapper.is-reading #main-content {
+    grid-column: 1 / -1;
+    display: block;
+  }
+
+  #wrapper.is-reading #content-panel {
+    display: block;
+  }
+}

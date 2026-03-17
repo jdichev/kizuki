@@ -12,7 +12,9 @@ import {
   SIDEBAR_MENU_HIDE_REQUEST_EVENT,
   SIDEBAR_MENU_VISIBILITY_EVENT,
   SIDEBAR_VISIBILITY_MODE,
+  READING_VIEW_VISIBILITY_EVENT,
   type SidebarMenuHideRequestDetail,
+  type ReadingViewVisibilityDetail,
 } from "./utils/sidebarMenuVisibility";
 
 const ds = DataService.getInstance();
@@ -55,6 +57,15 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
   const [selectedFeed, setSelectedFeed] = useState<Feed>();
 
   const [article, setArticle] = useState<Item>();
+
+  useEffect(() => {
+    const detail: ReadingViewVisibilityDetail = {
+      isReading: !!article,
+    };
+    window.dispatchEvent(
+      new CustomEvent(READING_VIEW_VISIBILITY_EVENT, { detail })
+    );
+  }, [article]);
 
   const [selectedItem, setSelectedItem] = useState<Item>();
   const selectedItemIdRef = useRef<number | undefined>(undefined);
@@ -1076,6 +1087,9 @@ export default function FeedsMain({ topMenu, topOptions }: HomeProps) {
             selectedFeedCategory={selectedFeedCategory}
             selectedFeed={selectedFeed}
             topOptions={topOptions}
+            onBack={() => {
+              setArticle(undefined);
+            }}
           />
         </div>
       </main>

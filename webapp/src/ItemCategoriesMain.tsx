@@ -18,7 +18,9 @@ import {
   SIDEBAR_MENU_HIDE_REQUEST_EVENT,
   SIDEBAR_MENU_VISIBILITY_EVENT,
   SIDEBAR_VISIBILITY_MODE,
+  READING_VIEW_VISIBILITY_EVENT,
   type SidebarMenuHideRequestDetail,
+  type ReadingViewVisibilityDetail,
 } from "./utils/sidebarMenuVisibility";
 
 const ds = DataService.getInstance();
@@ -52,6 +54,15 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
   const [selectedItemCategory, setSelectedItemCategory] =
     useState<ItemCategory>();
   const [article, setArticle] = useState<Item>();
+
+  useEffect(() => {
+    const detail: ReadingViewVisibilityDetail = {
+      isReading: !!article,
+    };
+    window.dispatchEvent(
+      new CustomEvent(READING_VIEW_VISIBILITY_EVENT, { detail })
+    );
+  }, [article]);
   const [selectedItem, setSelectedItem] = useState<Item>();
   const selectedItemIdRef = useRef<number | undefined>(undefined);
   const [activeNav, setActiveNav] = useState<string>("categories");
@@ -979,6 +990,9 @@ export default function ItemCategoriesMain({ topMenu, topOptions }: HomeProps) {
             selectedItemCategory={selectedItemCategory}
             selectedParentCategory={selectedParentCategory}
             topOptions={topOptions}
+            onBack={() => {
+              setArticle(undefined);
+            }}
           />
         </div>
       </main>

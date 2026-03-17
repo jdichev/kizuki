@@ -1,6 +1,7 @@
 export const SIDEBAR_MENU_VISIBILITY_EVENT = "sidebar-menu-visibility" as const;
 export const SIDEBAR_MENU_HIDE_REQUEST_EVENT =
   "sidebar-menu-hide-request" as const;
+export const READING_VIEW_VISIBILITY_EVENT = "reading-view-visibility" as const;
 
 export const SIDEBAR_VISIBILITY_MODE = {
   temporaryShow: "temporary-show",
@@ -17,4 +18,8 @@ export type SidebarMenuVisibilityDetail = {
 
 export type SidebarMenuHideRequestDetail = {
   shouldSelectFirstItem?: boolean;
+};
+
+export type ReadingViewVisibilityDetail = {
+  isReading: boolean;
 };
