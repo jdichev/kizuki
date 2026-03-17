@@ -38,10 +38,19 @@ const serviceUsageManager = GoogleServiceUsageManager.getInstance();
 
 const markdownRenderer = new MarkdownIt();
 const SUMMARY_MIN_WORD_COUNT = 240;
-const SUMMARY_REQUEST_MIN_INTERVAL_MS = 1500;
+const SUMMARY_MODEL_RPM_LIMITS: Record<string, number> = {
+  "models/gemma-3-27b-it": 30,
+  "gemini-2.5-flash": 5,
+};
+const SUMMARY_DEFAULT_RPM_LIMIT = 30;
 
 const summarizeInFlightRequests = new Map<string, Promise<string>>();
-const summarizeLastRequestAt = new Map<string, number>();
+const summarizeLastRequestAtByModel = new Map<string, number>();
+
+const getSummaryRequestMinIntervalMs = (model: string): number => {
+  const rpmLimit = SUMMARY_MODEL_RPM_LIMITS[model] || SUMMARY_DEFAULT_RPM_LIMIT;
+  return Math.ceil(60000 / rpmLimit);
+};
 
 const renderMarkdownToHtml = (content: string) => {
   return markdownRenderer.render(content);
@@ -134,8 +143,7 @@ const retrieveLatestMarkdown = async (
       skipped: false,
     };
   } catch (fetchError: unknown) {
-    const errorMessage =
-      (fetchError as Error).message || String(fetchError);
+    const errorMessage = (fetchError as Error).message || String(fetchError);
     if (cachedMarkdown) {
       return {
         markdown: cachedMarkdown,
@@ -1052,20 +1060,25 @@ app.post("/api/summarize", jsonParser, async (req: Request, res: Response) => {
         pino.info({ requestKey }, "Joining in-flight summarize request");
         summary = await inFlightRequest;
       } else {
+        const summarizeModel = aiService.getSummarizationModel();
+        const summarizeMinIntervalMs =
+          getSummaryRequestMinIntervalMs(summarizeModel);
         const now = Date.now();
-        const lastRequestAt = summarizeLastRequestAt.get(requestKey) || 0;
+        const lastRequestAt =
+          summarizeLastRequestAtByModel.get(summarizeModel) || 0;
         const elapsed = now - lastRequestAt;
 
-        if (elapsed < SUMMARY_REQUEST_MIN_INTERVAL_MS) {
-          const retryAfterMs = SUMMARY_REQUEST_MIN_INTERVAL_MS - elapsed;
+        if (elapsed < summarizeMinIntervalMs) {
+          const retryAfterMs = summarizeMinIntervalMs - elapsed;
           return res.status(429).json({
             error: "Too many summarize requests",
+            model: summarizeModel,
             message: `Please wait ${retryAfterMs}ms before trying again`,
             retryAfterMs,
           });
         }
 
-        summarizeLastRequestAt.set(requestKey, now);
+        summarizeLastRequestAtByModel.set(summarizeModel, now);
 
         const summarizePromise = aiService.summarizeArticle(
           resolvedContent.content

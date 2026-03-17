@@ -23,6 +23,7 @@ export default class GoogleAiService {
   private aiClient: GoogleGenAI | null = null;
   private static readonly DEFAULT_MODEL = "gemini-3-flash-preview";
   private static readonly BACKUP_MODEL = "models/gemma-3-27b-it";
+  private static readonly SUMMARIZATION_MODEL = "models/gemma-3-27b-it";
 
   // Rate limiting: 2 requests per hour, 20 requests per day
   private static readonly MAX_REQUESTS_PER_HOUR = 2;
@@ -617,6 +618,13 @@ export default class GoogleAiService {
   }
 
   /**
+   * Get the model used for article summarization.
+   */
+  public getSummarizationModel(): string {
+    return GoogleAiService.SUMMARIZATION_MODEL;
+  }
+
+  /**
    * Summarize article content in up to 350 words
    * @param htmlContent The HTML content to summarize
    * @returns A plain text summary (abstract) of the content
@@ -660,7 +668,7 @@ export default class GoogleAiService {
     try {
       const summary = await this.generateContent(
         prompt,
-        GoogleAiService.BACKUP_MODEL
+        GoogleAiService.SUMMARIZATION_MODEL
       );
       const result = `${summary}\n\n---\n*Summary generated using: ${this.lastModelUsed}*`;
       pino.info(

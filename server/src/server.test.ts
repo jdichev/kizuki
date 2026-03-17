@@ -15,6 +15,7 @@ const mockDataModel = {
 const mockAiService = {
   isConfigured: jest.fn().mockReturnValue(true),
   summarizeArticle: jest.fn(),
+  getSummarizationModel: jest.fn(() => "models/gemma-3-27b-it"),
   getInstance: jest.fn(),
 };
 
@@ -63,8 +64,12 @@ describe("API Error Propagation", function () {
   describe("POST /api/retrieve-latest", function () {
     it("returns error field when retrieval fails but cached content exists", async () => {
       const url = "https://example.com/error-with-cache";
-      mockDataModel.getItemLatestContent.mockResolvedValue("Cached content that is long enough to be returned even on error.");
-      (ArticleToMarkdown.convertArticleToMarkdown as jest.Mock).mockRejectedValue(new Error("Network failure"));
+      mockDataModel.getItemLatestContent.mockResolvedValue(
+        "Cached content that is long enough to be returned even on error."
+      );
+      (
+        ArticleToMarkdown.convertArticleToMarkdown as jest.Mock
+      ).mockRejectedValue(new Error("Network failure"));
 
       const response = await request(app)
         .post("/api/retrieve-latest")
@@ -79,7 +84,9 @@ describe("API Error Propagation", function () {
     it("returns error field when retrieval fails and no cache exists", async () => {
       const url = "https://example.com/error-no-cache";
       mockDataModel.getItemLatestContent.mockResolvedValue(null);
-      (ArticleToMarkdown.convertArticleToMarkdown as jest.Mock).mockRejectedValue(new Error("Connection refused"));
+      (
+        ArticleToMarkdown.convertArticleToMarkdown as jest.Mock
+      ).mockRejectedValue(new Error("Connection refused"));
 
       const response = await request(app)
         .post("/api/retrieve-latest")
@@ -95,11 +102,16 @@ describe("API Error Propagation", function () {
   describe("POST /api/summarize", function () {
     it("returns latestContentError when summarization succeeds but refresh failed", async () => {
       const url = "https://example.com/summarize-with-refresh-error";
-      const longContent = "This is a very long piece of content that exceeds the minimum word count required for summarization. ".repeat(20);
-      
+      const longContent =
+        "This is a very long piece of content that exceeds the minimum word count required for summarization. ".repeat(
+          20
+        );
+
       mockDataModel.getItemSummary.mockResolvedValue(null);
       mockDataModel.getItemLatestContent.mockResolvedValue(longContent);
-      (ArticleToMarkdown.convertArticleToMarkdown as jest.Mock).mockRejectedValue(new Error("Refresh failed"));
+      (
+        ArticleToMarkdown.convertArticleToMarkdown as jest.Mock
+      ).mockRejectedValue(new Error("Refresh failed"));
       mockAiService.summarizeArticle.mockResolvedValue("This is a summary.");
 
       const response = await request(app)
@@ -114,10 +126,12 @@ describe("API Error Propagation", function () {
     it("prioritizes retrieval error over insufficient content error", async () => {
       const url = "https://example.com/short-content-error";
       const shortContent = "Too short.";
-      
+
       mockDataModel.getItemSummary.mockResolvedValue(null);
       mockDataModel.getItemLatestContent.mockResolvedValue(null);
-      (ArticleToMarkdown.convertArticleToMarkdown as jest.Mock).mockRejectedValue(new Error("Critical fetch error"));
+      (
+        ArticleToMarkdown.convertArticleToMarkdown as jest.Mock
+      ).mockRejectedValue(new Error("Critical fetch error"));
 
       const response = await request(app)
         .post("/api/summarize")
@@ -125,7 +139,9 @@ describe("API Error Propagation", function () {
 
       expect(response.status).toBe(200);
       expect(response.body.skipped).toBe(true);
-      expect(response.body.reason).toContain("Failed to retrieve latest content: Critical fetch error");
+      expect(response.body.reason).toContain(
+        "Failed to retrieve latest content: Critical fetch error"
+      );
     });
   });
 });
@@ -133,10 +149,8 @@ describe("API Error Propagation", function () {
 describe("Server Basic Endpoints", function () {
   it("sets no-cache headers on /api/summarize", async () => {
     const app = await server.start();
-    const response = await request(app)
-      .post("/api/summarize")
-      .send({});
-    
+    const response = await request(app).post("/api/summarize").send({});
+
     expect(response.status).toBe(400);
     expect(response.headers["cache-control"]).toContain("no-store");
     expect(response.headers["pragma"]).toBe("no-cache");
@@ -145,10 +159,8 @@ describe("Server Basic Endpoints", function () {
 
   it("sets no-cache headers on /api/retrieve-latest", async () => {
     const app = await server.start();
-    const response = await request(app)
-      .post("/api/retrieve-latest")
-      .send({});
-    
+    const response = await request(app).post("/api/retrieve-latest").send({});
+
     expect(response.status).toBe(400);
     expect(response.headers["cache-control"]).toContain("no-store");
     expect(response.headers["pragma"]).toBe("no-cache");
