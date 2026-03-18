@@ -687,6 +687,18 @@ export default class DataService {
     }
   }
 
+  // Track active summarizations and retrievals globally
+  private activeSummarizations = new Set<string>();
+  private activeRetrievals = new Set<string>();
+
+  public isSummarizing(url: string | undefined): boolean {
+    return url ? this.activeSummarizations.has(url) : false;
+  }
+
+  public isRetrieving(url: string | undefined): boolean {
+    return url ? this.activeRetrievals.has(url) : false;
+  }
+
   public async summarize(
     content?: string,
     url?: string,
@@ -700,27 +712,58 @@ export default class DataService {
     message?: string;
     latestContentError?: string;
   }> {
-    const response = await fetch(this.makeUrl("/api/summarize"), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ content, url, format }),
-    });
-
-    if (!response.ok) {
-      let message = "Failed to summarize content";
-      try {
-        const errorData = await response.json();
-        if (errorData?.message) {
-          message = String(errorData.message);
-        }
-      } catch {
-        // ignore parse failures
-      }
-      throw new Error(message);
+    if (url) {
+      this.activeSummarizations.add(url);
     }
+    try {
+      const response = await fetch(this.makeUrl("/api/summarize"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ content, url, format }),
+      });
 
-    return await response.json();
+      if (!response.ok) {
+        let message = "Failed to summarize content";
+        try {
+          const errorData = await response.json();
+          if (errorData?.message) {
+            message = String(errorData.message);
+          }
+        } catch {
+          // ignore parse failures
+        }
+        throw new Error(message);
+      }
+
+      return await response.json();
+    } finally {
+      if (url) {
+        this.activeSummarizations.delete(url);
+      }
+    }
+  }
+
+  public async retrieveLatest(url: string): Promise<any> {
+    this.activeRetrievals.add(url);
+    try {
+      const response = await fetch(this.makeUrl("/api/retrieve-latest"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ url, format: "html" }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to retrieve article");
+      }
+
+      return await response.json();
+    } finally {
+      this.activeRetrievals.delete(url);
+    }
   }
 }

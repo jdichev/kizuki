@@ -25,6 +25,8 @@ jest.mock("./service/DataService", () => {
     markItemRead: jest.fn(),
     getItemDeferred: jest.fn(),
     markItemsRead: jest.fn(),
+    isSummarizing: jest.fn().mockReturnValue(false),
+    isRetrieving: jest.fn().mockReturnValue(false),
   };
 
   return {

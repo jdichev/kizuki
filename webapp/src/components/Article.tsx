@@ -142,6 +142,8 @@ export default function Article({
     setSummaryError(null);
     setRetrievedContent(null);
     setRetrieveError(null);
+    setIsLoadingSummary(ds.isSummarizing(article?.url));
+    setIsLoadingContent(ds.isRetrieving(article?.url));
     setIsRetrievedContentExpanded(false);
     setAreExternalImagesAllowed(false);
 
@@ -261,20 +263,9 @@ export default function Article({
       // updated/backfilled latest_content while preparing summary content.
       if (article.url) {
         try {
-          const latestUrl = `${serverConfig.protocol}//${serverConfig.hostname}:${serverConfig.port}/api/retrieve-latest`;
-          const latestResponse = await fetch(latestUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ url: article.url, format: "html" }),
-          });
+          const latestData = await ds.retrieveLatest(article.url);
 
-          if (
-            latestResponse.ok &&
-            currentArticleIdRef.current === articleIdAtStart
-          ) {
-            const latestData = await latestResponse.json();
+          if (currentArticleIdRef.current === articleIdAtStart) {
             if (!latestData?.skipped) {
               setRetrievedContent(
                 latestData.html || latestData.markdown || null
@@ -309,25 +300,12 @@ export default function Article({
     setRetrieveError(null);
 
     try {
-      const url = `${serverConfig.protocol}//${serverConfig.hostname}:${serverConfig.port}/api/retrieve-latest`;
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ url: article.url, format: "html" }),
-      });
+      const data = await ds.retrieveLatest(article.url);
 
       if (currentArticleIdRef.current !== articleIdAtStart) {
         return;
       }
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to retrieve article");
-      }
-
-      const data = await response.json();
       // Use HTML version if available, otherwise use markdown
       setRetrievedContent(data.html || data.markdown);
       if (data.error) {
