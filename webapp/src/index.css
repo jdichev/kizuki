@@ -48,6 +48,11 @@
       var(--items-list-selected-active-bg) 58%,
       transparent
     );
+    --selected-active-shadow-color: color-mix(
+      in oklab,
+      var(--sidebar-selected-active-bg) 78%,
+      black
+    );
     --status-bar-bg: color-mix(in oklab, var(--header-bg) 82%, #007acc 18%);
     --status-bar-fg: color-mix(in oklab, var(--main-color) 88%, #007acc 12%);
     --status-bar-hover-bg: color-mix(
@@ -109,6 +114,11 @@
       in oklab,
       var(--items-list-selected-active-bg) 56%,
       transparent
+    );
+    --selected-active-shadow-color: color-mix(
+      in oklab,
+      var(--sidebar-selected-active-bg) 79%,
+      white
     );
     --status-bar-bg: color-mix(in oklab, var(--header-bg) 78%, #007acc 22%);
     --status-bar-fg: color-mix(in oklab, var(--main-color) 90%, #6fb8ef 10%);
@@ -538,12 +548,13 @@ a:hover {
   border: none;
 }
 
-#main-sidebar[data-activenav="true"] li.feed-selected button,
-#main-sidebar[data-activenav="true"] li.feed-selected button:hover,
-#main-sidebar[data-activenav="true"] li.feedcategory-selected button,
-#main-sidebar[data-activenav="true"] li.feedcategory-selected button:hover {
-  /* box-shadow: 0 0 1px var(--link-color) inset; */
-  background: var(--sidebar-selected-active-bg);
+#main-sidebar[data-activenav="true"]
+  :is(li.feed-selected, li.feedcategory-selected)
+  button,
+#main-sidebar[data-activenav="true"]
+  :is(li.feed-selected, li.feedcategory-selected)
+  button:hover {
+  --selected-active-bg: var(--sidebar-selected-active-bg);
 }
 
 #main-sidebar li button:hover {
@@ -648,8 +659,19 @@ table.feeds-table {
 
 #list-panel[data-activenav="true"] .table .selected-item td,
 #list-panel[data-activenav="true"] .table .selected-item td:hover {
-  /* box-shadow: 0 0 1px var(--link-color) inset; */
-  background: var(--table-row-selected-active-bg);
+  --selected-active-bg: var(--table-row-selected-active-bg);
+}
+
+#main-sidebar[data-activenav="true"]
+  :is(li.feed-selected, li.feedcategory-selected)
+  button,
+#main-sidebar[data-activenav="true"]
+  :is(li.feed-selected, li.feedcategory-selected)
+  button:hover,
+#list-panel[data-activenav="true"] .table .selected-item td,
+#list-panel[data-activenav="true"] .table .selected-item td:hover {
+  box-shadow: 0 0 1px var(--selected-active-shadow-color) inset;
+  background: var(--selected-active-bg);
 }
 
 #list-panel .table .selected-item td,
