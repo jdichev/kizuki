@@ -32,6 +32,7 @@
       var(--frame-border-color) 88%,
       transparent
     );
+    --items-list-row-border: transparent;
     --table-row-hover-bg: color-mix(
       in oklab,
       var(--btn-bg-color) 55%,
@@ -85,6 +86,11 @@
     --highlight-color: #e3c470;
     --heading-color: #eee;
     --table-row-border: color-mix(
+      in oklab,
+      var(--frame-border-color) 90%,
+      transparent
+    );
+    --items-list-row-border: color-mix(
       in oklab,
       var(--frame-border-color) 90%,
       transparent
@@ -661,7 +667,7 @@ table.feeds-table {
 }
 
 #list-panel .table > :not(caption) > * > * {
-  border-bottom: 1px solid var(--table-row-border);
+  border-bottom: 1px solid var(--items-list-row-border);
   padding: 0;
 }
 
