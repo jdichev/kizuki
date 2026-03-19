@@ -764,6 +764,11 @@ app.get("/feeds/readstats", async (req: Request, res: Response) => {
   res.json(feedReadStats);
 });
 
+app.get("/updater/status", (req: Request, res: Response) => {
+  const status = updater.getUpdateStatus();
+  res.json(status);
+});
+
 app.put("/feeds", jsonParser, async (req: Request, res: Response) => {
   const result = await dataModel.updateFeed(req.body);
 

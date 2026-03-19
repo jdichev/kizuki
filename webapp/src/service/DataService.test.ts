@@ -39,6 +39,25 @@ test("Test getFeedReadStats", async () => {
   expect(fetchMock).toHaveBeenCalledTimes(1);
 });
 
+test("Test getUpdaterStatus", async () => {
+  fetchMock.mockResponseOnce(
+    JSON.stringify({
+      inProgress: true,
+      stage: "fetching",
+      totalFeeds: 10,
+      processedFeeds: 3,
+      startedAt: 1,
+      updatedAt: 2,
+      lastCompletedAt: null,
+    })
+  );
+
+  const updaterStatus = await dataService.getUpdaterStatus();
+
+  expect(updaterStatus).toBeTruthy();
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+
 test("Test getItems", async () => {
   //  todo: needs to check parameter setting logic
   fetchMock.mockResponseOnce(JSON.stringify([]));

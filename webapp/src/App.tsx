@@ -21,6 +21,7 @@ import FeedCategoryList from "./FeedCategoryList";
 import FeedCategoryEdit from "./FeedCategoryEdit";
 import Settings from "./Settings";
 import ItemsSearch from "./ItemsSearch";
+import DataService from "./service/DataService";
 import { useSidebarDivider } from "./hooks/useSidebarDivider";
 import {
   SIDEBAR_MENU_HIDE_REQUEST_EVENT,
@@ -39,6 +40,10 @@ const SIDE_MENU_ITEMS = [
   { path: "/feeds/add", iconClass: "bi bi-plus-square-fill" },
   { path: "/settings", iconClass: "bi bi-gear-fill" },
 ] as const;
+
+const ds = DataService.getInstance();
+const UPDATER_STATUS_IDLE_POLLING_MS = 5000;
+const UPDATER_STATUS_ACTIVE_POLLING_MS = 1000;
 
 function getStatusLabel(pathname: string) {
   if (pathname === "/") {
@@ -117,6 +122,128 @@ function isTypingTarget(target: EventTarget | null) {
   );
 }
 
+function getUpdaterStageLabel(stage: FeedUpdateStage) {
+  if (stage === "loading-feeds") {
+    return "loading feeds";
+  }
+
+  if (stage === "fetching") {
+    return "fetching feed data";
+  }
+
+  if (stage === "processing") {
+    return "processing feed items";
+  }
+
+  if (stage === "failed") {
+    return "failed";
+  }
+
+  return "idle";
+}
+
+function getUpdaterStatusLabel(status: FeedUpdateStatus) {
+  const formatTimeAgo = (timestamp: number) => {
+    const elapsedMs = Math.max(0, Date.now() - timestamp);
+    const elapsedSeconds = Math.floor(elapsedMs / 1000);
+
+    if (elapsedSeconds < 60) {
+      return `${elapsedSeconds}s ago`;
+    }
+
+    const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+    if (elapsedMinutes < 60) {
+      return `${elapsedMinutes}m ago`;
+    }
+
+    const elapsedHours = Math.floor(elapsedMinutes / 60);
+    if (elapsedHours < 24) {
+      return `${elapsedHours}h ago`;
+    }
+
+    const elapsedDays = Math.floor(elapsedHours / 24);
+    return `${elapsedDays}d ago`;
+  };
+
+  const formatTimeUntil = (timestamp: number) => {
+    const remainingMs = Math.max(0, timestamp - Date.now());
+    const remainingSeconds = Math.floor(remainingMs / 1000);
+
+    if (remainingSeconds < 60) {
+      return `${remainingSeconds}s`;
+    }
+
+    const remainingMinutes = Math.floor(remainingSeconds / 60);
+    const remainingRemainderSeconds = remainingSeconds % 60;
+
+    if (remainingMinutes < 60) {
+      if (remainingRemainderSeconds === 0) {
+        return `${remainingMinutes}m`;
+      }
+
+      return `${remainingMinutes}m ${remainingRemainderSeconds}s`;
+    }
+
+    const remainingHours = Math.floor(remainingMinutes / 60);
+    const remainingRemainderMinutes = remainingMinutes % 60;
+
+    if (remainingHours < 24) {
+      if (remainingRemainderMinutes === 0) {
+        return `${remainingHours}h`;
+      }
+
+      return `${remainingHours}h ${remainingRemainderMinutes}m`;
+    }
+
+    const remainingDays = Math.floor(remainingHours / 24);
+    const remainingRemainderHours = remainingHours % 24;
+
+    if (remainingRemainderHours === 0) {
+      return `${remainingDays}d`;
+    }
+
+    return `${remainingDays}d ${remainingRemainderHours}h`;
+  };
+
+  const nextUpdateLabel = status.nextScheduledAt
+    ? `next in ${formatTimeUntil(status.nextScheduledAt)}`
+    : "";
+
+  if (status.inProgress) {
+    const totalFeeds = Math.max(0, status.totalFeeds);
+    const processedFeeds = Math.min(
+      totalFeeds,
+      Math.max(0, status.processedFeeds)
+    );
+    const stageLabel = getUpdaterStageLabel(status.stage);
+
+    if (totalFeeds === 0) {
+      return `Update in progress • stage: ${stageLabel}`;
+    }
+
+    return `Update in progress • ${processedFeeds}/${totalFeeds} feeds • ${stageLabel}`;
+  }
+
+  if (status.stage === "failed") {
+    return nextUpdateLabel
+      ? `Update failed • check server logs • ${nextUpdateLabel}`
+      : "Update failed • check server logs";
+  }
+
+  if (status.lastCompletedAt) {
+    const lastUpdateLabel = `last update ${formatTimeAgo(status.lastCompletedAt)}`;
+    const nextUpdateSuffix = nextUpdateLabel ? ` • ${nextUpdateLabel}` : "";
+
+    return `Ready • ${lastUpdateLabel}${nextUpdateSuffix}`;
+  }
+
+  if (status.nextScheduledAt) {
+    return `Ready • ${nextUpdateLabel}`;
+  }
+
+  return "Ready";
+}
+
 export default function App() {
   return (
     <Router>
@@ -138,8 +265,19 @@ function AppLayout() {
     useState(false);
   const [isReading, setIsReading] = useState(false);
   const [showAltNavHints, setShowAltNavHints] = useState(false);
+  const [updaterStatus, setUpdaterStatus] = useState<FeedUpdateStatus>({
+    inProgress: false,
+    stage: "idle",
+    totalFeeds: 0,
+    processedFeeds: 0,
+    startedAt: null,
+    updatedAt: Date.now(),
+    lastCompletedAt: null,
+    nextScheduledAt: null,
+  });
   const dividerRef = useSidebarDivider();
   const statusLabel = getStatusLabel(location.pathname);
+  const updaterStatusLabel = getUpdaterStatusLabel(updaterStatus);
 
   const isSidebarMenuHidden =
     isSidebarMenuExplicitlyHidden && !isSidebarMenuTemporarilyShown;
@@ -172,6 +310,37 @@ function AppLayout() {
         READING_VIEW_VISIBILITY_EVENT,
         handleReadingViewVisibility as EventListener
       );
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    const updateUpdaterStatus = async () => {
+      const status = await ds.getUpdaterStatus();
+      if (!isMounted) {
+        return;
+      }
+
+      setUpdaterStatus(status);
+
+      const nextPollDelay = status.inProgress
+        ? UPDATER_STATUS_ACTIVE_POLLING_MS
+        : UPDATER_STATUS_IDLE_POLLING_MS;
+
+      timeoutId = setTimeout(() => {
+        void updateUpdaterStatus();
+      }, nextPollDelay);
+    };
+
+    void updateUpdaterStatus();
+
+    return () => {
+      isMounted = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     };
   }, []);
 
@@ -437,8 +606,15 @@ function AppLayout() {
 
         <div className="status-bar-section status-bar-right">
           <span className="status-bar-item">
-            <i className="bi bi-shield-check" aria-hidden="true"></i>
-            Ready
+            <i
+              className={
+                updaterStatus.inProgress
+                  ? "bi bi-arrow-repeat"
+                  : "bi bi-shield-check"
+              }
+              aria-hidden="true"
+            ></i>
+            {updaterStatusLabel}
           </span>
         </div>
       </footer>

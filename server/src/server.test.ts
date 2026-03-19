@@ -35,7 +35,18 @@ jest.mock("./modules/GoogleAiService", () => ({
 
 // Mock other dependencies that server.ts might initialize
 jest.mock("./modules/FeedUpdater", () => {
-  return jest.fn().mockImplementation(() => ({}));
+  return jest.fn().mockImplementation(() => ({
+    addFeed: jest.fn(),
+    getUpdateStatus: jest.fn(() => ({
+      inProgress: false,
+      stage: "idle",
+      totalFeeds: 0,
+      processedFeeds: 0,
+      startedAt: null,
+      updatedAt: 0,
+      lastCompletedAt: null,
+    })),
+  }));
 });
 jest.mock("./modules/SettingsManager", () => ({
   getInstance: jest.fn(() => ({
@@ -147,6 +158,19 @@ describe("API Error Propagation", function () {
 });
 
 describe("Server Basic Endpoints", function () {
+  it("returns updater status payload from /updater/status", async () => {
+    const app = await server.start();
+    const response = await request(app).get("/updater/status");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      inProgress: false,
+      stage: "idle",
+      totalFeeds: 0,
+      processedFeeds: 0,
+    });
+  });
+
   it("sets no-cache headers on /api/summarize", async () => {
     const app = await server.start();
     const response = await request(app).post("/api/summarize").send({});

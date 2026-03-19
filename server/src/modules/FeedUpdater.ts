@@ -15,6 +15,25 @@ const pino = pinoLib({
 
 const dataModel = MixedDataModel.getInstance();
 
+export type FeedUpdateStage =
+  | "idle"
+  | "loading-feeds"
+  | "fetching"
+  | "processing"
+  | "completed"
+  | "failed";
+
+export type FeedUpdateStatus = {
+  inProgress: boolean;
+  stage: FeedUpdateStage;
+  totalFeeds: number;
+  processedFeeds: number;
+  startedAt: number | null;
+  updatedAt: number;
+  lastCompletedAt: number | null;
+  nextScheduledAt: number | null;
+};
+
 export default class FeedUpdater {
   // Time interval constants for scheduling
   private static readonly HOUR_LENGTH = 1000 * 60 * 60;
@@ -28,6 +47,16 @@ export default class FeedUpdater {
   private feedsProcCacheFilePath: string;
   private updateInProgress: boolean = false;
   private domainLastRequestTime: Map<string, number> = new Map();
+  private static updateStatus: FeedUpdateStatus = {
+    inProgress: false,
+    stage: "idle",
+    totalFeeds: 0,
+    processedFeeds: 0,
+    startedAt: null,
+    updatedAt: Date.now(),
+    lastCompletedAt: null,
+    nextScheduledAt: null,
+  };
 
   private feedsProcCache: {
     lastUpdateTimes: { [key: string]: number };
@@ -64,6 +93,26 @@ export default class FeedUpdater {
    */
   public get isUpdateInProgress(): boolean {
     return this.updateInProgress;
+  }
+
+  public getUpdateStatus(): FeedUpdateStatus {
+    return { ...FeedUpdater.updateStatus };
+  }
+
+  public static setNextScheduledAt(nextScheduledAt: number | null): void {
+    FeedUpdater.updateStatus = {
+      ...FeedUpdater.updateStatus,
+      nextScheduledAt,
+      updatedAt: Date.now(),
+    };
+  }
+
+  private setUpdateStatus(update: Partial<FeedUpdateStatus>): void {
+    FeedUpdater.updateStatus = {
+      ...FeedUpdater.updateStatus,
+      ...update,
+      updatedAt: Date.now(),
+    };
   }
 
   /**
@@ -404,6 +453,7 @@ export default class FeedUpdater {
     pino.trace(`Chunks num ${chunks.length}, ${this.chunkSize} feeds each`);
 
     for (const feedsChunk of chunks) {
+      this.setUpdateStatus({ stage: "fetching" });
       const chunkProcTimeStart = Date.now();
 
       const resultOfFeeds = await Promise.all(
@@ -422,8 +472,15 @@ export default class FeedUpdater {
       const chunkInsertStart = Date.now();
 
       for (const individualData of resultOfFeeds) {
+        this.setUpdateStatus({ stage: "processing" });
         await this.insertItems(individualData);
         this.updateFeedFrequencyData(individualData);
+        this.setUpdateStatus({
+          processedFeeds: Math.min(
+            FeedUpdater.updateStatus.totalFeeds,
+            FeedUpdater.updateStatus.processedFeeds + 1
+          ),
+        });
       }
 
       const chunkInsertEnd = Date.now();
@@ -440,9 +497,22 @@ export default class FeedUpdater {
    */
   public async updateItems() {
     this.updateInProgress = true;
+    let updateCompletedSuccessfully = false;
+    this.setUpdateStatus({
+      inProgress: true,
+      stage: "loading-feeds",
+      totalFeeds: 0,
+      processedFeeds: 0,
+      startedAt: Date.now(),
+    });
+
     try {
       const feeds = await dataModel.getFeeds();
       const feedsToUpdate = this.filterByFrequency(feeds);
+      this.setUpdateStatus({
+        stage: feedsToUpdate.length > 0 ? "fetching" : "completed",
+        totalFeeds: feedsToUpdate.length,
+      });
       pino.info(
         `Updating ${feedsToUpdate.length} out of ${feeds.length} feeds`
       );
@@ -453,9 +523,28 @@ export default class FeedUpdater {
 
       const updateEnd = Date.now();
 
+      this.setUpdateStatus({
+        stage: "completed",
+        processedFeeds: feedsToUpdate.length,
+      });
+      updateCompletedSuccessfully = true;
+
       pino.info("Crawl time %s", ms(updateEnd - updateStart));
+    } catch (error) {
+      this.setUpdateStatus({ stage: "failed" });
+      throw error;
     } finally {
       this.updateInProgress = false;
+      this.setUpdateStatus({
+        inProgress: false,
+        stage: updateCompletedSuccessfully
+          ? "idle"
+          : FeedUpdater.updateStatus.stage,
+        startedAt: null,
+        lastCompletedAt: updateCompletedSuccessfully
+          ? Date.now()
+          : FeedUpdater.updateStatus.lastCompletedAt,
+      });
     }
   }
 }

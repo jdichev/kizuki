@@ -50,6 +50,25 @@ interface ItemCategoryReadStat {
   unreadCount: number;
 }
 
+type FeedUpdateStage =
+  | "idle"
+  | "loading-feeds"
+  | "fetching"
+  | "processing"
+  | "completed"
+  | "failed";
+
+interface FeedUpdateStatus {
+  inProgress: boolean;
+  stage: FeedUpdateStage;
+  totalFeeds: number;
+  processedFeeds: number;
+  startedAt: number | null;
+  updatedAt: number;
+  lastCompletedAt: number | null;
+  nextScheduledAt: number | null;
+}
+
 type GroupingMode = "feed-categories" | "item-categories";
 
 interface Item {

@@ -110,6 +110,43 @@ export default class DataService {
     return Promise.resolve(feedReadStats);
   }
 
+  public async getUpdaterStatus(): Promise<FeedUpdateStatus> {
+    if (typeof fetch !== "function") {
+      return Promise.resolve({
+        inProgress: false,
+        stage: "idle",
+        totalFeeds: 0,
+        processedFeeds: 0,
+        startedAt: null,
+        updatedAt: Date.now(),
+        lastCompletedAt: null,
+        nextScheduledAt: null,
+      });
+    }
+
+    try {
+      const response = await fetch(this.makeUrl("/updater/status"));
+      if (!response.ok) {
+        throw new Error(`Failed to fetch updater status: ${response.status}`);
+      }
+
+      const status = await response.json();
+      return Promise.resolve(status as FeedUpdateStatus);
+    } catch (error) {
+      console.error("Error fetching updater status:", error);
+      return Promise.resolve({
+        inProgress: false,
+        stage: "idle",
+        totalFeeds: 0,
+        processedFeeds: 0,
+        startedAt: null,
+        updatedAt: Date.now(),
+        lastCompletedAt: null,
+        nextScheduledAt: null,
+      });
+    }
+  }
+
   private itemsTimeout: number = 0;
   private itemTimeout: number = 0;
 
@@ -263,9 +300,7 @@ export default class DataService {
   }
 
   public async getItem(itemId: number | undefined): Promise<Item | undefined> {
-    const response = await fetch(
-      this.makeUrl(`/items/${itemId}?format=html`)
-    );
+    const response = await fetch(this.makeUrl(`/items/${itemId}?format=html`));
     const item = await response.json();
 
     if (!item) {

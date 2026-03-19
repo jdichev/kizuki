@@ -73,6 +73,7 @@ export default class Updater {
 
     // Self-scheduling timer with drift detection and resynchronization
     let nextAt = Date.now() + INTERVAL_MS;
+    FeedUpdater.setNextScheduledAt(nextAt);
 
     const scheduleNext = () => {
       const now = Date.now();
@@ -95,6 +96,7 @@ export default class Updater {
         nextAt += INTERVAL_MS;
       }
       const delay = Math.max(0, nextAt - Date.now());
+      FeedUpdater.setNextScheduledAt(nextAt);
       this.timer = setTimeout(scheduleNext, delay);
     };
     this.timer = setTimeout(scheduleNext, INTERVAL_MS);
@@ -109,5 +111,7 @@ export default class Updater {
       clearTimeout(this.timer);
       this.timer = undefined;
     }
+
+    FeedUpdater.setNextScheduledAt(null);
   }
 }
