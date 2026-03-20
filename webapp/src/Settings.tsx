@@ -237,6 +237,42 @@ export default function Settings() {
                 </div>
               </form>
             </div>
+
+            <div>
+              <h3>AI setup how-to</h3>
+              <ul>
+                <li>
+                  Choose provider with <code>AI_PROVIDER</code> set to either{" "}
+                  <code>google</code> or <code>ollama</code>.
+                </li>
+                <li>
+                  If <code>AI_PROVIDER</code> is not set, the default provider
+                  is <code>google</code>.
+                </li>
+                <li>
+                  For Google: create an API key in Google AI Studio (
+                  <a
+                    href="https://aistudio.google.com/app/apikey"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    open key page
+                  </a>
+                  ) and save it as <code>GEMINI_API_KEY</code>.
+                </li>
+                <li>
+                  For Ollama: ensure Ollama is running, then set{" "}
+                  <code>OLLAMA_BASE_URL</code> (optional, default{" "}
+                  <code>http://127.0.0.1:11434</code>) and{" "}
+                  <code>OLLAMA_MODEL</code>.
+                </li>
+                <li>
+                  Optional Ollama overrides: <code>OLLAMA_BACKUP_MODEL</code>{" "}
+                  and <code>OLLAMA_SUMMARIZATION_MODEL</code>.
+                </li>
+                <li>Save each key/value pair using “Add Setting”.</li>
+              </ul>
+            </div>
           </div>
         </div>
       </main>

@@ -8,7 +8,7 @@ import MixedDataModel from "./modules/MixedDataModel";
 import FeedUpdater from "./modules/FeedUpdater";
 import FeedFinder from "./modules/FeedFinder";
 import SettingsManager from "./modules/SettingsManager";
-import GoogleAiService from "./modules/GoogleAiService";
+import AiServiceManager from "./modules/AiServiceManager";
 import GoogleServiceUsageManager from "./modules/GoogleServiceUsageManager";
 import projectConfig from "forestconfig";
 import {
@@ -32,7 +32,7 @@ const updater = new FeedUpdater();
 
 const settingsManager = SettingsManager.getInstance();
 
-const aiService = GoogleAiService.getInstance();
+const aiServiceManager = AiServiceManager.getInstance();
 
 const serviceUsageManager = GoogleServiceUsageManager.getInstance();
 
@@ -986,6 +986,7 @@ app.delete("/settings/:key", (req: Request, res: Response) => {
 app.post("/api/summarize", jsonParser, async (req: Request, res: Response) => {
   try {
     setNoStoreCacheHeaders(res);
+    const aiService = aiServiceManager.getActiveService();
 
     const { content, format, url, forceRefreshLatest } = req.body as {
       content?: string;
@@ -1002,10 +1003,27 @@ app.post("/api/summarize", jsonParser, async (req: Request, res: Response) => {
     }
 
     if (!aiService.isConfigured()) {
+      const activeProvider = aiServiceManager.getActiveProvider();
       return res.status(503).json({
         error: "AI service not configured",
-        message:
-          "Please set the Gemini API key in settings to use this feature",
+        message: `Please configure the active AI provider (${activeProvider}) in settings to use this feature`,
+      });
+    }
+
+    try {
+      await aiService.validatePrerequisites();
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      pino.warn(
+        {
+          provider: aiService.getProvider(),
+          error: message,
+        },
+        "AI prerequisites check failed"
+      );
+      return res.status(503).json({
+        error: "AI prerequisites check failed",
+        message,
       });
     }
 
@@ -1193,8 +1211,96 @@ app.post(
 );
 
 // Google AI Service metrics endpoints
+app.get("/api/ai/prerequisites", async (req: Request, res: Response) => {
+  const aiService = aiServiceManager.getActiveService();
+  const provider = aiService.getProvider();
+
+  try {
+    if (!aiService.isConfigured()) {
+      return res.status(200).json({
+        provider,
+        available: false,
+        message: `Provider '${provider}' is not configured`,
+      });
+    }
+
+    await aiService.validatePrerequisites();
+
+    return res.status(200).json({
+      provider,
+      available: true,
+      message: `Provider '${provider}' is available`,
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+
+    pino.warn(
+      {
+        provider,
+        error: message,
+      },
+      "AI prerequisites status check failed"
+    );
+
+    return res.status(200).json({
+      provider,
+      available: false,
+      message,
+    });
+  }
+});
+
+app.get("/api/ai/providers-status", async (req: Request, res: Response) => {
+  const activeProvider = aiServiceManager.getActiveProvider();
+  const providers: Record<
+    "google" | "ollama",
+    { available: boolean; message: string }
+  > = {
+    google: {
+      available: false,
+      message: "Provider 'google' is not configured",
+    },
+    ollama: {
+      available: false,
+      message: "Provider 'ollama' is not configured",
+    },
+  };
+
+  for (const provider of ["google", "ollama"] as const) {
+    const service = aiServiceManager.getService(provider);
+
+    if (!service.isConfigured()) {
+      providers[provider] = {
+        available: false,
+        message: `Provider '${provider}' is not configured`,
+      };
+      continue;
+    }
+
+    try {
+      await service.validatePrerequisites();
+      providers[provider] = {
+        available: true,
+        message: `Provider '${provider}' is available`,
+      };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      providers[provider] = {
+        available: false,
+        message,
+      };
+    }
+  }
+
+  return res.status(200).json({
+    activeProvider,
+    providers,
+  });
+});
+
 app.get("/api/google-ai/metrics", (req: Request, res: Response) => {
   try {
+    const aiService = aiServiceManager.getActiveService();
     const metrics = aiService.getUsageMetrics();
     pino.debug({ metrics }, "Google AI usage metrics retrieved");
     res.json(metrics);
@@ -1209,6 +1315,7 @@ app.get("/api/google-ai/metrics", (req: Request, res: Response) => {
 
 app.get("/api/google-ai/quota-status", (req: Request, res: Response) => {
   try {
+    const aiService = aiServiceManager.getActiveService();
     const quotaStatus = aiService.getQuotaStatus();
     pino.debug(
       { status: quotaStatus.status },

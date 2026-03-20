@@ -6,6 +6,7 @@ import path from "path";
 
 // Mock the @google/genai module
 jest.mock("@google/genai");
+jest.mock("axios");
 jest.mock("fs");
 jest.mock("os");
 jest.mock("./ItemCategorizer");
@@ -48,6 +49,18 @@ describe("GoogleAiService", () => {
         generateContent: mockGenerateContent,
       },
     }));
+
+    // Mock Google models listing used by prerequisite checks
+    const axios = require("axios");
+    axios.get.mockResolvedValue({
+      data: {
+        models: [
+          { name: "models/gemini-3-flash-preview" },
+          { name: "models/gemma-3-27b-it" },
+          { name: "models/gemini-pro" },
+        ],
+      },
+    });
   });
 
   describe("isConfigured", () => {

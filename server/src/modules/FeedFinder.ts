@@ -6,7 +6,7 @@ import pinoLib from "pino";
 import { MediumFeedResolver } from "../helpers/MediumFeedResolver";
 import { SubstackFeedResolver } from "../helpers/SubstackFeedResolver";
 import { YouTubeFeedResolver } from "../helpers/YouTubeFeedResolver";
-import GoogleAiService from "./GoogleAiService";
+import AiServiceManager from "./AiServiceManager";
 
 const pino = pinoLib({
   level: process.env.LOG_LEVEL || "info",
@@ -153,12 +153,22 @@ export default class FeedFinder {
   }
 
   private async discoverFeedsWithAi(query: string): Promise<Feed[]> {
-    const aiService = GoogleAiService.getInstance();
+    const aiService = AiServiceManager.getInstance().getActiveService();
 
     if (!aiService.isConfigured()) {
       pino.debug(
         { query },
         "AI service not configured, skipping feed discovery"
+      );
+      return [];
+    }
+
+    try {
+      await aiService.validatePrerequisites();
+    } catch (error) {
+      pino.warn(
+        { error, query, provider: aiService.getProvider() },
+        "AI prerequisites missing, skipping feed discovery"
       );
       return [];
     }

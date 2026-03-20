@@ -1,6 +1,7 @@
 import pinoLib from "pino";
 import MixedDataModel from "./MixedDataModel";
-import GoogleAiService from "./GoogleAiService";
+import AiServiceManager from "./AiServiceManager";
+import type { AiService } from "./AiService";
 
 const pino = pinoLib({
   level: process.env.LOG_LEVEL || "info",
@@ -43,7 +44,7 @@ export default class ItemCategorizer {
   private async runCategorization(
     items: Item[],
     itemCategories: Category[],
-    aiService: GoogleAiService,
+    aiService: AiService,
     logContext: string
   ): Promise<Array<{ name: string; items: Item[] }>> {
     const itemCategoriesForPrompt = itemCategories
@@ -88,9 +89,19 @@ export default class ItemCategorizer {
    */
   public async categorize(): Promise<Array<{ name: string; items: Item[] }>> {
     // Check if AI service is configured
-    const aiService = GoogleAiService.getInstance();
+    const aiService = AiServiceManager.getInstance().getActiveService();
     if (!aiService.isConfigured()) {
       pino.warn("AI Service not configured, skipping categorization");
+      return [];
+    }
+
+    try {
+      await aiService.validatePrerequisites();
+    } catch (error) {
+      pino.warn(
+        { error, provider: aiService.getProvider() },
+        "AI prerequisites missing, skipping categorization"
+      );
       return [];
     }
 

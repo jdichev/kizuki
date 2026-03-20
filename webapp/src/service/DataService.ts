@@ -147,6 +147,80 @@ export default class DataService {
     }
   }
 
+  public async getAiPrerequisitesStatus(): Promise<AiPrerequisitesStatus> {
+    if (typeof fetch !== "function") {
+      return Promise.resolve({
+        provider: "google",
+        available: false,
+        message: "AI status unavailable",
+      });
+    }
+
+    try {
+      const response = await fetch(this.makeUrl("/api/ai/prerequisites"));
+      if (!response.ok) {
+        throw new Error(
+          `Failed to fetch AI prerequisites status: ${response.status}`
+        );
+      }
+
+      const status = await response.json();
+      return Promise.resolve(status as AiPrerequisitesStatus);
+    } catch (error) {
+      console.error("Error fetching AI prerequisites status:", error);
+      return Promise.resolve({
+        provider: "google",
+        available: false,
+        message: "AI status unavailable",
+      });
+    }
+  }
+
+  public async getAiProvidersStatus(): Promise<AiProvidersStatus> {
+    if (typeof fetch !== "function") {
+      return Promise.resolve({
+        activeProvider: "google",
+        providers: {
+          google: {
+            available: false,
+            message: "AI status unavailable",
+          },
+          ollama: {
+            available: false,
+            message: "AI status unavailable",
+          },
+        },
+      });
+    }
+
+    try {
+      const response = await fetch(this.makeUrl("/api/ai/providers-status"));
+      if (!response.ok) {
+        throw new Error(
+          `Failed to fetch AI providers status: ${response.status}`
+        );
+      }
+
+      const status = await response.json();
+      return Promise.resolve(status as AiProvidersStatus);
+    } catch (error) {
+      console.error("Error fetching AI providers status:", error);
+      return Promise.resolve({
+        activeProvider: "google",
+        providers: {
+          google: {
+            available: false,
+            message: "AI status unavailable",
+          },
+          ollama: {
+            available: false,
+            message: "AI status unavailable",
+          },
+        },
+      });
+    }
+  }
+
   private itemsTimeout: number = 0;
   private itemTimeout: number = 0;
 

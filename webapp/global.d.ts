@@ -69,6 +69,19 @@ interface FeedUpdateStatus {
   nextScheduledAt: number | null;
 }
 
+type AiProvider = "google" | "ollama";
+
+interface AiPrerequisitesStatus {
+  provider: AiProvider;
+  available: boolean;
+  message: string;
+}
+
+interface AiProvidersStatus {
+  activeProvider: AiProvider;
+  providers: Record<AiProvider, { available: boolean; message: string }>;
+}
+
 type GroupingMode = "feed-categories" | "item-categories";
 
 interface Item {

@@ -44,6 +44,7 @@ const SIDE_MENU_ITEMS = [
 const ds = DataService.getInstance();
 const UPDATER_STATUS_IDLE_POLLING_MS = 5000;
 const UPDATER_STATUS_ACTIVE_POLLING_MS = 1000;
+const AI_STATUS_POLLING_MS = 15000;
 
 function getStatusLabel(pathname: string) {
   if (pathname === "/") {
@@ -275,6 +276,23 @@ function AppLayout() {
     lastCompletedAt: null,
     nextScheduledAt: null,
   });
+  const [aiProvidersStatus, setAiProvidersStatus] = useState<AiProvidersStatus>(
+    {
+      activeProvider: "google",
+      providers: {
+        google: {
+          available: false,
+          message: "AI status unavailable",
+        },
+        ollama: {
+          available: false,
+          message: "AI status unavailable",
+        },
+      },
+    }
+  );
+  const [isAiDropupOpen, setIsAiDropupOpen] = useState(false);
+  const aiDropupRef = useRef<HTMLDivElement>(null);
   const dividerRef = useSidebarDivider();
   const statusLabel = getStatusLabel(location.pathname);
   const updaterStatusLabel = getUpdaterStatusLabel(updaterStatus);
@@ -341,6 +359,62 @@ function AppLayout() {
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    const updateAiStatus = async () => {
+      const providersStatus = await ds.getAiProvidersStatus();
+      if (!isMounted) {
+        return;
+      }
+
+      setAiProvidersStatus(providersStatus);
+
+      timeoutId = setTimeout(() => {
+        void updateAiStatus();
+      }, AI_STATUS_POLLING_MS);
+    };
+
+    void updateAiStatus();
+
+    return () => {
+      isMounted = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, []);
+
+  const activeProviderStatus =
+    aiProvidersStatus.providers[aiProvidersStatus.activeProvider];
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!aiDropupRef.current) {
+        return;
+      }
+
+      if (!aiDropupRef.current.contains(event.target as Node)) {
+        setIsAiDropupOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsAiDropupOpen(false);
+      }
+    };
+
+    window.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("keydown", handleEscape);
+
+    return () => {
+      window.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("keydown", handleEscape);
     };
   }, []);
 
@@ -596,11 +670,15 @@ function AppLayout() {
         <div className="status-bar-section status-bar-left">
           <span className="status-bar-item">
             <i className="bi bi-rss-fill" aria-hidden="true"></i>
-            Kizuki
+            <span className="status-bar-text" title="Kizuki">
+              Kizuki
+            </span>
           </span>
           <span className="status-bar-item">
             <i className="bi bi-hash" aria-hidden="true"></i>
-            {statusLabel}
+            <span className="status-bar-text" title={statusLabel}>
+              {statusLabel}
+            </span>
           </span>
         </div>
 
@@ -614,8 +692,67 @@ function AppLayout() {
               }
               aria-hidden="true"
             ></i>
-            {updaterStatusLabel}
+            <span className="status-bar-text" title={updaterStatusLabel}>
+              {updaterStatusLabel}
+            </span>
           </span>
+
+          <div className="status-bar-dropup" ref={aiDropupRef}>
+            <button
+              type="button"
+              className="status-bar-item status-bar-button"
+              title={activeProviderStatus.message}
+              onClick={() => setIsAiDropupOpen((prev) => !prev)}
+            >
+              <i
+                className={
+                  activeProviderStatus.available
+                    ? "bi bi-cpu-fill"
+                    : "bi bi-cpu"
+                }
+                aria-hidden="true"
+              ></i>
+              <span
+                className="status-bar-text"
+                title={`AI ${aiProvidersStatus.activeProvider}`}
+              >
+                AI {aiProvidersStatus.activeProvider}
+              </span>
+            </button>
+
+            {isAiDropupOpen && (
+              <div className="status-bar-dropup-menu" role="menu">
+                <div className="status-bar-dropup-title">AI Providers</div>
+                {(["google", "ollama"] as const).map((provider) => {
+                  const providerStatus = aiProvidersStatus.providers[provider];
+                  return (
+                    <div
+                      key={provider}
+                      className="status-bar-dropup-item"
+                      title={providerStatus.message}
+                    >
+                      <i
+                        className={
+                          providerStatus.available
+                            ? "bi bi-check-circle-fill"
+                            : "bi bi-x-circle"
+                        }
+                        aria-hidden="true"
+                      ></i>
+                      <span>
+                        {provider}
+                        {provider === aiProvidersStatus.activeProvider
+                          ? " (active)"
+                          : ""}
+                        :{" "}
+                        {providerStatus.available ? "available" : "unavailable"}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </footer>
     </div>

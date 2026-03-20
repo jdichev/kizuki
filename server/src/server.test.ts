@@ -1,7 +1,6 @@
 import request from "supertest";
 import * as ArticleToMarkdown from "./modules/ArticleToMarkdown";
 import MixedDataModel from "./modules/MixedDataModel";
-import GoogleAiService from "./modules/GoogleAiService";
 
 // Define mock objects
 const mockDataModel = {
@@ -13,9 +12,30 @@ const mockDataModel = {
 };
 
 const mockAiService = {
+  getProvider: jest.fn(() => "google"),
   isConfigured: jest.fn().mockReturnValue(true),
+  validatePrerequisites: jest.fn().mockResolvedValue(undefined),
   summarizeArticle: jest.fn(),
   getSummarizationModel: jest.fn(() => "models/gemma-3-27b-it"),
+  getUsageMetrics: jest.fn(() => ({
+    totalRequests: 0,
+    totalTokensUsed: 0,
+    requestsRemaining: {
+      hourly: 2,
+      daily: 20,
+    },
+    quotaMetrics: {
+      limits: {},
+      usage: {},
+    },
+  })),
+  getQuotaStatus: jest.fn(() => ({
+    status: "healthy",
+    hourlyRemaining: 2,
+    dailyRemaining: 20,
+    alerts: [],
+    recommendations: [],
+  })),
   getInstance: jest.fn(),
 };
 
@@ -29,8 +49,12 @@ jest.mock("./modules/MixedDataModel", () => ({
   getInstance: jest.fn(() => mockDataModel),
 }));
 
-jest.mock("./modules/GoogleAiService", () => ({
-  getInstance: jest.fn(() => mockAiService),
+jest.mock("./modules/AiServiceManager", () => ({
+  getInstance: jest.fn(() => ({
+    getActiveService: jest.fn(() => mockAiService),
+    getActiveProvider: jest.fn(() => "google"),
+    getService: jest.fn(() => mockAiService),
+  })),
 }));
 
 // Mock other dependencies that server.ts might initialize
@@ -158,6 +182,35 @@ describe("API Error Propagation", function () {
 });
 
 describe("Server Basic Endpoints", function () {
+  it("returns AI prerequisites status payload from /api/ai/prerequisites", async () => {
+    const app = await server.start();
+    const response = await request(app).get("/api/ai/prerequisites");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      provider: "google",
+      available: true,
+    });
+  });
+
+  it("returns all AI providers status payload from /api/ai/providers-status", async () => {
+    const app = await server.start();
+    const response = await request(app).get("/api/ai/providers-status");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      activeProvider: "google",
+      providers: {
+        google: {
+          available: true,
+        },
+        ollama: {
+          available: true,
+        },
+      },
+    });
+  });
+
   it("returns updater status payload from /updater/status", async () => {
     const app = await server.start();
     const response = await request(app).get("/updater/status");
