@@ -13,7 +13,7 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({ title, terminalWid
   return (
     <Box flexDirection="column">
       <Text color={theme.colors.sectionHeaderFg} bold>
-        {title}
+        {` ${title}`}
       </Text>
       <Text color={theme.colors.sectionHeaderFg}>{"─".repeat(Math.max(1, terminalWidth - 2))}</Text>
     </Box>
