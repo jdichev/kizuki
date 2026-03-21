@@ -53,12 +53,12 @@
       var(--sidebar-selected-active-bg) 78%,
       black
     );
-    --status-bar-bg: color-mix(in oklab, var(--header-bg) 82%, #007acc 18%);
-    --status-bar-fg: color-mix(in oklab, var(--main-color) 88%, #007acc 12%);
+    --status-bar-bg: color-mix(in oklab, var(--header-bg) 88%, black 12%);
+    --status-bar-fg: var(--main-color);
     --status-bar-hover-bg: color-mix(
       in oklab,
-      var(--header-bg) 72%,
-      #007acc 28%
+      var(--btn-bg-color) 64%,
+      transparent
     );
   }
 }
@@ -120,12 +120,12 @@
       var(--sidebar-selected-active-bg) 79%,
       white
     );
-    --status-bar-bg: color-mix(in oklab, var(--header-bg) 78%, #007acc 22%);
-    --status-bar-fg: color-mix(in oklab, var(--main-color) 90%, #6fb8ef 10%);
+    --status-bar-bg: color-mix(in oklab, var(--header-bg) 82%, black 18%);
+    --status-bar-fg: var(--main-color);
     --status-bar-hover-bg: color-mix(
       in oklab,
-      var(--header-bg) 66%,
-      #007acc 34%
+      var(--btn-bg-color) 58%,
+      transparent
     );
   }
 }
@@ -454,6 +454,10 @@ a:hover {
   color: inherit;
   cursor: pointer;
   font: inherit;
+  margin: 0;
+  line-height: 1;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .status-bar-dropup {
