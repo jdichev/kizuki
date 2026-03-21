@@ -1,11 +1,20 @@
 import { MediumFeedResolver } from "./MediumFeedResolver";
 import RssParser from "rss-parser";
+import axios from "axios";
+
+jest.mock("axios");
+const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 describe("MediumFeedResolver", () => {
   let resolver: MediumFeedResolver;
+  let mockRssParser: jest.Mocked<RssParser>;
 
   beforeEach(() => {
-    resolver = new MediumFeedResolver(new RssParser());
+    mockRssParser = {
+      parseURL: jest.fn(),
+    } as any;
+    resolver = new MediumFeedResolver(mockRssParser);
+    jest.clearAllMocks();
   });
 
   describe("isMediumHost", () => {
@@ -148,16 +157,40 @@ describe("MediumFeedResolver", () => {
       const feeds = await resolver.resolveFeeds(url);
 
       expect(Array.isArray(feeds)).toBe(true);
-      expect(feeds.length).toBeGreaterThanOrEqual(0);
+      expect(feeds.length).toBe(0);
     });
 
     it("should handle errors gracefully", async () => {
       const url = new URL(
         "https://medium.com/@invalid-user-12345/article-that-does-not-exist"
       );
+      mockedAxios.get.mockRejectedValueOnce(new Error("Network Error"));
 
-      // Should not throw and should return empty array
-      await expect(resolver.resolveFeeds(url)).resolves.toEqual([]);
+      const feeds = await resolver.resolveFeeds(url);
+      expect(feeds).toEqual([]);
+    });
+
+    it("should resolve valid Medium feeds", async () => {
+      const url = new URL("https://medium.com/@jsenick/article");
+      
+      mockedAxios.get.mockResolvedValueOnce({
+        headers: { "content-type": "application/rss+xml" }
+      });
+
+      mockRssParser.parseURL.mockResolvedValueOnce({
+        title: "Jordan Senick",
+        link: "https://medium.com/@jsenick"
+      } as any);
+
+      const feeds = await resolver.resolveFeeds(url);
+      
+      expect(feeds).toHaveLength(1);
+      expect(feeds[0]).toEqual({
+        title: "Jordan Senick",
+        feedUrl: "https://medium.com/feed/@jsenick",
+        url: "https://medium.com/@jsenick"
+      });
     });
   });
 });
+

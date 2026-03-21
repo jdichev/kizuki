@@ -182,8 +182,17 @@ describe("API Error Propagation", function () {
 });
 
 describe("Server Basic Endpoints", function () {
+  let app: Application;
+
+  beforeEach(async () => {
+    app = await server.start();
+  });
+
+  afterEach(async () => {
+    await server.stop();
+  });
+
   it("returns AI prerequisites status payload from /api/ai/prerequisites", async () => {
-    const app = await server.start();
     const response = await request(app).get("/api/ai/prerequisites");
 
     expect(response.status).toBe(200);
@@ -194,7 +203,6 @@ describe("Server Basic Endpoints", function () {
   });
 
   it("returns all AI providers status payload from /api/ai/providers-status", async () => {
-    const app = await server.start();
     const response = await request(app).get("/api/ai/providers-status");
 
     expect(response.status).toBe(200);
@@ -212,7 +220,6 @@ describe("Server Basic Endpoints", function () {
   });
 
   it("returns updater status payload from /updater/status", async () => {
-    const app = await server.start();
     const response = await request(app).get("/updater/status");
 
     expect(response.status).toBe(200);
@@ -225,7 +232,6 @@ describe("Server Basic Endpoints", function () {
   });
 
   it("sets no-cache headers on /api/summarize", async () => {
-    const app = await server.start();
     const response = await request(app).post("/api/summarize").send({});
 
     expect(response.status).toBe(400);
@@ -235,7 +241,6 @@ describe("Server Basic Endpoints", function () {
   });
 
   it("sets no-cache headers on /api/retrieve-latest", async () => {
-    const app = await server.start();
     const response = await request(app).post("/api/retrieve-latest").send({});
 
     expect(response.status).toBe(400);
@@ -244,3 +249,4 @@ describe("Server Basic Endpoints", function () {
     expect(response.headers["expires"]).toBe("0");
   });
 });
+

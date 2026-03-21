@@ -1,11 +1,20 @@
 import { SubstackFeedResolver } from "./SubstackFeedResolver";
 import RssParser from "rss-parser";
+import axios from "axios";
+
+jest.mock("axios");
+const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 describe("SubstackFeedResolver", () => {
   let resolver: SubstackFeedResolver;
+  let mockRssParser: jest.Mocked<RssParser>;
 
   beforeEach(() => {
-    resolver = new SubstackFeedResolver(new RssParser());
+    mockRssParser = {
+      parseURL: jest.fn(),
+    } as any;
+    resolver = new SubstackFeedResolver(mockRssParser);
+    jest.clearAllMocks();
   });
 
   describe("isSubstackHost", () => {
@@ -139,16 +148,38 @@ describe("SubstackFeedResolver", () => {
       const feeds = await resolver.resolveFeeds(url);
 
       expect(Array.isArray(feeds)).toBe(true);
-      expect(feeds.length).toBeGreaterThanOrEqual(0);
+      expect(feeds.length).toBe(0);
     });
 
     it("should handle errors gracefully", async () => {
       const url = new URL("https://invalid-pub-12345.substack.com/p/article");
+      mockedAxios.get.mockRejectedValueOnce(new Error("Network Error"));
 
-      // Should not throw and should return empty array or valid feeds
-      await expect(resolver.resolveFeeds(url)).resolves.toEqual(
-        expect.any(Array)
-      );
+      const feeds = await resolver.resolveFeeds(url);
+      expect(feeds).toEqual([]);
+    });
+
+    it("should resolve valid Substack feeds", async () => {
+      const url = new URL("https://michaeljburry.substack.com/p/article");
+      
+      mockedAxios.get.mockResolvedValueOnce({
+        headers: { "content-type": "application/rss+xml" }
+      });
+
+      mockRssParser.parseURL.mockResolvedValueOnce({
+        title: "Michael J. Burry",
+        link: "https://michaeljburry.substack.com"
+      } as any);
+
+      const feeds = await resolver.resolveFeeds(url);
+      
+      expect(feeds).toHaveLength(1);
+      expect(feeds[0]).toEqual({
+        title: "Michael J. Burry",
+        feedUrl: "https://michaeljburry.substack.com/feed",
+        url: "https://michaeljburry.substack.com"
+      });
     });
   });
 });
+
